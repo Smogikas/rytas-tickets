@@ -12,6 +12,7 @@ Commands:
 """
 import argparse
 import csv
+import http.cookiejar
 import json
 import re
 import sys
@@ -39,12 +40,33 @@ ATT_FIELDS = ["event_id", "attendance", "recorded_utc", "note"]
 
 # ---------------------------------------------------------------- fetching
 
+HEADERS = {
+    "User-Agent": "rytas-tickets/0.2 (personal project)",
+    "Accept": "application/json",
+}
+_opener = None
+
+
+def opener():
+    """URL opener with an anonymous bilietai.lt session.
+
+    The store API answers 403 without a session cookie. The website gets one
+    by POSTing (empty body) to /login/express, which returns
+    {"authenticated": false} and sets the cookie. We do the same once per run.
+    """
+    global _opener
+    if _opener is None:
+        _opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        req = urllib.request.Request(f"{API}/login/express", data=b"", method="POST", headers=HEADERS)
+        with _opener.open(req, timeout=30) as r:
+            r.read()
+    return _opener
+
+
 def get_json(url):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "rytas-tickets/0.1 (personal project)",
-        "Accept": "application/json",
-    })
-    with urllib.request.urlopen(req, timeout=30) as r:
+    req = urllib.request.Request(url, headers=HEADERS)
+    with opener().open(req, timeout=30) as r:
         return json.load(r)
 
 

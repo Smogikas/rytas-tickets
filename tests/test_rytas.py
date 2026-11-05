@@ -168,6 +168,52 @@ class Tracker(unittest.TestCase):
         finally:
             rytas.get_json = orig
 
+    def test_real_http_uses_anonymous_session_cookie(self):
+        """Fake bilietai.lt: API returns 403 unless the login/express cookie is sent."""
+        import http.server
+        import threading
+
+        calls = []
+
+        class Fake(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _send(self, code, body, cookie=None):
+                data = json.dumps(body).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                if cookie:
+                    self.send_header("Set-Cookie", cookie)
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                calls.append(("POST", self.path))
+                if self.path == "/api/v1/login/express":
+                    self._send(200, {"uuid": "u", "authenticated": False}, "SESSION=abc; Path=/; HttpOnly")
+                else:
+                    self._send(404, {})
+
+            def do_GET(self):
+                calls.append(("GET", self.path))
+                if "SESSION=abc" not in (self.headers.get("Cookie") or ""):
+                    return self._send(403, {"error": "forbidden"})
+                self._send(200, FIXTURE if "/prices" in self.path else EVENT)
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Fake)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.shutdown)
+        with unittest.mock.patch.object(rytas, "API", f"http://127.0.0.1:{srv.server_port}/api/v1"), \
+             unittest.mock.patch.object(rytas, "_opener", None), \
+             unittest.mock.patch.dict("os.environ", {"no_proxy": "127.0.0.1", "NO_PROXY": "127.0.0.1"}):
+            info, prices = rytas.fetch_event("PNJMMUNJYB")
+        self.assertEqual(info["eventStartAt"], "2026-11-11T17:30:00Z")
+        self.assertEqual(len(prices["eventSections"]), 3)
+        self.assertEqual(calls[0], ("POST", "/api/v1/login/express"))  # session first, once
+        self.assertEqual([c[0] for c in calls].count("POST"), 1)
+
     def test_event_id_from_url(self):
         url = "https://www.bilietai.lt/renginiai/PNJMMUNJYB/bcl-vilniaus-rytas-nantero-nanterre-92/seatmap"
         self.assertEqual(rytas.event_id_from(url), "PNJMMUNJYB")
