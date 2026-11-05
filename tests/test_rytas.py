@@ -66,6 +66,19 @@ class Tracker(unittest.TestCase):
         self.assertEqual(t["sold"], 13)
         self.assertAlmostEqual(t["revenue_est"], 10 * 89 + 3 * 189)
 
+    def test_multiple_ticket_types_share_seats(self):
+        # a second, pricier ticket type in the VIP section must not double count capacity
+        p = json.loads(json.dumps(FIXTURE))
+        vip = [s for s in p["eventSections"] if s["id"] == "94921"][0]
+        vip["priceZones"][0]["ticketTypes"].append(
+            {"id": "9999", "name": "Su maistu", "price": 250.0, "fee": 200.0, "availableTickets": 8})
+        rows = rytas.flatten("EV", "t", p)
+        res = rytas.analyse(rows, {"94921": {"seats": 10}})
+        by = {x["section_id"]: x for x in res["sections"]}
+        self.assertEqual(len(res["sections"]), 3)
+        self.assertEqual(by["94921"]["sold"], 2)
+        self.assertEqual(by["94921"]["price"], 189.0)  # cheapest type
+
     def test_no_capacity_means_no_exact_sold(self):
         rows = rytas.flatten("EV", "t", FIXTURE)
         res = rytas.analyse(rows, {})

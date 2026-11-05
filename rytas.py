@@ -153,19 +153,31 @@ def event_id_from(text):
 def analyse(rows, caps):
     """Per-section and total sales figures from a list of snapshot rows.
 
-    sold            exact, = capacity - available; needs capacity and available < CAP
+    sold            seats no longer available online = capacity - available.
+                    Exact only when available < CAP. NOTE: this includes season
+                    tickets / club-held seats, not only bilietai.lt sales.
     sold_max        upper bound when available is capped (capacity - CAP)
     observed_*      tickets seen leaving between two snapshots where both were
-                    uncensored, priced at the price listed in the earlier one
+                    uncensored, priced at the price listed in the earlier one.
+                    These are real online sales.
     revenue_est     observed revenue + (sold - observed) priced at the first
                     logged price; only when sold is exact
+
+    Ticket types within a section share the same seats, so each section is
+    reduced to one row per snapshot: available = max over its ticket types,
+    price/fee/zone = those of the cheapest ticket type.
     """
-    series = defaultdict(list)
+    per_snap = defaultdict(list)
     for r in rows:
-        series[(r["section_id"], r["ticket_type_id"])].append(r)
+        per_snap[(r["section_id"], r["ts_utc"])].append(r)
+
+    series = defaultdict(list)
+    for (sid, _ts), rs in per_snap.items():
+        base = min(rs, key=lambda r: r["price"])
+        series[sid].append(dict(base, available=max(r["available"] for r in rs)))
 
     sections = []
-    for (sid, _tt), s in series.items():
+    for sid, s in series.items():
         s.sort(key=lambda r: r["ts_utc"])
         first, last = s[0], s[-1]
         seats = (caps.get(sid) or {}).get("seats")
@@ -287,19 +299,21 @@ def print_report(event_id, name, caps):
 
     print(f"\nSections with exact sold count: {t['sections_with_exact_sold']}/{t['sections']}"
           f"  (rest need seats in capacity.json or have >= {CAP} still available)")
-    print(f"Tickets sold (exact sections):  {t['sold']}")
+    print(f"Seats taken (exact sections):   {t['sold']}  (incl. season tickets / club-held seats)")
     print(f"Revenue estimate:               {money(t['revenue_est'])} EUR (excl. fees)")
     print(f"Average ticket price:           {money(t['avg_price'])} EUR")
-    print(f"Observed since tracking began:  {t['observed_sold']} tickets, "
+    print(f"Online sales seen by tracker:   {t['observed_sold']} tickets, "
           f"{money(t['observed_revenue'])} EUR, avg {money(t['observed_avg_price'])} EUR")
+    print(f"Still on sale (lower bound):    {t['reported_available']}")
 
     att = latest_attendance(event_id)
     if att is not None:
         print(f"\nActual attendance:              {att}")
         if t["sold"]:
             diff = att - t["sold"]
-            print(f"Attendance - online sold:       {diff:+d} "
-                  f"(season tickets, club allocations, other channels, comps)")
+            print(f"Attendance - seats taken:       {diff:+d}  (only exact sections counted; "
+                  f"negative = no-shows / unused tickets, positive = sections not yet exact, "
+                  f"comps, kids under 6)")
 
 
 def cmd_report(args):

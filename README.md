@@ -16,8 +16,13 @@ bilietai.lt exposes two public JSON endpoints that the site itself uses:
 The API only reports what is *left*, not what was sold. So:
 
 ```
-sold = section capacity - available
+seats taken = section capacity - available
 ```
+
+Important: "seats taken" includes season tickets and seats held back by the club, not only
+tickets sold on bilietai.lt. The real online sales are the tickets the tracker *sees* disappear
+between two snapshots ("Seen sold" / "Online sales seen by tracker"), so snapshot regularly
+from the moment sales open.
 
 Every run of `snapshot` appends the current price and availability of every section to
 `data/snapshots.csv`. Because prices are logged with each snapshot, you can later compute
@@ -63,12 +68,16 @@ tickets observed leaving between two snapshots.
 | Price / Fee | Latest ticket price and service fee (EUR) |
 | Avail | Tickets available now (`22+` = capped, exact number unknown) |
 | Seats | Capacity from `capacity.json` |
-| Sold | `Seats - Avail`, or `<=N` upper bound while capped |
-| Seen sold | Tickets observed leaving between snapshots |
-| Revenue | Estimated, excl. fees. Observed sales are priced at the price listed at that time; the rest at the first logged price |
+| Sold | Seats taken: `Seats - Avail`, or `<=N` upper bound while capped |
+| Seen sold | Online sales observed between snapshots |
+| Revenue | Estimated, excl. fees. Observed sales are priced at the price listed at that time; the rest at the first logged price (so season-ticket seats are valued at single-game price, an overestimate) |
 
-Attendance minus online sold shows season tickets, club allocations, other sales channels
-and complimentary tickets, i.e. everything not sold through bilietai.lt.
+If a section has several ticket types, they share the same seats: availability is taken once
+per section and the cheapest ticket type's price is used.
+
+After the game, `attendance - seats taken` shows no-shows (negative) or uncounted entries
+such as complimentary tickets and children under 6 (positive). Only sections with an exact
+count are included, so the comparison is most meaningful once most sections are below 22.
 
 ## Scheduling
 
