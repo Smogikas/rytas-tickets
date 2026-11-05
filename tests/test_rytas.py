@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -76,9 +77,18 @@ class FakeSite:
             if sid not in {s["id"] for s in self.prices[eid]["eventSections"]}:
                 raise rytas.urllib.error.HTTPError(url, 400, "closed", {}, None)
             return {"seatMapTickets": [
-                {"seatId": seat, "row": "1", "place": seat.split("-")[1], "priceClass": 1, "status": st}
+                {"seatId": seat, "row": "1", "place": seat.split("-")[1], "priceClass": 1, "status": st,
+                 "x": 10 + 16 * int(seat.split("-")[1]), "y": 20}
                 for seat, st in self.seats[eid][sid].items()]}
         raise AssertionError(f"unexpected URL {url}")
+
+    def get_text(self, url):
+        self.requests.append(url)
+        assert url.endswith("/store/seat-map/1769507581.svg"), url
+        return ("<svg>\r\n<image x='0'/>"
+                "<polygon id=\"section83548\" points=\"524,632 622,632 622,612 523,611 \" style=\"fill:#ccc\"/>\r\n"
+                "\t<polygon id='section94921' points=\"164,342 178,342\r\n 178,304 163,304 \"\r\n\tstyle=\"fill:#ccc\"/>"
+                "<polygon points=\"1,1 2,2 3,3\" id='section72935'/></svg>")
 
 
 class Base(unittest.TestCase):
@@ -88,14 +98,16 @@ class Base(unittest.TestCase):
             "DATA": self.tmp / "data", "SNAPSHOTS": self.tmp / "data" / "snapshots.csv",
             "SEATS_DIR": self.tmp / "data" / "seats", "ATTENDANCE": self.tmp / "data" / "attendance.csv",
             "EVENTS": self.tmp / "events.json", "PAUSE": 0,
+            "LAYOUT": self.tmp / "data" / "layout.csv", "SHAPES": self.tmp / "data" / "shapes.csv",
         }.items():
             p = unittest.mock.patch.object(rytas, name, value)
             p.start()
             self.addCleanup(p.stop)
         self.site = FakeSite()
-        p = unittest.mock.patch.object(rytas, "get_json", self.site.get_json)
-        p.start()
-        self.addCleanup(p.stop)
+        for name in ("get_json", "get_text"):
+            p = unittest.mock.patch.object(rytas, name, getattr(self.site, name))
+            p.start()
+            self.addCleanup(p.stop)
         self.hour = 10
         p = unittest.mock.patch.object(rytas, "now_utc", self._tick)
         p.start()
@@ -200,8 +212,11 @@ class Analysis(Base):
         p2 = by["83548"]
         self.assertEqual((p2["seats"], p2["taken"], p2["season"]), (28, 12, 6))
         self.assertEqual((p2["sold_seen"], p2["pre_taken"], p2["singles"]), (4, 2, 6))
-        self.assertAlmostEqual(p2["revenue"], 3 * 89 + 99 + 2 * 89)
-        self.assertEqual(p2["price"], 99.0)
+        # club revenue = ticket value = price - fee (fee 7 in this section)
+        self.assertAlmostEqual(p2["revenue"], 3 * (89 - 7) + (99 - 7) + 2 * (89 - 7))
+        self.assertAlmostEqual(p2["gross"], 3 * 89 + 99 + 2 * 89)
+        self.assertEqual((p2["price"], p2["fee"]), (99.0, 7.0))
+        self.assertEqual([h[1] for h in p2["history"]], [89.0, 99.0])  # price change recorded
 
         t = res[E]["totals"]
         self.assertEqual(t["seats"], 84)
@@ -252,6 +267,44 @@ class Commands(Base):
         n = len(self.site.requests)
         self.snapshot_all(seats=False)
         self.assertEqual(len(self.site.requests) - n, 4)  # prices only, 1 per game
+
+    def test_layout_and_shapes_stored_once_and_export(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        self.site.sell("PNJMMUNJYB", "83548", 2)
+        self.assertEqual(self.snapshot_all(), 0)
+        self.site.sell("PNJMMUNJYB", "83548", 1)
+        self.snapshot_all()
+        self.assertEqual(len(rytas.read_csv(rytas.LAYOUT)), 84)   # every seat once, shared by all games
+        shapes = rytas.read_csv(rytas.SHAPES)
+        self.assertEqual({s["section_id"] for s in shapes}, {"83548", "94921", "72935"})
+        self.assertEqual([s["points"] for s in shapes if s["section_id"] == "94921"], ["164,342 178,342 178,304 163,304"])
+        self.assertEqual(sum(u.endswith(".svg") for u in self.site.requests), 1)
+        self.assertEqual(rytas.load_events()["events"]["PNJMMUNJYB"]["conf_id"], "1769507581")
+
+        rytas.main(["attendance", "PNJMMUNJYB", "4100"])
+        out = self.tmp / "site"
+        self.assertEqual(rytas.main(["export", str(out)]), 0)
+        data = json.loads((out / "data.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(data["games"]), 3)
+        g = next(x for x in data["games"] if x["id"] == "PNJMMUNJYB")
+        self.assertEqual((g["comp"], g["opp"]), ("BCL", "Nantero „Nanterre 92“"))
+        self.assertEqual((g["taken"], g["season"], g["singles"], g["seen"], g["before"]), (21, 18, 3, 1, 2))
+        self.assertAlmostEqual(g["revenue"], 3 * (89 - 7))
+        self.assertAlmostEqual(g["gross"], 3 * 89)
+        self.assertEqual(g["attendance"], 4100)
+        self.assertEqual(len(data["shapes"]["1769507581"]), 3)
+        self.assertEqual(data["seasonSeats"], 18)
+        sec = next(s for s in data["sections"]["PNJMMUNJYB"] if s["id"] == "83548")
+        self.assertEqual((sec["seats"], sec["seen"], sec["fee"]), (28, 1, 7.0))
+        seats = json.loads((out / "seats" / "PNJMMUNJYB.json").read_text(encoding="utf-8"))
+        cats = Counter(s[4] for s in seats["83548"])
+        self.assertEqual(cats, Counter({"A": 19, "S": 6, "B": 2, "O": 1}))
+        sold = next(s for s in seats["83548"] if s[4] == "O")
+        self.assertEqual((sold[5], sold[6]), (89.0, 7.0))
+        self.assertTrue(sold[7])  # when the sale was seen
+
+    def test_split_name(self):
+        self.assertEqual(rytas.split_name("LKL: Vilniaus ''Rytas'' - Kauno ''Žalgiris''"), ("LKL", "Kauno „Žalgiris“"))
 
     def test_add_single_event(self):
         self.assertEqual(rytas.main(["add", "ZPHZTQITUH"]), 0)

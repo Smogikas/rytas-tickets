@@ -33,7 +33,11 @@ DATA = ROOT / "data"
 SNAPSHOTS = DATA / "snapshots.csv"       # section prices + capped availability
 SEATS_DIR = DATA / "seats"               # one CSV per game, seat status changes
 ATTENDANCE = DATA / "attendance.csv"
+LAYOUT = DATA / "layout.csv"             # seat positions for drawing the seat plan
+SHAPES = DATA / "shapes.csv"             # section outlines of the arena overview map
 EVENTS = ROOT / "events.json"
+# Local working copies. The GitHub job loads them from / saves them to the
+# Google Sheet (sheets.py), so no data is stored in the repository.
 
 # The prices API never reports more than 22 available per section ("20+").
 # Exact numbers come from the seat plans instead.
@@ -44,6 +48,11 @@ SNAP_FIELDS = ["ts_utc", "event_id", "section_id", "section", "zone",
                "ticket_type_id", "price", "fee", "available"]
 SEAT_FIELDS = ["ts_utc", "section_id", "seat_id", "row", "place", "price_class", "status"]
 ATT_FIELDS = ["event_id", "attendance", "recorded_utc", "note"]
+LAYOUT_FIELDS = ["seat_id", "section_id", "row", "place", "x", "y"]
+SHAPE_FIELDS = ["conf_id", "section_id", "points"]
+# Ticket price on bilietai.lt = ticket value (club) + fees (booking, arena,
+# venue administration, lounge). The API gives "price" (total) and "fee";
+# the club's revenue is price - fee.
 
 
 # ---------------------------------------------------------------- fetching
@@ -76,6 +85,25 @@ def get_json(url):
     req = urllib.request.Request(url, headers=HEADERS)
     with opener().open(req, timeout=30) as r:
         return json.load(r)
+
+
+def get_text(url):
+    req = urllib.request.Request(url, headers=dict(HEADERS, Accept="*/*"))
+    with opener().open(req, timeout=30) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def fetch_shapes(conf_id):
+    """Section outlines of the arena overview map: [(section_id, "x,y x,y ...")]
+    in a 1000x1000 space, from the seat-map SVG the website draws."""
+    svg = get_text(f"{API}/store/seat-map/{conf_id}.svg")
+    out = []
+    for tag in re.findall(r"<polygon\b[^>]*>", svg):
+        sid = re.search(r"""id=['"]section(\d+)['"]""", tag)
+        pts = re.search(r"""points=['"]([^'"]+)['"]""", tag)
+        if sid and pts:
+            out.append((sid.group(1), " ".join(pts.group(1).split())))
+    return out
 
 
 def fetch_info(event_id):
@@ -183,8 +211,11 @@ def load_seats(event_id):
 def latest_attendance(event_id):
     found = None
     for r in read_csv(ATTENDANCE):
-        if r["event_id"] == event_id:
-            found = int(r["attendance"])
+        if r["event_id"].strip() == event_id:
+            try:
+                found = int(float(str(r["attendance"]).replace(" ", "").replace(",", ".")))
+            except ValueError:
+                pass
     return found
 
 
@@ -256,6 +287,8 @@ def take_seat_snapshot(event_id, prices):
     to_fetch = open_ids + sorted(had_available - set(open_ids))
 
     current = {}
+    known_layout = {r["seat_id"] for r in read_csv(LAYOUT)}
+    new_layout = []
     for i, sid in enumerate(to_fetch):
         if i:
             time.sleep(PAUSE)
@@ -274,9 +307,23 @@ def take_seat_snapshot(event_id, prices):
                 "price_class": str(t.get("priceClass", "")),
                 "status": 1 if t.get("status") == 1 else 0,
             }
+            if seat not in known_layout and "x" in t:
+                known_layout.add(seat)
+                new_layout.append({"seat_id": seat, "section_id": sid, "row": t.get("row", ""),
+                                   "place": t.get("place", ""), "x": t["x"], "y": t["y"]})
     written = [r for k, r in current.items() if k not in last or last[k]["status"] != r["status"]]
     append_csv(seat_path(event_id), SEAT_FIELDS, written)
+    append_csv(LAYOUT, LAYOUT_FIELDS, new_layout)
     return current, written, len(to_fetch)
+
+
+def ensure_shapes(conf_id):
+    """Store the arena map's section outlines once per venue layout."""
+    if not conf_id or any(r["conf_id"] == str(conf_id) for r in read_csv(SHAPES)):
+        return 0
+    rows = [{"conf_id": str(conf_id), "section_id": s, "points": p} for s, p in fetch_shapes(conf_id)]
+    append_csv(SHAPES, SHAPE_FIELDS, rows)
+    return len(rows)
 
 
 def seats_due(meta, now):
@@ -291,6 +338,9 @@ def seats_due(meta, now):
 
 
 def snapshot_event(event_id, meta, now, force_seats=False):
+    if not meta.get("conf_id"):  # venue layout id, looked up once per game
+        meta["conf_id"] = str(fetch_info(event_id).get("confId") or "")
+    ensure_shapes(meta["conf_id"])
     prices = fetch_prices(event_id)
     rows, written = take_snapshot(event_id, prices)
     msg = f"prices: {len(written)} changed"
@@ -344,25 +394,65 @@ def season_seats(group, tls):
 
 
 def price_lookup(price_rows):
-    """section_id -> sorted [(ts, cheapest price)] from the price snapshots."""
+    """section_id -> sorted [(ts, price, fee)] of the cheapest ticket type, from the price snapshots."""
     per = defaultdict(dict)
     for r in price_rows:
         cur = per[r["section_id"]].get(r["ts_utc"])
-        per[r["section_id"]][r["ts_utc"]] = r["price"] if cur is None else min(cur, r["price"])
-    return {sid: sorted(d.items()) for sid, d in per.items()}
+        if cur is None or r["price"] < cur[0]:
+            per[r["section_id"]][r["ts_utc"]] = (r["price"], r["fee"])
+    return {sid: [(t, p, f) for t, (p, f) in sorted(d.items())] for sid, d in per.items()}
 
 
 def price_at(prices, sid, ts):
+    """(price, fee) in force at ts (the first logged one if ts is earlier), or (None, None)."""
     series = prices.get(sid)
     if not series:
-        return None
-    p = series[0][1]
-    for t, price in series:
+        return None, None
+    p, f = series[0][1], series[0][2]
+    for t, price, fee in series:
         if t <= ts:
-            p = price
+            p, f = price, fee
         else:
             break
-    return p
+    return p, f
+
+
+def price_history(prices, sid):
+    """Only the moments the price or fee changed: [(ts, price, fee)]."""
+    out = []
+    for t, p, f in prices.get(sid, []):
+        if not out or (out[-1][1], out[-1][2]) != (p, f):
+            out.append((t, p, f))
+    return out
+
+
+# seat categories
+SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE = "S", "O", "B", "A"
+
+
+def classify_seats(tl, prices, season):
+    """seat_id -> (section_id, category, price, fee, ts).
+
+    S  season ticket (never available in any compared game)
+    O  sold while tracked: price/fee in force when the sale was seen
+    B  taken before tracking began, not season: first logged price (estimate)
+    A  available: current price
+    """
+    out = {}
+    for seat, rows in tl.items():
+        first, last = rows[0], rows[-1]
+        sid = last["section_id"]
+        if last["status"] == 1:
+            cat, ts = AVAILABLE, "9999"
+        elif seat in season:
+            cat, ts = SEASON, last["ts_utc"]
+        elif first["status"] == 1:
+            cat, ts = SOLD_SEEN, last["ts_utc"]   # changes-only log: last row = the sale
+        else:
+            cat, ts = SOLD_BEFORE, first["ts_utc"]
+        p, f = price_at(prices, sid, ts)
+        out[seat] = (sid, cat, p, f, last["ts_utc"] if cat == SOLD_SEEN else None)
+    return out
 
 
 def analyse_event(tl, price_rows, season):
@@ -370,58 +460,56 @@ def analyse_event(tl, price_rows, season):
 
     seats       seats in sections that have been on sale (from seat plans)
     available   available now
-    taken       seats - available
+    taken       seats - available = expected crowd if every season holder comes
     season      taken seats in the season-ticket estimate
     sold_seen   seats seen going available -> taken while tracked: exact online sales
-    pre_taken   taken when first seen and not season: sold before tracking began,
-                comps, club allocations
+    pre_taken   taken when first seen and not season: sold before tracking began
     singles     taken - season: single-game tickets (estimate)
-    revenue     sold_seen at the section price at that moment + pre_taken at the
-                first logged section price (excl. fees)
+    revenue     club revenue = ticket value (price - fee) of the singles; seen sales
+                at the price in force when seen, earlier ones at the first logged price
+    gross       what buyers paid incl. fees
     """
     prices = price_lookup(price_rows)
     titles = {r["section_id"]: r["section"] for r in sorted(price_rows, key=lambda r: r["ts_utc"])}
     first_ts = min((rows[0]["ts_utc"] for rows in tl.values()), default=None)
+    first_seen = {}
+    for rows in tl.values():
+        sid = rows[-1]["section_id"]
+        if sid not in first_seen or rows[0]["ts_utc"] < first_seen[sid]:
+            first_seen[sid] = rows[0]["ts_utc"]
 
     keys = ["seats", "available", "taken", "season", "sold_seen", "pre_taken"]
-    sec = defaultdict(lambda: dict({k: 0 for k in keys}, revenue=0.0, first_seen=None))
-    for seat, rows in tl.items():
-        first, last = rows[0], rows[-1]
-        sid = last["section_id"]
+    sec = defaultdict(lambda: dict({k: 0 for k in keys}, revenue=0.0, gross=0.0))
+    count_key = {SEASON: "season", SOLD_SEEN: "sold_seen", SOLD_BEFORE: "pre_taken", AVAILABLE: "available"}
+    for seat, (sid, cat, p, f, _ts) in classify_seats(tl, prices, season).items():
         x = sec[sid]
         x["seats"] += 1
-        if x["first_seen"] is None or first["ts_utc"] < x["first_seen"]:
-            x["first_seen"] = first["ts_utc"]
-        if last["status"] == 1:
-            x["available"] += 1
-            continue
-        x["taken"] += 1
-        if seat in season:
-            x["season"] += 1
-        elif first["status"] == 1:
-            x["sold_seen"] += 1
-            x["revenue"] += price_at(prices, sid, last["ts_utc"]) or 0.0  # last row = the sale
-        else:
-            x["pre_taken"] += 1
-            x["revenue"] += price_at(prices, sid, first["ts_utc"]) or 0.0
+        x[count_key[cat]] += 1
+        if cat != AVAILABLE:
+            x["taken"] += 1
+        if cat in (SOLD_SEEN, SOLD_BEFORE) and p is not None:
+            x["revenue"] += p - (f or 0)
+            x["gross"] += p
 
     sections = []
     for sid, x in sec.items():
         x["singles"] = x["taken"] - x["season"]
-        later = first_ts and x["first_seen"] and parse_ts(x["first_seen"]) - parse_ts(first_ts) > timedelta(hours=1)
-        sections.append(dict(x, section_id=sid, section=titles.get(sid, sid),
-                             price=price_at(prices, sid, "9999"),
-                             opened_later=x["first_seen"] if later else None))
+        later = first_ts and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1)
+        p, f = price_at(prices, sid, "9999")
+        sections.append(dict(x, section_id=sid, section=titles.get(sid, sid), price=p, fee=f,
+                             opened_later=first_seen[sid] if later else None,
+                             history=price_history(prices, sid)))
     sections.sort(key=lambda x: x["section"])
-    tot = {k: sum(x[k] for x in sections) for k in keys + ["singles", "revenue"]}
+    tot = {k: sum(x[k] for x in sections) for k in keys + ["singles", "revenue", "gross"]}
     tot["avg_price"] = tot["revenue"] / tot["singles"] if tot["singles"] else None
+    tot["avg_paid"] = tot["gross"] / tot["singles"] if tot["singles"] else None
     tot["sections"] = len(sections)
     tot["first_ts"] = first_ts
     tot["last_ts"] = max((rows[-1]["ts_utc"] for rows in tl.values()), default=None)
     return {"sections": sections, "totals": tot}
 
 
-def analyse_all(ev):
+def analyse_all(ev, with_seats=False):
     names = {eid: m["name"] for eid, m in ev["events"].items()}
     tls = {eid: timelines(load_seats(eid)) for eid in names}
     groups = season_groups(names)
@@ -430,8 +518,12 @@ def analyse_all(ev):
         g = groups[eid]
         if g not in cache:
             cache[g] = season_seats(g, tls)
-        out[eid] = analyse_event(tls[eid], load_snapshots(eid), cache[g])
+        price_rows = load_snapshots(eid)
+        out[eid] = analyse_event(tls[eid], price_rows, cache[g])
         out[eid]["season_group_size"] = len(g)
+        out[eid]["season_total"] = len(cache[g])
+        if with_seats:
+            out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows), cache[g])
     return out
 
 
@@ -459,6 +551,7 @@ def cmd_add(args):
     ev = load_events()
     add_event(ev, eid, info["name"], info["eventStartAt"], info.get("seriesId"), info.get("status"))
     meta = ev["events"][eid]
+    meta["conf_id"] = str(info.get("confId") or "")
     print(f"Tracking {eid}: {info['name']} ({info['eventStartAt']})")
     print(snapshot_event(eid, meta, datetime.now(timezone.utc), force_seats=True))
     save_events(ev)
@@ -581,8 +674,9 @@ Taken:                       {t['taken']}
   single tickets (est.):     {t['singles']}
     sold online, seen:       {t['sold_seen']}
     taken before tracking:   {t['pre_taken']}
-Revenue, singles (est.):     {money(t['revenue'])} EUR excl. fees
-Average single ticket:       {money(t['avg_price'])} EUR""")
+Club revenue, singles (est.): {money(t['revenue'])} EUR (ticket value = price - fees)
+Buyers paid incl. fees:      {money(t['gross'])} EUR
+Average ticket value:        {money(t['avg_price'])} EUR (buyers paid {money(t['avg_paid'])} EUR)""")
     att = latest_attendance(eid)
     if att is not None:
         print(f"\nActual attendance:           {att}")
@@ -632,6 +726,71 @@ def cmd_season(args):
     return 0
 
 
+def split_name(name):
+    """'LKL: Vilniaus ''Rytas'' - Utenos ''Juventus''' -> ('LKL', 'Utenos „Juventus“')."""
+    comp = competition(name)
+    rest = name.split(":", 1)[1].strip() if ":" in name else name
+    opp = rest.split(" - ", 1)[1] if " - " in rest else rest
+    return comp, re.sub(r"''(.+?)''", "„\\1“", opp).strip()
+
+
+def r2(x):
+    return None if x is None else round(x, 2)
+
+
+def cmd_export(args):
+    """Write the website's data: <dir>/data.json (games, sections, map) and
+    <dir>/seats/<game>.json (every seat with its category and price)."""
+    out = Path(args.dir)
+    (out / "seats").mkdir(parents=True, exist_ok=True)
+    ev = load_events()
+    res = analyse_all(ev, with_seats=True)
+    layout = {r["seat_id"]: r for r in read_csv(LAYOUT)}
+    attendance = {}
+    for row in read_csv(ATTENDANCE):  # also typed by hand in the Sheet: be lenient
+        try:
+            attendance[row["event_id"].strip()] = int(float(str(row["attendance"]).replace(" ", "").replace(",", ".")))
+        except (ValueError, KeyError):
+            pass
+    now = datetime.now(timezone.utc)
+    games, sections = [], {}
+    for eid, meta in ev["events"].items():
+        r, t = res[eid], res[eid]["totals"]
+        comp, opp = split_name(meta["name"])
+        games.append({
+            "id": eid, "name": meta["name"], "comp": comp, "opp": opp, "start": meta["start_utc"],
+            "played": parse_ts(meta["start_utc"]) <= now, "conf": meta.get("conf_id", ""),
+            "seats": t["seats"], "available": t["available"], "taken": t["taken"], "season": t["season"],
+            "singles": t["singles"], "seen": t["sold_seen"], "before": t["pre_taken"],
+            "revenue": r2(t["revenue"]), "gross": r2(t["gross"]),
+            "avg": r2(t["avg_price"]), "avgPaid": r2(t["avg_paid"]),
+            "attendance": attendance.get(eid), "dataFrom": t["first_ts"], "dataTo": t["last_ts"],
+        })
+        sections[eid] = [{
+            "id": x["section_id"], "title": x["section"], "price": x["price"], "fee": x["fee"],
+            "seats": x["seats"], "available": x["available"], "season": x["season"], "singles": x["singles"],
+            "seen": x["sold_seen"], "before": x["pre_taken"], "revenue": r2(x["revenue"]), "gross": r2(x["gross"]),
+            "openedLater": x["opened_later"], "history": [[h[0], h[1], h[2]] for h in x["history"]],
+        } for x in r["sections"]]
+        # seats per section: [row, place, x, y, category, price, fee, sold_at]
+        per = defaultdict(list)
+        for seat, (sid, cat, p, f, ts) in r["seats"].items():
+            lo = layout.get(seat)
+            if lo:
+                per[sid].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), cat, p, f, ts])
+        (out / "seats" / f"{eid}.json").write_text(json.dumps(per, ensure_ascii=False, separators=(",", ":")),
+                                                  encoding="utf-8")
+    shapes = defaultdict(list)
+    for s in read_csv(SHAPES):
+        shapes[s["conf_id"]].append([s["section_id"], s["points"]])
+    any_res = next(iter(res.values()), {})
+    data = {"updated": now_utc(), "seasonSeats": any_res.get("season_total", 0),
+            "games": games, "sections": sections, "shapes": shapes}
+    (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"Exported {len(games)} games to {out}")
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -646,6 +805,7 @@ def main(argv=None):
     t.set_defaults(fn=cmd_attendance)
     r = sub.add_parser("report"); r.add_argument("event", nargs="?"); r.set_defaults(fn=cmd_report)
     sub.add_parser("season").set_defaults(fn=cmd_season)
+    x = sub.add_parser("export"); x.add_argument("dir"); x.set_defaults(fn=cmd_export)
     args = p.parse_args(argv)
     return args.fn(args) or 0
 

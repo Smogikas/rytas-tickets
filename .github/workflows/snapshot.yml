@@ -24,16 +24,20 @@ on:
         default: false
   push:
     branches: [main]
-    paths: ["rytas.py", "tests/**", ".github/workflows/**"]
+    paths: ["rytas.py", "sheets.py", "site/**", "tests/**", ".github/workflows/**"]
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
-# never let two runs commit at the same time
+# one run at a time: runs read and write the same Google Sheet
 concurrency:
   group: snapshot
   cancel-in-progress: false
+
+env:
+  # the data lives in this Google Sheet (not in the repo); not a secret
+  SHEET_ID: 12u2OBPsVzivfjZopgrjTtUKfc-TtXARYcEODmzRVGaM
 
 jobs:
   test:
@@ -46,26 +50,36 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
-  snapshot:
+  run:
     needs: test
-    # code pushes and PRs only run the tests; snapshots run on schedule / manual trigger
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # schedule / manual: collect + save + publish. Code push: only rebuild the page.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
+    env:
+      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+      COLLECT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      built: ${{ steps.site.outputs.built }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - run: pip install google-auth==2.38.0 requests==2.32.3
+
+      - name: Load data from Google Sheet
+        id: pull
+        run: python sheets.py pull
 
       - name: Add series
-        if: inputs.add_series != ''
+        if: env.COLLECT == 'true' && inputs.add_series != ''
         env:
           TARGET: ${{ inputs.add_series }}
         run: python rytas.py add-series "$TARGET"
 
       - name: Add event
-        if: inputs.add_event != ''
+        if: env.COLLECT == 'true' && inputs.add_event != ''
         env:
           EVENT: ${{ inputs.add_event }}
         run: python rytas.py add "$EVENT"
@@ -75,32 +89,41 @@ jobs:
         run: python rytas.py discover
 
       - name: Snapshot
+        if: env.COLLECT == 'true'
         env:
           SEATS: ${{ inputs.seats && '--seats' || '' }}
         run: python rytas.py snapshot $SEATS
 
-      - name: Commit data
-        if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for f in data events.json; do
-            if [ -e "$f" ]; then git add "$f"; fi
-          done
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit -m "Snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
-          for i in 1 2 3; do
-            if git pull --rebase origin main && git push; then exit 0; fi
-            git rebase --abort 2>/dev/null || true
-            sleep 5
-          done
-          exit 1
+      # only after a successful load, so rows are never uploaded twice
+      - name: Save data to Google Sheet
+        if: always() && env.COLLECT == 'true' && steps.pull.outcome == 'success'
+        run: python sheets.py push
 
-      - name: Report
-        if: always()
+      - name: Build page
+        id: site
+        if: always() && steps.pull.outcome == 'success'
         run: |
+          python rytas.py export _site
+          cp site/index.html _site/
           python rytas.py report > report.txt 2>&1 || true
           { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "built=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: always() && steps.site.outcome == 'success'
+        with:
+          path: _site
+
+  deploy:
+    needs: run
+    if: ${{ !cancelled() && needs.run.outputs.built == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

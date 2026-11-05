@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ryto bilietai</title>
+<meta name="description" content="Vilniaus „Ryto“ namų rungtynių bilietų pardavimai, abonementai ir arenos planas.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Crect x='7' y='9' width='18' height='14' rx='2' fill='none' stroke='white' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F2EC; --panel:#FFFFFF; --ink:#16181D; --muted:#5A606C; --line:#E0DBCF;
+  --accent:#1D4ED8; --accent-ink:#FFFFFF; --season:#8590A6; --single:#D2620A; --free:#F4F2EC; --seat-line:#ADA696;
+  --closed:#ECE8DE; --low:#DCE6FB; --high:#1D4ED8; --court:#D9D3C4; --focus:#1D4ED8;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1220; --panel:#121B2E; --ink:#E8EDF7; --muted:#9AA8C2; --line:#26344F;
+    --accent:#4C8DFF; --accent-ink:#0B1220; --season:#6C7EA3; --single:#FF9F43; --free:#1A2540; --seat-line:#4A5A7C;
+    --closed:#162036; --low:#1D2B4A; --high:#4C8DFF; --court:#2B3A5A; --focus:#82AEFF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1220; --panel:#121B2E; --ink:#E8EDF7; --muted:#9AA8C2; --line:#26344F;
+  --accent:#4C8DFF; --accent-ink:#0B1220; --season:#6C7EA3; --single:#FF9F43; --free:#1A2540; --seat-line:#4A5A7C;
+  --closed:#162036; --low:#1D2B4A; --high:#4C8DFF; --court:#2B3A5A; --focus:#82AEFF;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.disp{font-family:"Space Grotesk",Inter,sans-serif}
+button{font:inherit;color:inherit}
+button:focus-visible,[tabindex]:focus-visible,polygon:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1320px;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:20px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.num{font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px}
+header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:12px;background:var(--panel);border:1px solid var(--line);flex-wrap:wrap}
+.seg button,.chip{cursor:pointer;border:1px solid transparent;background:transparent;border-radius:9px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.seg button[aria-pressed="true"],.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg.small-seg button{padding:5px 9px;font-size:12px}
+.chip{border-color:var(--line);text-align:left}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{padding:14px 16px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.kpi .v{font-family:"Space Grotesk",Inter,sans-serif;font-size:24px;font-weight:700;overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid transparent}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.card{cursor:pointer;text-align:left;padding:20px;display:flex;flex-direction:column;gap:14px;border-radius:18px;width:100%}
+.card:hover{border-color:var(--accent)}
+.badge{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px;border:1px solid currentColor}
+.badge.LKL{color:var(--accent)} .badge.BCL{color:var(--single)}
+.opp{font-family:"Space Grotesk",Inter,sans-serif;font-size:22px;font-weight:700;line-height:1.15}
+.big{font-family:"Space Grotesk",Inter,sans-serif;font-size:40px;font-weight:700;line-height:1}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--free);border:1px solid var(--line)}
+.bar i{display:block;height:100%}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;font-size:13px}
+.grid2 b{display:block;font-family:"Space Grotesk",Inter,sans-serif;font-size:17px}
+.arena{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}
+.mapbox{flex:3 1 520px;min-width:0;padding:16px;display:flex;flex-direction:column;gap:12px}
+.side{flex:2 1 340px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.side .panel{padding:18px;display:flex;flex-direction:column;gap:12px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip small{display:block;font-size:11px;font-weight:500;opacity:.8}
+svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
+svg.map polygon{cursor:pointer;stroke:var(--line);stroke-width:2;vector-effect:non-scaling-stroke}
+svg.map polygon.closed{cursor:default;fill:transparent;stroke-dasharray:6 5;stroke:var(--seat-line);stroke-width:1.5}
+svg.map polygon.sel{stroke:var(--single);stroke-width:3}
+svg.map text{font:700 15px "Space Grotesk",Inter,sans-serif;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+svg.seats rect{cursor:pointer}
+.tablebox{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:600}
+th:first-child,td:first-child{text-align:left}
+tr.sel td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration:underline;font-weight:600}
+.hist{display:flex;flex-direction:column;gap:4px;font-size:13px;max-height:180px;overflow:auto}
+.hist div{display:flex;justify-content:space-between;gap:10px}
+.note{font-size:12px;color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.err{padding:18px;border-radius:12px;border:1px solid var(--single)}
+@media (max-width:560px){h1{font-size:26px}.big{font-size:34px}.kpi .v{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow" data-t="eyebrow"></div>
+      <h1 data-t="title"></h1>
+      <div class="small muted" id="updated"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="seg small-seg" role="group" aria-label="Language" id="langSeg"></div>
+      <div class="seg small-seg" role="group" id="themeSeg"></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" id="tabSeg"></div>
+    <div class="seg" role="group" id="whenSeg"></div>
+  </div>
+
+  <section class="kpis" id="kpis" aria-live="polite"></section>
+  <main id="view"><div class="empty" data-t="loading"></div></main>
+  <footer class="note" id="foot"></footer>
+</div>
+
+<script>
+"use strict";
+const T = {
+  lt: {
+    title: "Ryto bilietai", eyebrow: "Vilniaus „Rytas“ · namų rungtynės · Arena Vilnius", loading: "Kraunama…",
+    updated: "Duomenys atnaujinti {d} · atnaujinama kas valandą", games: "Rungtynės", arena: "Arenos planas",
+    upcoming: "Būsimos", played: "Sužaistos", all: "Visos", sort: "Rikiuoti", byDate: "Data", byExpected: "Žiūrovai",
+    bySingles: "Pavieniai", byRevenue: "Pajamos", theme: "Tema", auto: "Auto", light: "Šviesi", dark: "Tamsi",
+    nextGame: "Kitos rungtynės", seasonSeats: "Abonementų vietos", seasonSub: "niekada nebuvo laisvos ({n} rungt.)",
+    singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
+    clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto vertė", avgValueSub: "pirkėjai mokėjo vid. {p}",
+    vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
+    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. vertė", seen: "Stebint parduota: {n}",
+    attendance: "Lankomumas", attVs: "laukta {e}", noAtt: "lankomumas dar neįrašytas",
+    inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
+    legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
+    noGames: "Šiame sąraše rungtynių nėra.", noData: "vietų duomenys dar renkami",
+    modeTaken: "% užimta", modeSingles: "% pavienių", modePrice: "Kaina", low: "mažai", high: "daug",
+    cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
+    pickSection: "Spustelėkite sektorių žemėlapyje arba lentelėje.",
+    seats: "Vietos", season: "Abonementai", single: "Pavieniai", free: "Laisvos", full: "Užimta",
+    price: "Kaina", value: "Vertė", fee: "Mokesčiai", section: "Sektorius",
+    seatPlan: "Vietų planas", seatHint: "Užveskite arba palieskite vietą", row: "Eilė", place: "vieta",
+    catS: "abonementas", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
+    paid: "pirkėjas moka {p}, klubui {v}",
+    noLayout: "Šio sektoriaus vietų išdėstymas bus rodomas po kito vietų plano nuskaitymo.",
+    priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
+    sectionsTable: "Sektoriai", totalRow: "Iš viso",
+    foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai (jei ateitų visi abonementų turėtojai). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
+    loadErr: "Nepavyko įkelti duomenų."
+  },
+  en: {
+    title: "Rytas tickets", eyebrow: "Vilniaus „Rytas“ · home games · Arena Vilnius", loading: "Loading…",
+    updated: "Data updated {d} · refreshed hourly", games: "Games", arena: "Arena plan",
+    upcoming: "Upcoming", played: "Played", all: "All", sort: "Sort", byDate: "Date", byExpected: "Crowd",
+    bySingles: "Singles", byRevenue: "Revenue", theme: "Theme", auto: "Auto", light: "Light", dark: "Dark",
+    nextGame: "Next game", seasonSeats: "Season-ticket seats", seasonSub: "never available ({n} games)",
+    singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
+    clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket value", avgValueSub: "buyers paid avg {p}",
+    vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
+    available: "Available", revenue: "Club revenue", avg: "Avg value", seen: "Sold while tracked: {n}",
+    attendance: "Attendance", attVs: "expected {e}", noAtt: "attendance not recorded yet",
+    inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
+    legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
+    noGames: "No games in this list.", noData: "seat data still being collected",
+    modeTaken: "% taken", modeSingles: "% single", modePrice: "Price", low: "low", high: "high",
+    cheap: "cheapest", notOnSale: "Not on sale for this game",
+    pickSection: "Click a section on the map or in the table.",
+    seats: "Seats", season: "Season", single: "Single", free: "Available", full: "Taken",
+    price: "Price", value: "Value", fee: "Fees", section: "Section",
+    seatPlan: "Seat plan", seatHint: "Hover or tap a seat", row: "Row", place: "seat",
+    catS: "season ticket", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
+    paid: "buyer pays {p}, club gets {v}",
+    noLayout: "Seat positions for this section appear after the next seat-plan scan.",
+    priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
+    sectionsTable: "Sections", totalRow: "Total",
+    foot: "Expected crowd = season-ticket seats + single tickets sold (attendance if every season holder comes). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
+    loadErr: "Could not load the data."
+  }
+};
+
+const store = {
+  get(k, d){ try { const v = localStorage.getItem("rytas." + k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v){ try { localStorage.setItem("rytas." + k, v); } catch (e) {} }
+};
+const S = {
+  lang: store.get("lang", "lt"), theme: store.get("theme", "auto"), tab: store.get("tab", "games"),
+  when: "upcoming", comp: "all", sort: "date", game: store.get("game", null), sec: null, mode: "taken", seat: null
+};
+let DATA = null;
+const seatCache = {};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const t = (k, vars) => { let s = (T[S.lang] || T.lt)[k] || k; for (const v in vars || {}) s = s.replace("{" + v + "}", vars[v]); return s; };
+const loc = () => S.lang === "en" ? "en-GB" : "lt-LT";
+const nf = (n) => n == null ? "–" : new Intl.NumberFormat(loc(), { maximumFractionDigits: 0 }).format(n);
+const eur = (n, d) => n == null ? "–" : new Intl.NumberFormat(loc(), { style: "currency", currency: "EUR", maximumFractionDigits: d == null ? 0 : d, minimumFractionDigits: d == null ? 0 : d }).format(n);
+const fmt = (iso, o) => new Intl.DateTimeFormat(loc(), Object.assign({ timeZone: "Europe/Vilnius" }, o)).format(new Date(iso));
+const dShort = (iso) => fmt(iso, { day: "numeric", month: "short" });
+const dFull = (iso) => fmt(iso, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dTime = (iso) => fmt(iso, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const pct = (a, b) => b ? (100 * a / b) : 0;
+const vilniusDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" }).format(d);
+function daysTo(iso){
+  const a = Date.parse(vilniusDay(new Date()) + "T00:00:00Z"), b = Date.parse(vilniusDay(new Date(iso)) + "T00:00:00Z");
+  return Math.round((b - a) / 86400000);
+}
+function whenText(g){
+  if (g.played) return t("playedLbl");
+  const n = daysTo(g.start);
+  return n <= 0 ? t("today") : n === 1 ? t("tomorrow") : t("inDays", { n: n });
+}
+function setTheme(){ if (S.theme === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", S.theme); }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function mix(a, b, f){
+  const p = (h) => { const x = h.replace("#", ""); return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)); };
+  const x = p(a), y = p(b); f = Math.max(0, Math.min(1, f));
+  return "rgb(" + x.map((v, i) => Math.round(v + (y[i] - v) * f)).join(",") + ")";
+}
+function segButtons(el, items, current, onPick, label){
+  el.setAttribute("aria-label", label || "");
+  el.innerHTML = items.map(([v, l]) => `<button type="button" data-v="${esc(v)}" aria-pressed="${v === current}">${esc(l)}</button>`).join("");
+  el.onclick = (e) => { const b = e.target.closest("button[data-v]"); if (b) onPick(b.dataset.v); };
+}
+const shortTitle = (s) => s.indexOf("Parteris") === 0 ? "P2" : s.indexOf("VIP") === 0 ? "VIP" : s.split(" ")[0];
+
+// ---------------------------------------------------------------- render
+function render(){
+  document.documentElement.lang = S.lang;
+  document.title = t("title");
+  document.querySelectorAll("[data-t]").forEach((n) => { n.textContent = t(n.dataset.t); });
+  segButtons($("langSeg"), [["lt", "LT"], ["en", "EN"]], S.lang, (v) => { S.lang = v; store.set("lang", v); render(); }, "Language / Kalba");
+  segButtons($("themeSeg"), [["auto", t("auto")], ["light", t("light")], ["dark", t("dark")]], S.theme, (v) => { S.theme = v; store.set("theme", v); setTheme(); render(); }, t("theme"));
+  segButtons($("tabSeg"), [["games", t("games")], ["arena", t("arena")]], S.tab, (v) => { S.tab = v; store.set("tab", v); render(); }, t("games") + " / " + t("arena"));
+  segButtons($("whenSeg"), [["upcoming", t("upcoming")], ["played", t("played")]], S.when, (v) => { S.when = v; S.game = null; render(); }, t("upcoming") + " / " + t("played"));
+  $("foot").textContent = t("foot");
+  if (!DATA) return;
+  $("updated").textContent = t("updated", { d: dTime(DATA.updated) });
+  renderKpis();
+  if (S.tab === "games") renderGames(); else renderArena();
+}
+
+function listGames(){
+  return DATA.games.filter((g) => (S.when === "played") === g.played);
+}
+
+function renderKpis(){
+  const gs = listGames();
+  const next = DATA.games.filter((g) => !g.played).sort((a, b) => a.start < b.start ? -1 : 1)[0];
+  const singles = gs.reduce((s, g) => s + g.singles, 0), rev = gs.reduce((s, g) => s + (g.revenue || 0), 0), gross = gs.reduce((s, g) => s + (g.gross || 0), 0);
+  const k = [
+    [t("nextGame"), next ? next.opp : "–", next ? dFull(next.start) + " · " + whenText(next) + " · " + nf(next.taken) + " " + t("expected") : ""],
+    [t("seasonSeats"), nf(DATA.seasonSeats), t("seasonSub", { n: DATA.games.length })],
+    [t("singlesSold"), nf(singles), (S.when === "played" ? t("played") : t("upcoming")) + " · " + t("gamesN", { n: gs.length })],
+    [t("clubRevenue"), eur(rev), t("clubRevenueSub")],
+    [t("avgValue"), singles ? eur(rev / singles, 2) : "–", singles ? t("avgValueSub", { p: eur(gross / singles, 2) }) : ""]
+  ];
+  $("kpis").innerHTML = k.map(([l, v, s]) => `<div class="panel kpi"><span class="small muted">${esc(l)}</span><span class="v">${esc(v)}</span><span class="small muted">${esc(s)}</span></div>`).join("");
+}
+
+function renderGames(){
+  let gs = listGames().filter((g) => S.comp === "all" || g.comp === S.comp);
+  const key = { date: (g) => g.start, expected: (g) => -g.taken, singles: (g) => -g.singles, revenue: (g) => -(g.revenue || 0) }[S.sort];
+  gs.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
+  if (S.when === "played" && S.sort === "date") gs.reverse();
+  const comps = ["all"].concat([...new Set(DATA.games.map((g) => g.comp))].sort());
+  const cards = gs.map((g) => {
+    const has = g.seats > 0;
+    const att = g.played ? (g.attendance != null
+      ? `<div class="small"><b class="num">${t("attendance")}: ${nf(g.attendance)}</b> <span class="muted">· ${t("attVs", { e: nf(g.taken) })} (${(g.attendance - g.taken >= 0 ? "+" : "") + nf(g.attendance - g.taken)})</span></div>`
+      : `<div class="small muted">${t("noAtt")}</div>`) : "";
+    return `<button type="button" class="panel card" data-game="${esc(g.id)}" aria-label="${esc(t("arena") + ": " + g.opp)}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="badge ${esc(g.comp)}">${esc(g.comp)}</span><span class="small muted">${esc(dFull(g.start))}</span></div>
+      <div><div class="small muted">${t("vs")}</div><div class="opp">${esc(g.opp)}</div><div class="small muted">${esc(whenText(g))}</div></div>
+      ${has ? `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="big num">${nf(g.taken)}</span><span class="small muted">${t("expected")}</span></div>
+      <div class="bar" aria-hidden="true"><i style="width:${pct(g.season, g.seats)}%;background:var(--season)"></i><i style="width:${pct(g.singles, g.seats)}%;background:var(--single)"></i></div>
+      <div class="grid2"><div><span class="muted">${t("singles")}</span><b class="num">${nf(g.singles)}</b></div><div><span class="muted">${t("available")}</span><b class="num">${nf(g.available)}</b></div>
+      <div><span class="muted">${t("revenue")}</span><b class="num">${eur(g.revenue)}</b></div><div><span class="muted">${t("avg")}</span><b class="num">${g.singles ? eur(g.avg, 2) : "–"}</b></div></div>
+      <div class="small muted">${t("seen", { n: nf(g.seen) })}</div>` : `<div class="small muted">${t("noData")}</div>`}
+      ${att}
+    </button>`;
+  }).join("");
+  $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+    <div class="controls">
+      <div class="seg small-seg" role="group" id="compSeg"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="small muted">${t("sort")}</span><div class="seg small-seg" role="group" id="sortSeg"></div></div>
+    </div>
+    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("legendSeason")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--free);border-color:var(--line)"></i>${t("legendFree")}</span></div>
+    ${gs.length ? `<div class="cards">${cards}</div>` : `<div class="panel empty">${t("noGames")}</div>`}
+  </div>`;
+  segButtons($("compSeg"), comps.map((c) => [c, c === "all" ? t("all") : c]), S.comp, (v) => { S.comp = v; renderGames(); });
+  segButtons($("sortSeg"), [["date", t("byDate")], ["expected", t("byExpected")], ["singles", t("bySingles")], ["revenue", t("byRevenue")]], S.sort, (v) => { S.sort = v; renderGames(); }, t("sort"));
+  $("view").querySelectorAll("[data-game]").forEach((b) => b.addEventListener("click", () => { S.tab = "arena"; S.game = b.dataset.game; S.sec = null; S.seat = null; store.set("tab", "arena"); store.set("game", S.game); render(); window.scrollTo({ top: 0 }); }));
+}
+
+function sectionValue(s){
+  const seats = s.seats || 1;
+  if (S.mode === "price") return s._p;
+  if (S.mode === "singles") return s.singles / seats;
+  return (s.season + s.singles) / seats;
+}
+
+function renderArena(){
+  const gs = listGames().slice().sort((a, b) => S.when === "played" ? (a.start < b.start ? 1 : -1) : (a.start < b.start ? -1 : 1));
+  if (!gs.length){ $("view").innerHTML = `<div class="panel empty">${t("noGames")}</div>`; return; }
+  let g = gs.find((x) => x.id === S.game) || gs[0];
+  S.game = g.id;
+  const secs = DATA.sections[g.id] || [];
+  const byId = {}; secs.forEach((s) => { byId[s.id] = s; });
+  const prices = secs.map((s) => s.price || 0).filter((p) => p > 0);
+  const lo = Math.log(Math.min(...prices, 1e9)), hi = Math.log(Math.max(...prices, 1));
+  secs.forEach((s) => { s._p = s.price && hi > lo ? (Math.log(s.price) - lo) / (hi - lo) : 0; });
+  if (!S.sec || !byId[S.sec]) S.sec = (secs.find((s) => s.title === "108") || secs[0] || {}).id || null;
+  const low = cssVar("--low"), high = cssVar("--high"), closed = cssVar("--closed");
+  const shapes = (DATA.shapes[g.conf] || []);
+  const polys = shapes.map(([id, pts]) => {
+    const s = byId[id];
+    const fill = s ? mix(low, high, sectionValue(s)) : closed;
+    const lbl = s ? (s.title) : "";
+    return `<polygon points="${esc(pts)}" fill="${fill}" class="${s ? "" : "closed"} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
+  }).join("");
+  const labels = shapes.filter(([id]) => byId[id]).map(([id, pts]) => {
+    const n = pts.split(" ").map((p) => p.split(",").map(Number));
+    const cx = n.reduce((a, p) => a + p[0], 0) / n.length, cy = n.reduce((a, p) => a + p[1], 0) / n.length;
+    const v = sectionValue(byId[id]);
+    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${v > 0.55 ? "#FFFFFF" : "var(--ink)"}">${esc(shortTitle(byId[id].title))}</text>`;
+  }).join("");
+  const legend = { taken: [t("low"), "100%"], singles: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
+  const s = byId[S.sec];
+  const tot = secs.reduce((a, x) => { ["seats", "season", "singles", "available", "revenue"].forEach((k) => { a[k] = (a[k] || 0) + (x[k] || 0); }); return a; }, {});
+  const sorted = secs.slice().sort((a, b) => a.title.localeCompare(b.title, "lt", { numeric: true }));
+
+  $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+    <div class="chips" role="group" aria-label="${esc(t("games"))}">${gs.map((x) => `<button type="button" class="chip" data-game="${esc(x.id)}" aria-pressed="${x.id === g.id}"><small>${esc(dShort(x.start))} · ${esc(x.comp)}</small>${esc(x.opp)}</button>`).join("")}</div>
+    <div class="arena">
+      <div class="panel mapbox">
+        <div class="controls">
+          <div><div class="disp" style="font-size:20px;font-weight:700">${esc(g.opp)}</div>
+          <div class="small muted">${esc(dFull(g.start))} · ${nf(g.taken)} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
+          <div class="seg small-seg" role="group" id="modeSeg"></div>
+        </div>
+        ${shapes.length ? `<svg class="map" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
+          <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
+          <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
+          <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
+          ${polys}${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
+        <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--high))"></span><span>${esc(legend[1])}</span>
+          <span><i class="sw" style="border:1.5px dashed var(--seat-line)"></i>${t("notOnSale")}</span></div>
+      </div>
+      <div class="side">
+        ${s ? sectionPanel(s, g) : `<div class="panel note">${t("pickSection")}</div>`}
+      </div>
+    </div>
+    <div class="panel tablebox"><table>
+      <caption class="small muted" style="text-align:left;padding:10px 12px">${t("sectionsTable")}</caption>
+      <thead><tr><th scope="col">${t("section")}</th><th scope="col">${t("price")}</th><th scope="col">${t("value")}</th><th scope="col">${t("seats")}</th><th scope="col">${t("season")}</th><th scope="col">${t("single")}</th><th scope="col">${t("free")}</th><th scope="col">${t("full")}</th><th scope="col">${t("revenue")}</th></tr></thead>
+      <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button></td>
+        <td class="num">${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
+        <tr><td><b>${t("totalRow")}</b></td><td></td><td></td><td class="num"><b>${nf(tot.seats)}</b></td><td class="num"><b>${nf(tot.season)}</b></td><td class="num"><b>${nf(tot.singles)}</b></td><td class="num"><b>${nf(tot.available)}</b></td><td class="num"><b>${pct(tot.seats - tot.available, tot.seats).toFixed(0)}%</b></td><td class="num"><b>${eur(tot.revenue)}</b></td></tr>
+      </tbody></table></div>
+  </div>`;
+
+  segButtons($("modeSeg"), [["taken", t("modeTaken")], ["singles", t("modeSingles")], ["price", t("modePrice")]], S.mode, (v) => { S.mode = v; renderArena(); });
+  const v = $("view");
+  v.querySelectorAll(".chip[data-game]").forEach((b) => b.addEventListener("click", () => { S.game = b.dataset.game; S.seat = null; store.set("game", S.game); renderArena(); }));
+  v.querySelectorAll("[data-sec]").forEach((el) => {
+    const pick = () => { S.sec = el.dataset.sec; S.seat = null; renderArena(); };
+    el.addEventListener("click", pick);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+  });
+  if (s) loadSeats(g.id).then(() => drawSeats(g, s));
+}
+
+function sectionPanel(s, g){
+  const hist = (s.history || []).slice().reverse();
+  const histHtml = hist.length > 1
+    ? hist.map((h) => `<div><span class="muted">${esc(dTime(h[0]))}</span><span class="num">${eur(h[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(h[1] - h[2])})</span></span></div>`).join("")
+    : (hist.length ? `<div class="muted">${t("unchanged", { d: dTime(hist[0][0]) })}</div>` : "");
+  return `<div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${eur(s.price)}</div></div>
+    <div class="small muted">${t("value")} ${eur(s.price - (s.fee || 0))} · ${t("fee").toLowerCase()} ${eur(s.fee)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}</div>
+    <div class="grid2">
+      <div><span class="muted">${t("seats")}</span><b class="num">${nf(s.seats)}</b></div><div><span class="muted">${t("free")}</span><b class="num">${nf(s.available)}</b></div>
+      <div><span class="muted">${t("season")}</span><b class="num">${nf(s.season)}</b></div><div><span class="muted">${t("singles")}</span><b class="num">${nf(s.singles)}</b></div>
+      <div><span class="muted">${t("revenue")}</span><b class="num">${eur(s.revenue)}</b></div><div><span class="muted">${t("full")}</span><b class="num">${pct(s.seats - s.available, s.seats).toFixed(0)}%</b></div>
+    </div>
+  </div>
+  <div class="panel"><div style="font-weight:600">${t("seatPlan")}</div><div id="seatBox"><div class="note">${t("loading")}</div></div></div>
+  <div class="panel"><div style="font-weight:600">${t("priceHistory")}</div><div class="hist">${histHtml}</div></div>`;
+}
+
+function loadSeats(gid){
+  if (!seatCache[gid]) seatCache[gid] = fetch("seats/" + encodeURIComponent(gid) + ".json", { cache: "no-store" }).then((r) => r.ok ? r.json() : {}).catch(() => ({}));
+  return seatCache[gid];
+}
+
+async function drawSeats(g, s){
+  const box = $("seatBox");
+  if (!box) return;
+  const all = await loadSeats(g.id);
+  const list = all[s.id] || [];
+  if (S.game !== g.id || S.sec !== s.id) return;
+  if (!list.length){ box.innerHTML = `<div class="note">${t("noLayout")}</div>`; return; }
+  const xs = list.map((q) => q[2]), ys = list.map((q) => q[3]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 16, h = Math.max(...ys) - y0 + 16;
+  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--free)" };
+  const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
+  box.innerHTML = `<svg class="seats" viewBox="0 0 ${w} ${h}" style="width:100%;max-height:340px" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg>
+    <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
+    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--free);border-color:var(--seat-line)"></i>${t("catA")}</span></div>`;
+  const svg = box.querySelector("svg");
+  const show = (e) => { const r = e.target.closest("rect[data-i]"); if (!r) return; S.seat = +r.dataset.i; $("seatInfo").textContent = seatLabel(list[S.seat]); };
+  svg.addEventListener("mouseover", show); svg.addEventListener("click", show);
+}
+
+function seatLabel(q){
+  const [row, place, , , cat, price, fee, ts] = q;
+  let st = cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : t("catA");
+  if (cat !== "S" && price != null) st += " · " + t("paid", { p: eur(price), v: eur(price - (fee || 0)) });
+  return `${t("row")} ${row}, ${t("place")} ${place} · ${st}`;
+}
+
+// ---------------------------------------------------------------- start
+setTheme();
+render();
+if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") render(); });
+fetch("data.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => {
+  DATA = d;
+  if (!DATA.games.some((g) => !g.played)) S.when = "played";
+  if (S.game){ const g = DATA.games.find((x) => x.id === S.game); if (g) S.when = g.played ? "played" : "upcoming"; }
+  render();
+}).catch(() => { $("view").innerHTML = `<div class="err">${esc(t("loadErr"))}</div>`; });
+</script>
+</body>
+</html>
