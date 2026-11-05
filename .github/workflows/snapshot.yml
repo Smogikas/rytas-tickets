@@ -2,13 +2,26 @@ name: Ticket snapshot
 
 on:
   schedule:
-    - cron: "17 * * * *"   # every hour at :17 UTC (off the busy :00 slot)
+    - cron: "17 * * * *"   # hourly at :17 UTC: prices every hour, seat plans when due
+    - cron: "41 5 * * 1"   # Mondays 05:41 UTC: look for new / rescheduled games
   workflow_dispatch:
     inputs:
-      add_event:
-        description: "Optional: bilietai.lt event URL or id to start tracking"
+      add_series:
+        description: "Optional: bilietai.lt game URL/id or series id - track the whole season"
         required: false
         default: ""
+      add_event:
+        description: "Optional: bilietai.lt game URL/id - track a single game"
+        required: false
+        default: ""
+      discover:
+        description: "Look for new games in tracked series now"
+        type: boolean
+        default: false
+      seats:
+        description: "Fetch seat plans now for every upcoming game (even if not due)"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ["rytas.py", "tests/**", ".github/workflows/**"]
@@ -38,27 +51,40 @@ jobs:
     # code pushes and PRs only run the tests; snapshots run on schedule / manual trigger
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Add event
-        if: github.event.inputs.add_event != ''
+      - name: Add series
+        if: inputs.add_series != ''
         env:
-          EVENT: ${{ github.event.inputs.add_event }}
+          TARGET: ${{ inputs.add_series }}
+        run: python rytas.py add-series "$TARGET"
+
+      - name: Add event
+        if: inputs.add_event != ''
+        env:
+          EVENT: ${{ inputs.add_event }}
         run: python rytas.py add "$EVENT"
 
+      - name: Discover new games
+        if: github.event.schedule == '41 5 * * 1' || inputs.discover
+        run: python rytas.py discover
+
       - name: Snapshot
-        run: python rytas.py snapshot
+        env:
+          SEATS: ${{ inputs.seats && '--seats' || '' }}
+        run: python rytas.py snapshot $SEATS
 
       - name: Commit data
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for f in data events.json capacity.json; do
+          for f in data events.json; do
             if [ -e "$f" ]; then git add "$f"; fi
           done
           if git diff --cached --quiet; then
@@ -72,3 +98,9 @@ jobs:
             sleep 5
           done
           exit 1
+
+      - name: Report
+        if: always()
+        run: |
+          python rytas.py report > report.txt 2>&1 || true
+          { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

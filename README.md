@@ -1,126 +1,99 @@
 # rytas-tickets
 
-Tracks ticket sales for Vilniaus „Rytas" home games on [bilietai.lt](https://www.bilietai.lt):
-how many tickets are still on sale, how many have sold, at what price, and how that compares
-with the real attendance after the game.
+Tracks ticket sales for Vilniaus „Rytas" home games on [bilietai.lt](https://www.bilietai.lt),
+seat by seat: how many seats are on sale, how many are taken, how many of those are season
+tickets, what was sold online and at what price, and how that compares with the real
+attendance after the game.
 
-No dependencies, Python 3.8+ standard library only.
+Runs by itself on GitHub Actions every hour. No dependencies, Python 3.8+ standard library only.
 
-## How it works
+## What bilietai.lt exposes
 
-bilietai.lt exposes two public JSON endpoints that the site itself uses:
+The website loads public JSON from `https://www.bilietai.lt/api/v1` (an anonymous session
+cookie from `POST /login/express` is required, the script handles it):
 
-- `GET /api/v1/events/<id>` – event name, start time, venue
-- `GET /api/v1/store/events/<id>/prices` – per section: price, fee, **tickets still available**
+| Endpoint | Gives |
+|---|---|
+| `/series/<id>` | all games of the season series |
+| `/events/<id>` | game name, start time, series id |
+| `/store/events/<id>/prices` | open sections: price, fee, availability (capped at 22, shows "20+") |
+| `/store/events/<id>/sections/<section>/seat-map` | **every seat** of an open section: row, place, status (1 = available, 0 = taken) |
 
-The API only reports what is *left*, not what was sold. So:
+Seat ids are the same in every game (same arena layout), which makes the season-ticket
+estimate below possible. Closed sections return no seat plan; sections open during the
+sales, and the tracker records when each one first appears.
 
-```
-seats taken = section capacity - available
-```
+## How the numbers are worked out
 
-Important: "seats taken" includes season tickets and seats held back by the club, not only
-tickets sold on bilietai.lt. The real online sales are the tickets the tracker *sees* disappear
-between two snapshots ("Seen sold" / "Online sales seen by tracker"), so snapshot regularly
-from the moment sales open.
+For each game, from the seat plans:
 
-Every run of `snapshot` appends the current price and availability of every section to
-`data/snapshots.csv`. Because prices are logged with each snapshot, you can later compute
-average ticket price and revenue, and see how prices changed over time.
+- **Seats**: seats in sections that have been on sale
+- **Available**: available now
+- **Taken**: seats − available
+- **Season** (estimate): taken seats that were **never available in any tracked game**
+  (seen in at least 2 games). A seat sold for one game would be free in the others, so a
+  seat that is always taken belongs to a season-ticket holder (or is permanently held by
+  the club). Games of the same competition (LKL, BCL) are compared with each other; a
+  competition with fewer than 3 tracked games is compared with all games.
+- **Single** = taken − season: single-game tickets
+  - **Seen**: seats observed going available → taken while tracked: exact online sales
+  - **Before**: taken when first seen and not season: sold before tracking began, comps
+- **Revenue** (singles, excl. fees): each seen sale at the section price at that moment;
+  "before" seats at the first logged price. **Avg** = revenue / singles.
 
-### Known limitation: availability is capped at 22
+The more games are tracked, the better the season estimate: games late in the season, with
+few single tickets sold, help most. A seat a season holder releases for resale shows up
+as available and is then not counted as season.
 
-The API never reports more than 22 available tickets per section (the site shows "20+").
-While a section still has 22+ left, the exact sold count is unknown (the report shows
-`<=N` as an upper bound). Once it drops below 22, the numbers are exact. Early in the
-sales, most sections are capped; closer to the game more of them become exact.
+After the game, `attendance − taken` shows no-shows (negative) or entries without a seat
+(comps, children under 6) (positive).
 
 ## Usage
 
 ```bash
-# 1. start tracking a game (paste the URL or just the id) – takes a first snapshot
-python3 rytas.py add https://www.bilietai.lt/renginiai/PNJMMUNJYB/bcl-vilniaus-rytas-nantero-nanterre-92/seatmap
-
-# 2. fill in section capacities in capacity.json ("seats": null -> number)
-
-# 3. take snapshots regularly (see "Scheduling" below)
-python3 rytas.py snapshot
-
-# 4. after the game, record real attendance
+python3 rytas.py add-series https://www.bilietai.lt/renginiai/PNJMMUNJYB/bcl-vilniaus-rytas-nantero-nanterre-92
+python3 rytas.py snapshot            # prices; seat plans when due
+python3 rytas.py snapshot --seats    # seat plans now for every upcoming game
+python3 rytas.py discover            # new / rescheduled games of tracked series
 python3 rytas.py attendance PNJMMUNJYB 8450 --note "official figure"
-
-# 5. report
-python3 rytas.py report            # all tracked games
-python3 rytas.py report PNJMMUNJYB # one game
+python3 rytas.py report              # one line per game
+python3 rytas.py report PNJMMUNJYB   # one game, per section
+python3 rytas.py season              # season-ticket seats by section
+python3 rytas.py add <url|id>        # a single game outside the series
 ```
 
-### Section capacities
+## Automatic runs (GitHub Actions)
 
-`capacity.json` is created automatically with every section listed and `"seats": null`.
-Fill in the seat count of each section (from the arena seat map / club figures).
-Until a section has a capacity, it can only contribute "seen sold" numbers, which are
-tickets observed leaving between two snapshots.
+`.github/workflows/snapshot.yml`:
 
-### Report columns
+- **every hour (:17 UTC)**: tests, then `snapshot`. Prices are logged every hour (1 request
+  per game). Seat plans cost one request per open section, so they are fetched **hourly in
+  the last 48 h before a game, every 6 h within 14 days, daily otherwise**.
+- **Mondays 05:41 UTC**: `discover` adds newly published games and updates rescheduled ones.
+- data is committed back to the repo, and the run page shows the season summary.
+- code pushes and pull requests run the tests only. If the tests fail, no snapshot is taken.
 
-| Column | Meaning |
-|---|---|
-| Price / Fee | Latest ticket price and service fee (EUR) |
-| Avail | Tickets available now (`22+` = capped, exact number unknown) |
-| Seats | Capacity from `capacity.json` |
-| Sold | Seats taken: `Seats - Avail`, or `<=N` upper bound while capped |
-| Seen sold | Online sales observed between snapshots |
-| Revenue | Estimated, excl. fees. Observed sales are priced at the price listed at that time; the rest at the first logged price (so season-ticket seats are valued at single-game price, an overestimate) |
+Manual run: Actions → *Ticket snapshot* → *Run workflow*. Options: track a series or a
+single game, discover now, fetch seat plans now.
 
-If a section has several ticket types, they share the same seats: availability is taken once
-per section and the cheapest ticket type's price is used.
+Next season: run the workflow with *add_series* set to any game of the new season.
 
-After the game, `attendance - seats taken` shows no-shows (negative) or uncounted entries
-such as complimentary tickets and children under 6 (positive). Only sections with an exact
-count are included, so the comparison is most meaningful once most sections are below 22.
-
-## Automatic snapshots (GitHub Actions)
-
-`.github/workflows/snapshot.yml` runs **every hour at :17 UTC** on GitHub, so it works even
-when your computer is off:
-
-1. runs the test suite. If the tests fail, no snapshot is taken.
-2. `python rytas.py snapshot` for every tracked game that hasn't started yet
-3. commits `data/`, `events.json` and `capacity.json` back to the repo
-
-Only changes are logged: a row is written when a section's price, fee or availability
-changes. A section that disappears from the API is logged as `available = 0` (sold out or
-withdrawn).
-
-**Track a new game from the browser:** Actions → *Ticket snapshot* → *Run workflow* →
-paste the bilietai.lt URL into *add_event*. Or run `python3 rytas.py add <url>` locally and
-push `events.json`.
-
-Every push that changes code also runs the tests (no snapshot). A failed run sends a
-GitHub email notification.
-
-Note: GitHub may delay scheduled runs at busy times, and disables schedules in repos with
-no activity for 60 days (the snapshot commits count as activity while a game is tracked).
-
-To run locally instead, a cron example:
-
-```cron
-17 * * * * cd /path/to/rytas-tickets && python3 rytas.py snapshot >> snapshot.log 2>&1
-```
+GitHub may delay scheduled runs at busy times and disables schedules after 60 days without
+repo activity (snapshot commits count as activity).
 
 ## Files
 
 ```
-rytas.py          the tracker
-.github/workflows/snapshot.yml   hourly snapshot + tests
-tests/            offline tests (no network, simulated API)
-events.json       tracked events (created by `add`)
-capacity.json     seats per section (fill in by hand)
-data/snapshots.csv   every snapshot: time, section, price, fee, available
-data/attendance.csv  recorded attendance
+rytas.py                         the tracker
+.github/workflows/snapshot.yml   hourly snapshots, weekly discovery, tests
+tests/                           offline tests with a simulated bilietai.lt
+events.json                      tracked series and games
+data/snapshots.csv               section prices/availability, changes only
+data/seats/<game id>.csv         seat status, changes only (first row per seat = initial state)
+data/attendance.csv              recorded attendance
 ```
 
 ## Notes
 
-Be polite to the site: one snapshot per hour per game is plenty. This is a personal
-analytics project and is not affiliated with bilietai.lt or BC Rytas.
+Requests are spaced out (0.4 s between seat plans) and kept to what the analysis needs.
+This is a personal analytics project, not affiliated with bilietai.lt or BC Rytas.
