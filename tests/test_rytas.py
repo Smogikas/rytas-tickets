@@ -3,12 +3,24 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import rytas  # noqa: E402
 
-FIXTURE = json.loads((Path(__file__).parent / "fixtures" / "prices.json").read_text(encoding="utf-8"))
+FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURE = json.loads((FIXTURES / "prices.json").read_text(encoding="utf-8"))
+EVENT = json.loads((FIXTURES / "event.json").read_text(encoding="utf-8"))
+
+
+def fake_get_json(url):
+    """Stand-in for the bilietai.lt API (no network in tests)."""
+    if "/prices" in url:
+        return json.loads(json.dumps(FIXTURE))
+    if "/events/" in url:
+        return dict(EVENT)
+    raise AssertionError(f"unexpected URL {url}")
 
 
 def with_available(prices, section_id, n, price=None):
@@ -93,6 +105,68 @@ class Tracker(unittest.TestCase):
         rytas.main(["attendance", "EV", "8450", "--note", "official"])
         self.assertEqual(rytas.latest_attendance("EV"), 8450)
         self.assertEqual(len(rytas.load_snapshots("EV")), 3)
+
+    def test_add_snapshot_report_end_to_end(self):
+        orig = rytas.get_json
+        rytas.get_json = fake_get_json
+        try:
+            url = "https://www.bilietai.lt/renginiai/PNJMMUNJYB/bcl-vilniaus-rytas-nantero-nanterre-92/seatmap"
+            self.assertEqual(rytas.main(["add", url]), 0)
+            events = json.loads(rytas.EVENTS.read_text(encoding="utf-8"))
+            self.assertEqual(events["PNJMMUNJYB"]["start_utc"], "2026-11-11T17:30:00Z")
+
+            # future event -> snapshot taken; past event -> skipped
+            events["OLDGAME"] = {"name": "old", "start_utc": "2020-01-01T00:00:00Z"}
+            rytas.EVENTS.write_text(json.dumps(events), encoding="utf-8")
+            with unittest.mock.patch.object(rytas, "datetime", wraps=rytas.datetime) as dt:
+                dt.now.return_value = rytas.datetime(2026, 11, 6, 12, tzinfo=rytas.timezone.utc)
+                self.assertEqual(rytas.main(["snapshot"]), 0)
+            # nothing changed between the two snapshots -> no new rows
+            self.assertEqual(len(rytas.load_snapshots("PNJMMUNJYB")), 3)
+            self.assertEqual(rytas.load_snapshots("OLDGAME"), [])
+            self.assertEqual(rytas.main(["report"]), 0)
+        finally:
+            rytas.get_json = orig
+
+    def test_only_changes_logged_and_vanished_section_is_sold_out(self):
+        hours = iter(range(10, 20))
+        patcher = unittest.mock.patch.object(
+            rytas, "now_utc", side_effect=lambda: f"2026-11-06T{next(hours)}:00:00+00:00")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        rows, written = rytas.take_snapshot("EV", FIXTURE)
+        self.assertEqual(len(written), 3)
+        rows, written = rytas.take_snapshot("EV", FIXTURE)
+        self.assertEqual(written, [])  # identical -> nothing written
+
+        # VIP sells 2, Parteris 2 (14 left) disappears from the API entirely
+        p = with_available(FIXTURE, "94921", 6)
+        p["eventSections"] = [s for s in p["eventSections"] if s["id"] != "83548"]
+        rows, written = rytas.take_snapshot("EV", p)
+        got = {r["section_id"]: int(r["available"]) for r in written}
+        self.assertEqual(got, {"94921": 6, "83548": 0})
+
+        # it stays at 0 on later snapshots without being re-logged
+        rows, written = rytas.take_snapshot("EV", p)
+        self.assertEqual(written, [])
+
+        res = rytas.analyse(rytas.load_snapshots("EV"), {"83548": {"seats": 20}, "94921": {"seats": 10}})
+        by = {x["section_id"]: x for x in res["sections"]}
+        self.assertEqual(by["83548"]["sold"], 20)
+        self.assertEqual(by["83548"]["observed_sold"], 14)
+        self.assertEqual(by["94921"]["observed_sold"], 2)
+
+    def test_snapshot_failure_returns_nonzero(self):
+        def boom(url):
+            raise OSError("network down")
+        rytas.EVENTS.write_text(json.dumps(
+            {"X": {"name": "x", "start_utc": "2099-01-01T00:00:00Z"}}), encoding="utf-8")
+        orig = rytas.get_json
+        rytas.get_json = boom
+        try:
+            self.assertEqual(rytas.main(["snapshot"]), 1)
+        finally:
+            rytas.get_json = orig
 
     def test_event_id_from_url(self):
         url = "https://www.bilietai.lt/renginiai/PNJMMUNJYB/bcl-vilniaus-rytas-nantero-nanterre-92/seatmap"

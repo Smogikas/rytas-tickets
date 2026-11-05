@@ -128,9 +128,35 @@ def latest_attendance(event_id):
     return found
 
 
+def last_state(event_id):
+    """Latest logged row per (section_id, ticket_type_id) for an event."""
+    last = {}
+    for r in sorted(load_snapshots(event_id), key=lambda r: r["ts_utc"]):
+        last[(r["section_id"], r["ticket_type_id"])] = r
+    return last
+
+
 def take_snapshot(event_id, prices):
-    rows = flatten(event_id, now_utc(), prices)
-    append_csv(SNAPSHOTS, SNAP_FIELDS, rows)
+    """Log the current state, writing only rows that changed since the last log.
+
+    A section that was on sale before but is missing from the API now is
+    logged as available=0 (sold out / withdrawn), so its sales are not lost.
+    Returns (all current rows, rows actually written).
+    """
+    ts = now_utc()
+    rows = flatten(event_id, ts, prices)
+    last = last_state(event_id)
+    current = {(r["section_id"], r["ticket_type_id"]) for r in rows}
+    for key, prev in last.items():
+        if key not in current and prev["available"] > 0:
+            rows.append(dict(prev, ts_utc=ts, available=0))
+    changed_rows = [
+        r for r in rows
+        if (k := (r["section_id"], r["ticket_type_id"])) not in last
+        or (float(r["price"]), float(r["fee"]), int(r["available"]))
+        != (last[k]["price"], last[k]["fee"], last[k]["available"])
+    ]
+    append_csv(SNAPSHOTS, SNAP_FIELDS, changed_rows)
     # make sure every section has a slot in capacity.json for the user to fill in
     caps = load_json(CAPACITY, {})
     changed = False
@@ -140,7 +166,7 @@ def take_snapshot(event_id, prices):
             changed = True
     if changed:
         save_json(CAPACITY, caps)
-    return rows
+    return rows, changed_rows
 
 
 def event_id_from(text):
@@ -238,9 +264,9 @@ def cmd_add(args):
     events = load_json(EVENTS, {})
     events[event_id] = {"name": info["name"], "start_utc": info["eventStartAt"]}
     save_json(EVENTS, events)
-    rows = take_snapshot(event_id, prices)
+    rows, written = take_snapshot(event_id, prices)
     print(f"Tracking {event_id}: {info['name']} ({info['eventStartAt']})")
-    print(f"First snapshot logged: {len(rows)} rows. "
+    print(f"Snapshot: {len(rows)} sections/ticket types, {len(written)} rows logged. "
           f"Fill in section seat counts in capacity.json to get 'sold' numbers.")
 
 
@@ -256,8 +282,9 @@ def cmd_snapshot(args):
             continue  # game already started, sales are over
         try:
             _info, prices = fetch_event(eid)
-            rows = take_snapshot(eid, prices)
-            print(f"{eid}: {len(rows)} rows, {sum(r['available'] for r in rows)} tickets shown available")
+            rows, written = take_snapshot(eid, prices)
+            print(f"{eid}: {len(rows)} sections/ticket types, {len(written)} changed, "
+                  f"{sum(int(r['available']) for r in rows)} tickets shown available")
         except Exception as e:  # keep going for other events
             failed = True
             print(f"{eid}: failed: {e}", file=sys.stderr)
@@ -280,7 +307,7 @@ def print_report(event_id, name, caps):
         print("No snapshots yet.")
         return
     stamps = sorted({r["ts_utc"] for r in rows})
-    print(f"{len(stamps)} snapshots, {stamps[0]} -> {stamps[-1]}")
+    print(f"{len(stamps)} snapshots with changes, {stamps[0]} -> {stamps[-1]}")
     res = analyse(rows, caps)
     t = res["totals"]
 

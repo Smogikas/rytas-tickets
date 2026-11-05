@@ -1,0 +1,74 @@
+name: Ticket snapshot
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # every hour at :17 UTC (off the busy :00 slot)
+  workflow_dispatch:
+    inputs:
+      add_event:
+        description: "Optional: bilietai.lt event URL or id to start tracking"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: ["rytas.py", "tests/**", ".github/workflows/**"]
+  pull_request:
+
+permissions:
+  contents: write
+
+# never let two runs commit at the same time
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+  snapshot:
+    needs: test
+    # code pushes and PRs only run the tests; snapshots run on schedule / manual trigger
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Add event
+        if: github.event.inputs.add_event != ''
+        env:
+          EVENT: ${{ github.event.inputs.add_event }}
+        run: python rytas.py add "$EVENT"
+
+      - name: Snapshot
+        run: python rytas.py snapshot
+
+      - name: Commit data
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in data events.json capacity.json; do
+            if [ -e "$f" ]; then git add "$f"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          exit 1

@@ -79,21 +79,41 @@ After the game, `attendance - seats taken` shows no-shows (negative) or uncounte
 such as complimentary tickets and children under 6 (positive). Only sections with an exact
 count are included, so the comparison is most meaningful once most sections are below 22.
 
-## Scheduling
+## Automatic snapshots (GitHub Actions)
 
-Sales speed up before the game, so snapshot more often near match day. Cron example
-(hourly):
+`.github/workflows/snapshot.yml` runs **every hour at :17 UTC** on GitHub, so it works even
+when your computer is off:
+
+1. runs the test suite. If the tests fail, no snapshot is taken.
+2. `python rytas.py snapshot` for every tracked game that hasn't started yet
+3. commits `data/`, `events.json` and `capacity.json` back to the repo
+
+Only changes are logged: a row is written when a section's price, fee or availability
+changes. A section that disappears from the API is logged as `available = 0` (sold out or
+withdrawn).
+
+**Track a new game from the browser:** Actions → *Ticket snapshot* → *Run workflow* →
+paste the bilietai.lt URL into *add_event*. Or run `python3 rytas.py add <url>` locally and
+push `events.json`.
+
+Every push that changes code also runs the tests (no snapshot). A failed run sends a
+GitHub email notification.
+
+Note: GitHub may delay scheduled runs at busy times, and disables schedules in repos with
+no activity for 60 days (the snapshot commits count as activity while a game is tracked).
+
+To run locally instead, a cron example:
 
 ```cron
-0 * * * * cd /path/to/rytas-tickets && python3 rytas.py snapshot >> snapshot.log 2>&1
+17 * * * * cd /path/to/rytas-tickets && python3 rytas.py snapshot >> snapshot.log 2>&1
 ```
-
-Or use a GitHub Actions schedule that commits the CSV back to the repo.
 
 ## Files
 
 ```
 rytas.py          the tracker
+.github/workflows/snapshot.yml   hourly snapshot + tests
+tests/            offline tests (no network, simulated API)
 events.json       tracked events (created by `add`)
 capacity.json     seats per section (fill in by hand)
 data/snapshots.csv   every snapshot: time, section, price, fee, available
