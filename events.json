@@ -1,6 +1,105 @@
 {
-  "PNJMMUNJYB": {
-    "name": "BCL: Vilniaus ''Rytas'' - Nantero ''Nanterre 92''",
-    "start_utc": "2026-11-11T17:30:00Z"
+  "series": {
+    "Y4ISRKYEV3": "Vilniaus 'Ryto' 2026/27 sezono namų rungtynės"
+  },
+  "events": {
+    "PNJMMUNJYB": {
+      "name": "BCL: Vilniaus ''Rytas'' - Nantero ''Nanterre 92''",
+      "start_utc": "2026-11-11T17:30:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:40:52+00:00"
+    },
+    "ZPHZTQITUH": {
+      "name": "LKL: Vilniaus ''Rytas'' - Jonavos ''Jonava Hipocredit''",
+      "start_utc": "2026-11-15T17:00:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:41:18+00:00"
+    },
+    "JSAIJZ5XW2": {
+      "name": "LKL: Vilniaus ''Rytas'' - Utenos ''Juventus''",
+      "start_utc": "2026-11-22T17:10:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:41:42+00:00"
+    },
+    "IJYNZ5IT2E": {
+      "name": "LKL: Vilniaus ''Rytas'' - Šiaulių ''Šiauliai''",
+      "start_utc": "2026-12-12T17:10:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:42:06+00:00"
+    },
+    "M5QZGK5SG7": {
+      "name": "LKL: Vilniaus ''Rytas'' - Panevėžio ''Lietkabelis''",
+      "start_utc": "2026-12-27T14:50:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:42:30+00:00"
+    },
+    "BDIHWVU77U": {
+      "name": "LKL: Vilniaus ''Rytas'' - Kėdainių ''Nevėžis-Paskolų klubas''",
+      "start_utc": "2027-01-24T17:10:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:42:52+00:00"
+    },
+    "XLD42PRSVQ": {
+      "name": "LKL: Vilniaus ''Rytas'' - Utenos ''Juventus''",
+      "start_utc": "2027-02-07T17:10:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:43:16+00:00"
+    },
+    "RMPQ5ISZR5": {
+      "name": "LKL: Vilniaus ''Rytas'' - Šiaulių ''Šiauliai''",
+      "start_utc": "2027-02-14T14:50:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:43:40+00:00"
+    },
+    "4UMXX5CPLG": {
+      "name": "LKL: Vilniaus ''Rytas'' - Tauragės ''Tauragė''",
+      "start_utc": "2027-03-14T14:50:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:44:03+00:00"
+    },
+    "Y44L7MFKEU": {
+      "name": "LKL: Vilniaus ''Rytas'' - Jonavos ''Jonava Hipocredit''",
+      "start_utc": "2027-04-03T13:00:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:44:29+00:00"
+    },
+    "ANRYC2PYOU": {
+      "name": "LKL: Vilniaus ''Rytas'' - Klaipėdos ''Neptūnas''",
+      "start_utc": "2027-04-11T13:50:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:44:53+00:00"
+    },
+    "ZMS7IPCJGD": {
+      "name": "LKL: Vilniaus ''Rytas'' - Kauno ''Žalgiris''",
+      "start_utc": "2027-04-18T13:50:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:45:16+00:00"
+    },
+    "Y3LRWHFSAJ": {
+      "name": "LKL: Vilniaus ''Rytas'' - Gargždų ''Gargždai''",
+      "start_utc": "2027-04-28T16:00:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:45:40+00:00"
+    },
+    "BTUPKO23TG": {
+      "name": "LKL: Vilniaus ''Rytas'' - Kėdainių ''Nevėžis-Paskolų klubas''",
+      "start_utc": "2027-05-02T13:00:00Z",
+      "series_id": "Y4ISRKYEV3",
+      "status": "ON_SALE",
+      "last_seats_utc": "2026-11-05T22:46:04+00:00"
+    }
   }
 }
