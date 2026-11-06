@@ -634,25 +634,21 @@ function renderSalesMap(){
       ${S.smode === "replay" ? `<label class="small muted">${t("gameLbl")} <select id="smGame" class="sel">${opts}</select></label>` : ""}</div>`;
   if (S.smode === "popular"){
     const pop = DATA.popularity || {}, rows = Object.values(pop).filter((p) => p.fill != null);
-    const byCount = S.pmode === "count";
-    const val = (p) => byCount ? p.taken : p.fill;
-    const hi = byCount ? Math.max(1, ...rows.map((p) => p.taken)) : 100;
+    const val = (p) => p.fill, hi = 100;
     const nPlayed = Math.max(0, ...rows.map((p) => p.games));
     const next = DATA.games.filter((g) => !g.played).sort((a, b) => a.start.localeCompare(b.start))[0];
-    const fmtV = (p) => byCount ? `${nf(p.taken)} / ${nf(p.seats)}` : `${p.fill.toFixed(0)}%`;
+    const fmtV = (p) => `${p.fill.toFixed(0)}%`;
     const cell = (id) => { const p = pop[id]; if (!p || p.fill == null) return null; const fill = scale(val(p) / hi);
       return { fill, label: shortTitle(p.title), ink: labelInk(fill), title: `${p.title}: ${p.fill.toFixed(0)}% · ${t("avgTakenLbl")} ${nf(p.taken)} / ${nf(p.seats)} (${gamesN(p.games)})` }; };
     const top = rows.slice().sort((a, b) => val(b) - val(a)).slice(0, 10);
     const body = !rows.length
       ? `<div class="note" style="margin-top:12px">${t("popEmpty", { d: next ? dShort(next.start) + " (" + next.opp + ")" : "–" })}</div>`
       : `<div class="smgrid"><div>${mapSvg(shapes, cell)}
-          <div class="legend"><span>0</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${byCount ? nf(hi) + " " + t("seatsWord") : "100% " + t("takenWord")}</span></div></div>
+          <div class="legend"><span>0%</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>100% ${t("takenWord")}</span></div></div>
         <div><h3 style="margin:0 0 6px;font-size:15px">${t("topSections")}</h3>${top.map((p) => `<div class="byrow small"><span>${esc(p.title)}</span><span class="minibar wide"><i style="width:${(100 * val(p) / hi).toFixed(0)}%"></i></span><span class="num">${fmtV(p)}</span></div>`).join("")}</div></div>`;
     $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
-      ${rows.length ? `<div class="seg small-seg" role="group" id="popSeg" style="margin-top:10px"></div>` : ""}
       ${body}
-      ${rows.length ? `<p class="note" style="margin:8px 0 0">${t(byCount ? "popNoteCount" : "popNoteFill", { n: gamesN(nPlayed) })}</p>` : ""}</section></div>`;
-    if (rows.length) segButtons($("popSeg"), [["fill", t("popFill")], ["count", t("popCount")]], byCount ? "count" : "fill", (v) => { S.pmode = v; render(); }, t("popular"));
+      ${rows.length ? `<p class="note" style="margin:8px 0 0">${t("popNoteFill", { n: gamesN(nPlayed) })}</p>` : ""}</section></div>`;
   } else {
     $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
       <div id="smBody" class="note" style="margin-top:10px">…</div></section></div>`;

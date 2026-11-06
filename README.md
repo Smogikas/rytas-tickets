@@ -20,7 +20,7 @@ seat by seat, with a live web page:
   opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).
 - **Sales map** (Pardavimų žemėlapis): replay how a game's sections filled up over the last 7 / 14 / 30 days or
   all of tracking (slider / play), and section popularity over played games (average fill rate incl. season
-  tickets, and average seats taken; far-away games are left out so they don't pull the averages down).
+  tickets; far-away games are left out so they don't pull the averages down).
 - Game cards show tickets sold in the last 24 h (▲/▼ against the 24 h before).
 - Lithuanian / English, light / dark (follows the system by default).
 
