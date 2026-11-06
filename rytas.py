@@ -967,7 +967,7 @@ def cmd_attendance(args):
 
 def print_summary(ev, res):
     print(f"{'Date':<11}{'Game':<44}{'Seats':>7}{'Avail':>7}{'Taken':>7}{'Season':>8}"
-          f"{'Single':>8}{'Seen':>6}{'Revenue':>10}{'Avg':>6}{'Attend':>8}")
+          f"{'Single':>8}{'Seen':>6}{'Revenue':>10}{'Avg':>6}{'BTrib':>6}{'Expect':>7}{'Attend':>8}")
     for eid, meta in ev["events"].items():
         t = res[eid]["totals"]
         att = latest_attendance(eid)
@@ -977,8 +977,12 @@ def print_summary(ev, res):
             continue
         print(f"{meta['start_utc'][:10]:<11}{name[:43]:<44}{t['seats']:>7}{t['available']:>7}{t['taken']:>7}"
               f"{t['season']:>8}{t['singles']:>8}{t['sold_seen']:>6}{money(t['revenue']):>10}"
-              f"{money(t['avg_price']):>6}{(att if att is not None else '-'):>8}")
+              f"{money(t['avg_price']):>6}{t.get('fans_est', 0):>6}{t.get('expected', t['taken']):>7}"
+              f"{(att if att is not None else '-'):>8}")
     for eid, meta in ev["events"].items():
+        fans = res[eid].get("fan_sections") or []
+        if len(fans) > 2:
+            print(f"{meta['start_utc'][:10]} B Tribūna: " + ", ".join(f"{name} {n}" for _sid, name, n in fans))
         off = res[eid].get("season_off_sections") or []
         if off:
             print(f"{meta['start_utc'][:10]} season seats in sections not on sale: "
