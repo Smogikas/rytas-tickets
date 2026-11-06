@@ -76,7 +76,10 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .modal-x:hover{border-color:var(--accent)}
 .modal-x svg{width:16px;height:16px}
 .modal-actions{display:flex;gap:8px;padding:0 16px 16px}
-.modal-actions .btn{flex:1 1 0}
+.modal-actions .btn{flex:1 1 0;padding:8px 10px;min-width:0}
+.modal-actions .btn[hidden]{display:none}
+.modal-actions .btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:440px){.modal-actions .btn{flex-direction:column;gap:4px;font-size:12px;min-height:58px;padding:8px 4px}.modal-actions{gap:6px;padding:0 12px 12px}}
 .seatwrap{overflow:auto;max-height:440px}
 .seatwrap svg{display:block;margin:0 auto}
 .badge{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px;border:1px solid currentColor}
@@ -169,7 +172,8 @@ td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration
     <div id="shareBody"></div>
     <button type="button" class="modal-x" id="shareX" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <div class="modal-actions">
-      <button type="button" class="btn primary" id="shareGo"></button>
+      <button type="button" class="btn primary" id="shareCopy"></button>
+      <button type="button" class="btn" id="shareGo"></button>
       <a class="btn" id="shareDl" download></a>
     </div>
   </div>
@@ -205,6 +209,7 @@ const T = {
     sectionsTable: "Sektoriai", totalRow: "Iš viso",
     foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai (jei ateitų visi abonementų turėtojai). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
     loadErr: "Nepavyko įkelti duomenų.",
+    copy: "Kopijuoti", copied: "Nukopijuota", copyFailed: "Nepavyko – atsisiųskite",
     share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", making: "Ruošiamas paveikslėlis…",
     shareFoot: "Duomenys {d}",
     soldOut: "Išparduota", closedSec: "Uždarytas", closedOn: "uždarytas {d}", priceFrom: "anksčiau {p} (pakeista {d})",
@@ -237,6 +242,7 @@ const T = {
     sectionsTable: "Sections", totalRow: "Total",
     foot: "Expected crowd = season-ticket seats + single tickets sold (attendance if every season holder comes). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
     loadErr: "Could not load the data.",
+    copy: "Copy", copied: "Copied", copyFailed: "Failed – download it",
     share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", making: "Making the picture…",
     shareFoot: "Data {d}",
     soldOut: "Sold out", closedSec: "Closed", closedOn: "closed {d}", priceFrom: "was {p} (changed {d})",
@@ -583,6 +589,8 @@ function seatLabel(q){
 
 // ---------------------------------------------------------------- share picture
 const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
 const ICON_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
 const share = { url: null, file: null, open: false, game: null };
 
@@ -748,6 +756,8 @@ async function openShare(gid, kind){
   $("shareBody").innerHTML = `<div class="note" style="padding:40px 0;text-align:center">${esc(t("making"))}</div>`;
   $("shareGo").innerHTML = ICON_SHARE + `<span>${esc(t("share"))}</span>`;
   $("shareDl").innerHTML = ICON_DL + `<span>${esc(t("download"))}</span>`;
+  $("shareCopy").innerHTML = ICON_COPY + `<span>${esc(t("copy"))}</span>`;
+  $("shareCopy").hidden = !canCopyImage();
   $("shareX").setAttribute("aria-label", t("close"));
   m.querySelector(".modal-box").style.setProperty("--ar", kind === "arena" ? "0.66" : "0.86");
   m.hidden = false; share.open = true; share.game = g;
@@ -772,6 +782,21 @@ function closeShare(fromBack){
   if (share.url){ URL.revokeObjectURL(share.url); share.url = null; }
   if (!fromBack && history.state && history.state.share) history.back();
 }
+
+// copy the picture to the clipboard (Chrome/Edge, Safari, Firefox 127+); paste with Ctrl/Cmd+V
+function canCopyImage(){ return !!(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem && window.isSecureContext); }
+$("shareCopy").addEventListener("click", async () => {
+  const btn = $("shareCopy");
+  if (!share.file) return;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": share.file })]);
+    btn.innerHTML = ICON_OK + `<span>${esc(t("copied"))}</span>`;
+  } catch (e) {
+    btn.innerHTML = `<span>${esc(t("copyFailed"))}</span>`;
+  }
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.innerHTML = ICON_COPY + `<span>${esc(t("copy"))}</span>`; }, 2200);
+});
 
 $("shareGo").addEventListener("click", async () => {
   if (!share.file) return;
