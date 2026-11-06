@@ -279,8 +279,10 @@ class Seats(Base):
         self.assertTrue(rytas.seats_due({"start_utc": NOW.isoformat()}, NOW))  # never fetched
         self.assertTrue(due(24, 1))
         self.assertFalse(due(24, 0.5))
-        self.assertFalse(due(24 * 5, 3))
-        self.assertTrue(due(24 * 5, 6))
+        self.assertTrue(due(24 * 4, 1))          # 4 days away: hourly (last 5 days)
+        self.assertTrue(due(24 * 5, 1))
+        self.assertFalse(due(24 * 6, 3))         # 6 days away: every 6 h
+        self.assertTrue(due(24 * 6, 6))
         self.assertFalse(due(24 * 60, 12))
         self.assertTrue(due(24 * 60, 23))
 

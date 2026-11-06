@@ -472,15 +472,20 @@ def is_hot(meta, seat_rows, now):
     return recent_sales(seat_rows, (now - timedelta(hours=24)).isoformat()) >= HOT_SALES
 
 
+def seat_interval(hours_left, hot=False):
+    """Hours between full seat scans for a game starting in `hours_left` hours."""
+    return 1 if hours_left <= 24 * HOURLY_DAYS or hot else 6 if hours_left <= 24 * SIX_HOURLY_DAYS else 24
+
+
 def seats_due(meta, now, hot=False):
     """Seat plans cost one request per section, so fetch them less often for
-    games far away: hourly in the last 48 h (and always for hot games), every 6 h
-    within 14 days, else daily."""
+    games far away: hourly in the last HOURLY_DAYS days (and always for hot games),
+    every 6 h within SIX_HOURLY_DAYS days, else daily."""
     last = meta.get("last_seats_utc")
     if not last:
         return True
     hours_left = (parse_ts(meta["start_utc"]) - now).total_seconds() / 3600
-    interval = 1 if hours_left <= 48 or hot else 6 if hours_left <= 24 * 14 else 24
+    interval = seat_interval(hours_left, hot)
     return now - parse_ts(last) >= timedelta(hours=interval * 0.9)
 
 
@@ -664,6 +669,9 @@ def price_history(prices, sid):
     open_zs = [z for z in zs if z[3]] or zs
     return zone_histories(prices, sid).get(open_zs[0][0], [])
 
+
+HOURLY_DAYS = 5      # full seat plans every hour in the last 5 days before tip-off
+SIX_HOURLY_DAYS = 14  # every 6 hours within 14 days, daily further away
 
 # seat categories
 SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE, BLOCKED = "S", "O", "B", "A", "X"
@@ -1236,7 +1244,7 @@ def health_warnings(ev, res, now):
         last = meta.get("last_seats_utc")
         if last:
             hours_left = (start - now).total_seconds() / 3600
-            interval = 1 if hours_left <= 48 else 6 if hours_left <= 24 * 14 else 24
+            interval = seat_interval(hours_left)
             if now - parse_ts(last) > timedelta(hours=2 * interval + 1):
                 out.append({"code": "stale", "game": opp[eid], "since": last})
     return out

@@ -85,7 +85,7 @@ Seat ids are the same in every game, so for each game:
 ## Schedule (GitHub Actions, `.github/workflows/snapshot.yml`)
 
 - **hourly (:17 UTC)**: tests → load data from the Sheet → prices for every upcoming game;
-  full seat plans hourly in the last 48 h before a game, every 6 h within 14 days, daily
+  full seat plans hourly in the last 5 days before a game, every 6 h within 14 days, daily
   otherwise; **hot games** (Žalgiris, BCL, or any game selling 50+ seats in 24 h) hourly
   however far away → save new rows to the Sheet → rebuild and publish the page.
   Between full scans, when the hourly price check sees a section open or close, a price
