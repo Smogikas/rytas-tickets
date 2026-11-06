@@ -166,6 +166,33 @@ class Seats(Base):
         _, w, n = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
         self.assertEqual((n, w), (2, []))  # nothing left to check there
 
+    def test_soldout_vs_withdrawn_sections(self):
+        prices = rytas.fetch_prices(self.E)
+        rytas.take_snapshot(self.E, prices)
+        rytas.take_seat_snapshot(self.E, prices)
+        # VIP leaves the list with 10 left (an exact count): sold out
+        # 401 leaves the list with 34 left ("20+"): withdrawn, nothing counted as sold
+        self.site.close_section(self.E, "94921")
+        self.site.close_section(self.E, "72935")
+        prices = rytas.fetch_prices(self.E)
+        rytas.take_snapshot(self.E, prices)
+        _, w, _ = rytas.take_seat_snapshot(self.E, prices)
+        self.assertEqual({r["section_id"] for r in w}, {"94921"})
+        res = rytas.analyse_event(rytas.timelines(rytas.load_seats(self.E)), rytas.load_snapshots(self.E), set())
+        by = {x["section_id"]: x for x in res["sections"]}
+        self.assertEqual(by["94921"]["status"], "soldout")
+        self.assertEqual(by["94921"]["available"], 0)
+        self.assertEqual(by["72935"]["status"], "closed")
+        self.assertEqual(by["72935"]["available"], 34)       # not counted as sold
+        self.assertTrue(by["72935"]["closed_at"])
+        self.assertEqual(by["83548"]["status"], "open")
+        # the withdrawn section reopens: open again
+        self.site.prices[self.E] = copy.deepcopy(PRICES)
+        prices = rytas.fetch_prices(self.E)
+        rytas.take_snapshot(self.E, prices)
+        res = rytas.analyse_event(rytas.timelines(rytas.load_seats(self.E)), rytas.load_snapshots(self.E), set())
+        self.assertEqual({x["section_id"]: x["status"] for x in res["sections"]}["72935"], "open")
+
     def test_section_opening_later_is_picked_up(self):
         self.site.close_section(self.E, "72935")
         cur, _, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))

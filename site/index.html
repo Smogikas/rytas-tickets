@@ -114,6 +114,14 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
 svg.map polygon{cursor:pointer;stroke:var(--line);stroke-width:2;vector-effect:non-scaling-stroke}
 svg.map polygon.closed{cursor:default;fill:transparent;stroke-dasharray:6 5;stroke:var(--seat-line);stroke-width:1.5}
+svg.map polygon.withdrawn{fill:transparent;stroke-dasharray:6 5;stroke:var(--muted);stroke-width:2}
+svg.map polygon.stripes{pointer-events:none;stroke:none}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:5px;vertical-align:middle;margin-left:6px;white-space:nowrap}
+.tag.soldout{background:var(--accent);color:var(--accent-ink)}
+.tag.closed{border:1px dashed var(--muted);color:var(--muted)}
+.pchg{font-size:12px;font-weight:600;white-space:nowrap}
+.pchg.up{color:var(--single)} .pchg.down{color:var(--season)}
+.sw.striped{background:repeating-linear-gradient(45deg,var(--high) 0 3px,rgba(255,255,255,.55) 3px 5px)}
 svg.map polygon.sel{stroke:var(--sel);stroke-width:3.5}
 svg.map text{font:700 15px "Space Grotesk",Inter,sans-serif;pointer-events:none;text-anchor:middle;dominant-baseline:central}
 svg.seats rect{cursor:pointer}
@@ -198,7 +206,8 @@ const T = {
     foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai (jei ateitų visi abonementų turėtojai). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
     loadErr: "Nepavyko įkelti duomenų.",
     share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", making: "Ruošiamas paveikslėlis…",
-    shareFoot: "Duomenys {d}"
+    shareFoot: "Duomenys {d}",
+    soldOut: "Išparduota", closedSec: "Uždarytas", closedOn: "uždarytas {d}", priceFrom: "anksčiau {p} (pakeista {d})"
   },
   en: {
     title: "Rytas tickets", eyebrow: "Vilniaus „Rytas“ · home games · Arena Vilnius", loading: "Loading…",
@@ -228,7 +237,8 @@ const T = {
     foot: "Expected crowd = season-ticket seats + single tickets sold (attendance if every season holder comes). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
     loadErr: "Could not load the data.",
     share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", making: "Making the picture…",
-    shareFoot: "Data {d}"
+    shareFoot: "Data {d}",
+    soldOut: "Sold out", closedSec: "Closed", closedOn: "closed {d}", priceFrom: "was {p} (changed {d})"
   }
 };
 
@@ -381,14 +391,17 @@ function renderArena(){
   const polys = shapes.map(([id, pts]) => {
     const s = byId[id];
     const fill = s ? scale(sectionValue(s)) : closed;
-    const lbl = s ? (s.title) : "";
-    return `<polygon points="${esc(pts)}" fill="${fill}" class="${s ? "" : "closed"} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
+    const lbl = s ? s.title + (s.status === "soldout" ? " · " + t("soldOut") : s.status === "closed" ? " · " + t("closedSec") : "") : "";
+    const cls = !s ? "closed" : s.status === "closed" ? "withdrawn" : "";
+    const poly = `<polygon points="${esc(pts)}" fill="${fill}" class="${cls} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
+    return poly + (s && s.status === "soldout" ? `<polygon points="${esc(pts)}" class="stripes" fill="url(#soldStripes)" aria-hidden="true"></polygon>` : "");
   }).join("");
   const labels = shapes.filter(([id]) => byId[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
     const cx = n.reduce((a, p) => a + p[0], 0) / n.length, cy = n.reduce((a, p) => a + p[1], 0) / n.length;
-    // label colour by the fill's brightness
-    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${labelInk(scale(sectionValue(byId[id])))}">${esc(shortTitle(byId[id].title))}</text>`;
+    // label colour by the fill's brightness (withdrawn sections have no fill)
+    const ink = byId[id].status === "closed" ? "var(--muted)" : labelInk(scale(sectionValue(byId[id])));
+    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${ink}">${esc(shortTitle(byId[id].title))}</text>`;
   }).join("");
   const legend = arenaColors(g).legend;
   const s = byId[S.sec];
@@ -411,8 +424,11 @@ function renderArena(){
           <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
           <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
           <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
+          <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="12" height="12" patternTransform="rotate(45)"><rect width="5" height="12" fill="rgba(255,255,255,.45)"></rect></pattern></defs>
           ${polys}${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
         <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
+          <span><i class="sw striped"></i>${t("soldOut")}</span>
+          <span><i class="sw" style="border:2px dashed var(--muted)"></i>${t("closedSec")}</span>
           <span><i class="sw" style="border:1.5px dashed var(--seat-line)"></i>${t("notOnSale")}</span></div>
       </div>
       <div class="side">
@@ -422,8 +438,8 @@ function renderArena(){
     <div class="panel tablebox sb" id="secTable"><table>
       <caption class="small muted" style="text-align:left;padding:10px 12px">${t("sectionsTable")}</caption>
       <thead><tr><th scope="col">${t("section")}</th><th scope="col">${t("price")}</th><th scope="col">${t("value")}</th><th scope="col">${t("seats")}</th><th scope="col">${t("season")}</th><th scope="col">${t("single")}</th><th scope="col">${t("free")}</th><th scope="col">${t("full")}</th><th scope="col">${t("revenue")}</th></tr></thead>
-      <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button></td>
-        <td class="num">${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
+      <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button>${statusTag(x)}</td>
+        <td class="num">${priceChg(x, true)} ${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
         <tr><td><b>${t("totalRow")}</b></td><td></td><td></td><td class="num"><b>${nf(tot.seats)}</b></td><td class="num"><b>${nf(tot.season)}</b></td><td class="num"><b>${nf(tot.singles)}</b></td><td class="num"><b>${nf(tot.available)}</b></td><td class="num"><b>${pct(tot.seats - tot.available, tot.seats).toFixed(0)}%</b></td><td class="num"><b>${eur(tot.revenue)}</b></td></tr>
       </tbody></table></div>
   </div>`;
@@ -488,14 +504,30 @@ function scrollIndicator(el, bar, thumb, key){
   update();
 }
 
+function statusTag(s){
+  if (s.status === "soldout") return ` <span class="tag soldout">${t("soldOut")}</span>`;
+  if (s.status === "closed") return ` <span class="tag closed">${t("closedSec")}</span>`;
+  return "";
+}
+
+// ▲/▼ against the first logged price; short form for the table, a line for the section card
+function priceChg(s, short){
+  const h = s.history || [];
+  if (h.length < 2 || s.price == null || h[0][1] === s.price) return "";
+  const up = s.price > h[0][1], last = h[h.length - 1][0];
+  if (short) return `<span class="pchg ${up ? "up" : "down"}" title="${esc(t("priceFrom", { p: eur(h[0][1]), d: dShort(last) }))}">${up ? "▲" : "▼"}</span>`;
+  return `<div class="pchg ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${esc(t("priceFrom", { p: eur(h[0][1]), d: dShort(last) }))}</div>`;
+}
+
 function sectionPanel(s, g){
   const hist = (s.history || []).slice().reverse();
   const histHtml = hist.length > 1
     ? hist.map((h) => `<div><span class="muted">${esc(dTime(h[0]))}</span><span class="num">${eur(h[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(h[1] - h[2])})</span></span></div>`).join("")
     : (hist.length ? `<div class="muted">${t("unchanged", { d: dTime(hist[0][0]) })}</div>` : "");
   return `<div class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${eur(s.price)}</div></div>
-    <div class="small muted">${t("value")} ${eur(s.price - (s.fee || 0))} · ${t("fee").toLowerCase()} ${eur(s.fee)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}${statusTag(s)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${eur(s.price)}</div></div>
+    <div class="small muted">${t("value")} ${eur(s.price - (s.fee || 0))} · ${t("fee").toLowerCase()} ${eur(s.fee)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}${s.status === "closed" && s.closedAt ? " · " + t("closedOn", { d: dTime(s.closedAt) }) : ""}</div>
+    ${priceChg(s, false)}
     <div class="grid2">
       <div><span class="muted">${t("seats")}</span><b class="num">${nf(s.seats)}</b></div><div><span class="muted">${t("free")}</span><b class="num">${nf(s.available)}</b></div>
       <div><span class="muted">${t("season")}</span><b class="num">${nf(s.season)}</b></div><div><span class="muted">${t("singles")}</span><b class="num">${nf(s.singles)}</b></div>
@@ -607,7 +639,15 @@ function drawArenaShare(c, g, W, H){
   for (const [id, p] of pts){
     const s = A.byId[id];
     c.beginPath(); p.forEach(([px, py], i) => (i ? c.lineTo(X(px), Y(py)) : c.moveTo(X(px), Y(py)))); c.closePath();
-    if (s){ c.setLineDash([]); c.fillStyle = A.scale(sectionValue(s)); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke(); }
+    if (s && s.status === "closed"){ c.setLineDash([7, 6]); c.strokeStyle = v("--muted"); c.lineWidth = 2.5; c.stroke(); }
+    else if (s){
+      c.setLineDash([]); c.fillStyle = A.scale(sectionValue(s)); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
+      if (s.status === "soldout"){
+        c.save(); c.clip(); c.strokeStyle = "rgba(255,255,255,.45)"; c.lineWidth = 6;
+        for (let d = -1100; d < 1100; d += 16){ c.beginPath(); c.moveTo(x0 + d, y); c.lineTo(x0 + d + 1100, y + 1100); c.stroke(); }
+        c.restore();
+      }
+    }
     else { c.setLineDash([7, 6]); c.strokeStyle = v("--seat-line"); c.lineWidth = 1.5; c.stroke(); }
   }
   c.setLineDash([]); c.textAlign = "center"; c.textBaseline = "middle"; c.font = `700 22px ${HEAD}`;

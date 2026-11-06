@@ -298,8 +298,12 @@ def take_seat_snapshot(event_id, prices, only=None):
         tickets = fetch_section_seats(event_id, sid)
         if tickets is None:
             if sid not in open_ids:
-                for r in last.values():
-                    if r["section_id"] == sid and r["status"] == 1:
+                # The section left the sale list. With fewer than CAP seats left
+                # (an exact count, watched hourly) it sold out: the last seats were
+                # sold. With CAP+ left it was withdrawn: nothing is counted as sold.
+                remaining = [r for r in last.values() if r["section_id"] == sid and r["status"] == 1]
+                if len(remaining) < CAP:
+                    for r in remaining:
                         current[r["seat_id"]] = dict(r, ts_utc=ts, status=0)
             continue
         for t in tickets:
@@ -501,13 +505,26 @@ def analyse_event(tl, price_rows, season):
             x["revenue"] += p - (f or 0)
             x["gross"] += p
 
+    # is the section in the sale list now? (a vanished section's last price row has available=0)
+    listed = {}
+    for r in sorted(price_rows, key=lambda r: r["ts_utc"]):
+        listed[r["section_id"]] = (r["available"] > 0, r["ts_utc"])
+
     sections = []
     for sid, x in sec.items():
         x["singles"] = x["taken"] - x["season"]
         later = first_ts and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1)
         p, f = price_at(prices, sid, "9999")
+        on_sale, since = listed.get(sid, (True, None))
+        if x["seats"] and x["available"] == 0:
+            status = "soldout"        # every seat taken
+        elif not on_sale:
+            status = "closed"         # withdrawn from sale with seats left
+        else:
+            status = "open"
         sections.append(dict(x, section_id=sid, section=titles.get(sid, sid), price=p, fee=f,
                              opened_later=first_seen[sid] if later else None,
+                             status=status, closed_at=since if status != "open" and not on_sale else None,
                              history=price_history(prices, sid)))
     sections.sort(key=lambda x: x["section"])
     tot = {k: sum(x[k] for x in sections) for k in keys + ["singles", "revenue", "gross"]}
@@ -780,7 +797,8 @@ def cmd_export(args):
             "id": x["section_id"], "title": x["section"], "price": x["price"], "fee": x["fee"],
             "seats": x["seats"], "available": x["available"], "season": x["season"], "singles": x["singles"],
             "seen": x["sold_seen"], "before": x["pre_taken"], "revenue": r2(x["revenue"]), "gross": r2(x["gross"]),
-            "openedLater": x["opened_later"], "history": [[h[0], h[1], h[2]] for h in x["history"]],
+            "openedLater": x["opened_later"], "status": x["status"], "closedAt": x["closed_at"],
+            "history": [[h[0], h[1], h[2]] for h in x["history"]],
         } for x in r["sections"]]
         # seats per section: [row, place, x, y, category, price, fee, sold_at]
         per = defaultdict(list)

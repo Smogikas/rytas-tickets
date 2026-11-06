@@ -43,6 +43,10 @@ Seat ids are the same in every game, so for each game:
   e.g. a 45 € lounge ticket = 30 € ticket value + 15 € fees.
 - Prices are logged hourly whenever they change, so price changes before a game are kept.
 - Only sections sold online are counted; sections that open later are picked up.
+- A section leaving the sale list with an exact count (< 20) left is **sold out** (last
+  seats counted as sold, striped on the map); with "20+" left it was **withdrawn**
+  (nothing counted as sold, dashed outline, closing date shown).
+- Price changes show as ▲/▼ next to the price (section card, table) and in the price history.
 
 ## Schedule (GitHub Actions, `.github/workflows/snapshot.yml`)
 
