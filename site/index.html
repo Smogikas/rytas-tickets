@@ -85,6 +85,7 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .badge{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px;border:1px solid currentColor}
 .badge.LKL{color:var(--accent)} .badge.BCL{color:var(--bcl)}
 .opp{font-family:"Space Grotesk",Inter,sans-serif;font-size:22px;font-weight:700;line-height:1.15}
+@media (min-width:620px){.card-head{min-height:94px}}
 .big{font-family:"Space Grotesk",Inter,sans-serif;font-size:40px;font-weight:700;line-height:1}
 .bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--free);border:1px solid var(--line)}
 .bar i{display:block;height:100%}
@@ -142,7 +143,7 @@ td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration
 .note{font-size:12px;color:var(--muted)}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 .err{padding:18px;border-radius:12px;border:1px solid var(--single)}
-@media (max-width:560px){h1{font-size:26px}.big{font-size:34px}.kpi .v{font-size:20px}}
+@media (max-width:560px){.kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}h1{font-size:26px}.big{font-size:34px}.kpi .v{font-size:20px}}
 </style>
 </head>
 <body>
@@ -189,7 +190,7 @@ const T = {
     updated: "Duomenys atnaujinti {d} · atnaujinama kas valandą", games: "Rungtynės", arena: "Arenos planas",
     upcoming: "Būsimos", played: "Sužaistos", all: "Visos", sort: "Rikiuoti", byDate: "Data", byExpected: "Žiūrovai",
     bySingles: "Pavieniai", byRevenue: "Pajamos", byAvg: "Vid. kaina", theme: "Tema", auto: "Auto", light: "Šviesi", dark: "Tamsi",
-    nextGame: "Kitos rungtynės", seasonSeats: "Abonementų vietos", seasonSub: "niekada nebuvo laisvos ({n} rungt.)",
+    nextGame: "Kitos rungtynės", seasonSeats: "Abonementų vietos", seasonSub: "užimtos nuo pradžių visose rungtynėse ({n})",
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
     clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto kaina", avgValueSub: "su mokesčiais · klubui vid. {p}",
     vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
@@ -204,7 +205,7 @@ const T = {
     seats: "Vietos", season: "Abonementai", single: "Pavieniai", free: "Laisvos", full: "Užimta",
     price: "Kaina", value: "Vertė", fee: "Mokesčiai", section: "Sektorius",
     seatPlan: "Vietų planas", seatHint: "Užveskite arba palieskite vietą", row: "Eilė", place: "vieta",
-    catS: "abonementas", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
+    catS: "abonementas", seatSingle: "parduota pavieniui", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
     paid: "pirkėjas moka {p}, klubui {v}",
     noLayout: "Šio sektoriaus vietų išdėstymas bus rodomas po kito vietų plano nuskaitymo.",
     priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
@@ -224,7 +225,7 @@ const T = {
     updated: "Data updated {d} · refreshed hourly", games: "Games", arena: "Arena plan",
     upcoming: "Upcoming", played: "Played", all: "All", sort: "Sort", byDate: "Date", byExpected: "Crowd",
     bySingles: "Singles", byRevenue: "Revenue", byAvg: "Avg price", theme: "Theme", auto: "Auto", light: "Light", dark: "Dark",
-    nextGame: "Next game", seasonSeats: "Season-ticket seats", seasonSub: "never available ({n} games)",
+    nextGame: "Next game", seasonSeats: "Season-ticket seats", seasonSub: "taken from the start in every game ({n})",
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
     clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket price", avgValueSub: "incl. fees · club gets avg {p}",
     vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
@@ -239,7 +240,7 @@ const T = {
     seats: "Seats", season: "Season", single: "Single", free: "Available", full: "Taken",
     price: "Price", value: "Value", fee: "Fees", section: "Section",
     seatPlan: "Seat plan", seatHint: "Hover or tap a seat", row: "Row", place: "seat",
-    catS: "season ticket", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
+    catS: "season ticket", seatSingle: "single ticket sold", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
     paid: "buyer pays {p}, club gets {v}",
     noLayout: "Seat positions for this section appear after the next seat-plan scan.",
     priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
@@ -278,6 +279,20 @@ const dShort = (iso) => fmt(iso, { day: "numeric", month: "short" });
 const dFull = (iso) => fmt(iso, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const dTime = (iso) => fmt(iso, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const pct = (a, b) => b ? (100 * a / b) : 0;
+// "14 rungtynių", "3 rungtynės", "1 game"
+const gamesN = (n) => S.lang === "en" ? `${n} game${n === 1 ? "" : "s"}`
+  : `${n} ${n % 10 === 0 || (n % 100 > 10 && n % 100 < 20) ? "rungtynių" : "rungtynės"}`;
+// label point of a section outline: area-weighted centroid (a notch or an extra corner
+// doesn't pull it toward the edge), the corner average if the outline is degenerate
+function polyCenter(n){
+  let A = 0, x = 0, y = 0;
+  for (let i = 0; i < n.length; i++){
+    const [x0, y0] = n[i], [x1, y1] = n[(i + 1) % n.length], c = x0 * y1 - x1 * y0;
+    A += c; x += (x0 + x1) * c; y += (y0 + y1) * c;
+  }
+  if (Math.abs(A) < 1e-6) return [n.reduce((a, p) => a + p[0], 0) / n.length, n.reduce((a, p) => a + p[1], 0) / n.length];
+  return [x / (3 * A), y / (3 * A)];
+}
 const vilniusDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" }).format(d);
 function daysTo(iso){
   const a = Date.parse(vilniusDay(new Date()) + "T00:00:00Z"), b = Date.parse(vilniusDay(new Date(iso)) + "T00:00:00Z");
@@ -331,7 +346,7 @@ function renderKpis(){
   const k = [
     [t("nextGame"), next ? next.opp : "–", next ? dFull(next.start) + " · " + whenText(next) + " · " + nf(expectedOf(next)) + " " + t("expected") : ""],
     [t("seasonSeats"), nf(DATA.seasonSeats), t("seasonSub", { n: DATA.games.length })],
-    [t("singlesSold"), nf(singles), (S.when === "played" ? t("played") : t("upcoming")) + " · " + t("gamesN", { n: gs.length })],
+    [t("singlesSold"), nf(singles), (S.when === "played" ? t("played") : t("upcoming")) + " · " + gamesN(gs.length)],
     [t("clubRevenue"), eur(rev), t("clubRevenueSub")],
     [t("avgValue"), singles ? eur(gross / singles, 2) : "–", singles ? t("avgValueSub", { p: eur(rev / singles, 2) }) : ""]
   ];
@@ -351,7 +366,7 @@ function renderGames(){
       : `<div class="small muted">${t("noAtt")}</div>`) : "";
     return `<article class="panel card"><button type="button" class="card-open" data-game="${esc(g.id)}" aria-label="${esc(t("arena") + ": " + g.opp)}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="badge ${esc(g.comp)}">${esc(g.comp)}</span><span class="small muted">${esc(dFull(g.start))}</span></div>
-      <div><div class="small muted">${t("vs")}</div><div class="opp">${esc(g.opp)}</div><div class="small muted">${esc(whenText(g))}</div></div>
+      <div class="card-head"><div class="small muted">${t("vs")}</div><div class="opp">${esc(g.opp)}</div><div class="small muted">${esc(whenText(g))}</div></div>
       ${has ? `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="big num">${nf(expectedOf(g))}</span><span class="small muted">${t("expected")}</span></div>
       <div class="bar" aria-hidden="true"><i style="width:${pct(g.season, g.seats + (g.fans || 0))}%;background:var(--season)"></i><i style="width:${pct(g.fans || 0, g.seats + (g.fans || 0))}%;background:var(--fan)"></i><i style="width:${pct(g.singles, g.seats + (g.fans || 0))}%;background:var(--single)"></i></div>
       ${g.fans ? `<div class="small muted" style="margin-top:-6px">${esc(t("fanPart", { n: nf(expectedOf(g) - g.fans) }))}</div>` : ""}
@@ -417,7 +432,7 @@ function renderArena(){
   }).join("");
   const labels = shapes.filter(([id]) => byId[id] || fanById[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
-    const cx = n.reduce((a, p) => a + p[0], 0) / n.length, cy = n.reduce((a, p) => a + p[1], 0) / n.length;
+    const [cx, cy] = polyCenter(n);
     if (!byId[id]) return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="#FFFFFF">${esc(fanById[id].title)}</text>`;
     // label colour by the fill's brightness (withdrawn sections have no fill)
     const ink = byId[id].status === "closed" ? "var(--muted)" : labelInk(scale(sectionValue(byId[id])));
@@ -572,10 +587,23 @@ function fanPanel(f){
   <div class="panel"><div style="font-weight:600">${t("seatPlan")}</div><div id="seatBox"><div class="note">${t("loading")}</div></div></div>`;
 }
 
+// ticket value / fee of a section; a range when its open zones differ
+function openZones(s){ return (s.zones || []).filter((z) => z.open); }
+function valueRange(s){
+  const v = openZones(s).map((z) => z.price - (z.fee || 0));
+  if (v.length < 2 || Math.min(...v) === Math.max(...v)) return eur(s.price - (s.fee || 0));
+  return eur(Math.min(...v)) + "–" + eur(Math.max(...v));
+}
+function feeRange(s){
+  const f = openZones(s).map((z) => z.fee || 0);
+  if (f.length < 2 || Math.min(...f) === Math.max(...f)) return eur(s.fee);
+  return eur(Math.min(...f)) + "–" + eur(Math.max(...f));
+}
+
 function sectionPanel(s, g){
   return `<div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}${statusTag(s)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${s.priceMax != null && s.priceMax !== s.price ? eur(s.price) + "–" + eur(s.priceMax) : eur(s.price)}</div></div>
-    <div class="small muted">${t("value")} ${eur(s.price - (s.fee || 0))} · ${t("fee").toLowerCase()} ${eur(s.fee)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}${s.status === "closed" && s.closedAt ? " · " + t("closedOn", { d: dTime(s.closedAt) }) : ""}</div>
+    <div class="small muted">${t("value")} ${valueRange(s)} · ${t("fee").toLowerCase()} ${feeRange(s)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}${s.status === "closed" && s.closedAt ? " · " + t("closedOn", { d: dTime(s.closedAt) }) : ""}</div>
     ${(s.zones || []).length > 1 ? `<div class="small" style="margin-top:4px">${s.zones.map((z) => `<span style="white-space:nowrap${z.open ? "" : ";opacity:.6"}">${esc(z.name)} <b class="num">${eur(z.price)}</b>${z.open ? "" : " (" + t("soldOut").toLowerCase() + ")"}</span>`).join(" · ")}</div>` : ""}
     <div class="grid2">
       <div><span class="muted">${t("seats")}</span><b class="num">${nf(s.seats)}</b></div><div><span class="muted">${t("free")}</span><b class="num">${nf(s.available)}</b></div>
@@ -607,7 +635,7 @@ async function drawSeats(g, s){
   box.innerHTML = `<div class="seatwrap sb" id="seatWrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
     <div class="legend">${list.some((q) => q[4] === "F") ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN} · ${t("catF")}</span>`
-      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>`}</div>`;
+      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>`}</div>`;
   const svg = box.querySelector("svg");
   const show = (e) => { const r = e.target.closest("rect[data-i]"); if (!r) return; S.seat = +r.dataset.i; $("seatInfo").textContent = seatLabel(list[S.seat]); };
   svg.addEventListener("mouseover", show); svg.addEventListener("click", show);
@@ -708,11 +736,11 @@ function drawArenaShare(c, g, W, H){
   for (const [id, p] of pts){
     const s = A.byId[id], f = (g.fanSections || []).find((x) => x.id === id);
     if (!s && f){
-      const fx = p.reduce((a, q) => a + q[0], 0) / p.length, fy = p.reduce((a, q) => a + q[1], 0) / p.length;
+      const [fx, fy] = polyCenter(p);
       c.fillStyle = "#FFFFFF"; c.fillText(f.title, X(fx), Y(fy)); continue;
     }
     if (!s) continue;
-    const cx = p.reduce((a, q) => a + q[0], 0) / p.length, cy = p.reduce((a, q) => a + q[1], 0) / p.length;
+    const [cx, cy] = polyCenter(p);
     c.fillStyle = A.labelInk(A.scale(sectionValue(s))); c.fillText(shortTitle(s.title), X(cx), Y(cy));
   }
   c.textAlign = "left"; c.textBaseline = "alphabetic";
@@ -727,6 +755,12 @@ function drawArenaShare(c, g, W, H){
   lx += c.measureText(A.legend[1]).width + 40;
   c.setLineDash([6, 5]); c.strokeStyle = v("--seat-line"); c.lineWidth = 2; roundRect(c, lx, y - 22, 26, 26, 6); c.stroke(); c.setLineDash([]);
   c.fillText(t("notOnSale"), lx + 38, y);
+  if (g.fans){                                         // B Tribūna swatch; next line if it doesn't fit
+    lx += 38 + c.measureText(t("notOnSale")).width + 40;
+    if (lx + 38 + c.measureText(FAN).width > x1){ lx = x0; y += 44; }
+    roundRect(c, lx, y - 22, 26, 26, 6); c.fillStyle = v("--fan"); c.fill();
+    c.fillStyle = v("--muted"); c.fillText(FAN, lx + 38, y);
+  }
   // key numbers
   y += 40; const cells = [[t("season"), nf(g.season)], [t("singles"), nf(g.singles)], [t("revenue"), eur(g.revenue)]], colW = (x1 - x0) / 3;
   cells.forEach(([label, val], i) => {
@@ -778,7 +812,7 @@ function drawShare(c, g, W, H){
   }
   // metrics 2x2 (+ attendance for played games)
   const cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
-  if (g.played && g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(g.taken)]);
+  if (g.played && g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(expectedOf(g))]);
   y += 40; const colW = (x1 - x0) / 2, shown = cells.slice(0, 6);
   shown.forEach(([label, val], i) => {
     const cx = x0 + (i % 2) * colW, cy = y + Math.floor(i / 2) * 128;
@@ -815,7 +849,7 @@ async function openShare(gid, kind){
   share.url = URL.createObjectURL(blob);
   const name = `ryto-bilietai-${g.start.slice(0, 10)}-${g.opp.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase()}${kind === "arena" ? "-arena" : ""}.png`;
   share.file = new File([blob], name, { type: "image/png" });
-  $("shareBody").innerHTML = `<img src="${share.url}" alt="${esc(g.opp + " · " + nf(g.taken) + " " + t("expected"))}">`;
+  $("shareBody").innerHTML = `<img src="${share.url}" alt="${esc(g.opp + " · " + nf(expectedOf(g)) + " " + t("expected"))}">`;
   $("shareDl").href = share.url; $("shareDl").setAttribute("download", name);
   const canFiles = !!(navigator.canShare && navigator.canShare({ files: [share.file] }));
   $("shareGo").hidden = !(canFiles || navigator.share);
@@ -845,7 +879,7 @@ $("shareCopy").addEventListener("click", async () => {
 
 $("shareGo").addEventListener("click", async () => {
   if (!share.file) return;
-  const g = share.game, text = `${g.opp} · ${dFull(g.start)} · ${nf(g.taken)} ${t("expected")}`;
+  const g = share.game, text = `${g.opp} · ${dFull(g.start)} · ${nf(expectedOf(g))} ${t("expected")}`;
   try {
     if (navigator.canShare && navigator.canShare({ files: [share.file] })) await navigator.share({ files: [share.file], title: t("title"), text: text });
     else if (navigator.share) await navigator.share({ title: t("title"), text: text, url: location.href });
