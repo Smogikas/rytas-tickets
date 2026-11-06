@@ -232,7 +232,7 @@ class SheetsTest(unittest.TestCase):
         self.assertIn(["", "Visa arena (žemėlapio sektoriai)", 385], cap)
         self.assertIn(["", "Visas salės planas (su ložėmis ir kt.)", 393], cap)
         ov = f.tabs["Rungtynės"]
-        self.assertEqual(ov[0][6], "iš jų B Tribūna (110–111, įvert.)")
+        self.assertEqual(ov[0][6], "iš jų B Tribūna (įvert.)")
         self.assertEqual((ov[1][5], ov[1][6]), (6 + 246, 246))       # expected = taken 6 + fan sector 111 (246)
         # the capacity table survives a fresh start (hidden _capacity tab)
         self.wipe_local(); sheets.pull()
