@@ -81,7 +81,8 @@ def request(method, path, params=None, body=None):
             if (e.code == 429 or e.code >= 500) and attempt < 5:
                 time.sleep(min(64, 2 ** (attempt + 2)))
                 continue
-            raise
+            detail = e.read().decode("utf-8", "replace")[:500]
+            raise RuntimeError(f"Sheets API {method} {path}: HTTP {e.code}: {detail}") from e
 
 
 def rng(tab, cells=""):
@@ -100,7 +101,8 @@ def sheet_props():
 
 def add_tab(title, head, hidden=False, index=None):
     props = {"title": title, "hidden": hidden,
-             "gridProperties": {"rowCount": 1, "columnCount": len(head), "frozenRowCount": 1}}
+             # header row frozen; Google refuses to freeze all rows, so start with 2
+             "gridProperties": {"rowCount": 2, "columnCount": len(head), "frozenRowCount": 1}}
     if index is not None:
         props["index"] = index
     request("POST", ":batchUpdate", body={"requests": [{"addSheet": {"properties": props}}]})

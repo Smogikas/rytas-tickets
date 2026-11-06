@@ -58,6 +58,11 @@ class FakeSheets:
                 if "addSheet" in r:
                     p = r["addSheet"]["properties"]
                     assert p["title"] not in self.tabs
+                    g = p.get("gridProperties", {})
+                    # Google: "You can't freeze all visible rows on the sheet" (HTTP 400)
+                    assert g.get("frozenRowCount", 0) < g.get("rowCount", 1000), "would freeze all rows"
+                    # Google: a sheet can't hide its last visible tab
+                    assert not p.get("hidden") or any(not v["hidden"] for v in self.props.values())
                     self.tabs[p["title"]] = []
                     self.props[p["title"]] = {"sheetId": self.next_id, "hidden": p.get("hidden", False)}
                     self.next_id += 1
