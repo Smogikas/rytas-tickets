@@ -458,6 +458,31 @@ class Analysis(Base):
         tls["c"]["x"].append({"ts_utc": "T3", "section_id": "S", "seat_id": "x", "status": 1})
         self.assertEqual(rytas.classify_seats(tls["c"], {}, season)["x"][1], rytas.AVAILABLE)
 
+    def test_membership_section_counts_as_season_and_bcl_top8_has_none(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        self.site.prices = {e: copy.deepcopy(p) for e, p in self.site.prices.items()}
+        for e in self.site.prices:                             # 401 never on single sale (like 107)
+            self.site.close_section(e, "72935")
+        ev = rytas.load_events()
+        ev["events"]["PNJMMUNJYB"]["name"] = "BCL TOP 8: Vilniaus ''Rytas'' - Nantero ''Nanterre 92''"
+        rytas.save_events(ev)
+        with unittest.mock.patch.object(rytas, "SEASON_SECTIONS", {"72935": "401"}), \
+                unittest.mock.patch.object(rytas, "SEASON_MIN_GAMES", 2):
+            self.assertEqual(self.snapshot_all(), 0)
+            res = rytas.analyse_all(rytas.load_events())
+        lkl = res["ZPHZTQITUH"]["totals"]
+        self.assertEqual(res["ZPHZTQITUH"]["season_sections"], [("72935", "401", 40)])
+        self.assertEqual(lkl["season"], 6 + 6 + 40)            # 6 season seats in each sold section + the whole of 401
+        sec = {x["section_id"]: x for x in res["ZPHZTQITUH"]["sections"]}["72935"]
+        self.assertEqual((sec["seats"], sec["season"], sec["status"]), (40, 40, "soldout"))
+        top8 = res["PNJMMUNJYB"]["totals"]
+        self.assertEqual(top8["season"], 0)                    # Top 8: every taken seat is a single ticket
+        self.assertEqual(top8["singles"], top8["taken"])
+        self.assertEqual(res["PNJMMUNJYB"]["season_sections"], [])
+        self.assertTrue(rytas.season_covered("BCL: Vilniaus ''Rytas'' - Nantero ''Nanterre 92''"))
+        self.assertFalse(rytas.season_covered("BCL Top 8: Rytas - X"))
+        self.assertTrue(rytas.season_covered("LKL: Rytas - X (ketvirtfinalis)"))   # LKL playoffs are covered
+
     def test_seat_sold_in_one_game_before_tracking_is_not_season(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
         self.site.sell("PNJMMUNJYB", "72935", 3)

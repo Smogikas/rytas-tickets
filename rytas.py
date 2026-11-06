@@ -66,6 +66,13 @@ FAN_SECTIONS = {"79993": "110", "72934": "111"}
 # such a section counts as B Tribūna (full) in a game where it is not on sale online
 # while it is on sale in other games. Section numbers (start of the section title).
 FAN_EXTRA = ("109", "112")
+# Sections sold out as season memberships and never on single sale: every seat is a
+# season ticket in each game memberships cover (club posts, Aug 2026: 107 "išparduota").
+# Section id -> name. (107 AMUSNET Lounge, the 20-seat corner, is on sale and read normally.)
+SEASON_SECTIONS = {"87884": "107"}
+# Games memberships don't cover (BCL Top 8; a league-run final four): every seat is a
+# normal ticket there, so no season tickets are counted.
+NO_SEASON = re.compile(r"top\s*-?\s*8|ketvirtfinal|quarter.?final|final\s*four|finalo\s+ketvert", re.I)
 # Games whose sections sell out rather than get withdrawn: a section of such a game
 # leaving the sale list counts as sold out even with "22+" left at the last check.
 SELLOUT_OPPONENTS = ("Žalgiris",)
@@ -507,12 +514,20 @@ def season_groups(names):
     Games of the same competition are compared (season tickets might not cover
     every competition); a competition with fewer than 3 tracked games is
     compared with all games."""
+    covered = {eid: n for eid, n in names.items() if season_covered(n)}
     by_comp = defaultdict(list)
-    for eid, name in names.items():
+    for eid, name in covered.items():
         by_comp[competition(name)].append(eid)
-    everyone = tuple(sorted(names))
-    return {eid: tuple(sorted(by_comp[competition(n)])) if len(by_comp[competition(n)]) >= 3 else everyone
-            for eid, n in names.items()}
+    everyone = tuple(sorted(covered))
+    groups = {eid: tuple(sorted(by_comp[competition(n)])) if len(by_comp[competition(n)]) >= 3 else everyone
+              for eid, n in covered.items()}
+    groups.update({eid: () for eid in names if eid not in covered})   # not covered: no season tickets
+    return groups
+
+
+def season_covered(name):
+    """Do season memberships cover this game? Not BCL Top 8 (or a league-run final four)."""
+    return not ("BCL" in competition(name).upper() and NO_SEASON.search(name))
 
 
 def season_seats(group, tls):
@@ -800,6 +815,19 @@ def analyse_all(ev, with_seats=False):
         for k in ("seats", "taken", "season"):
             t[k] += t["season_off"]
         out[eid]["season_off_sections"] = sorted((sid, sec_titles.get(sid, sid), n) for sid, n in off.items())
+        # sections sold out as memberships, never on single sale (107): all season tickets
+        whole = [(sid, name, cap[sid]) for sid, name in SEASON_SECTIONS.items()
+                 if g and sid in cap and sid not in on_sale] if g else []
+        n_whole = sum(c for _s, _n, c in whole)
+        for k in ("seats", "taken", "season"):
+            t[k] += n_whole
+        out[eid]["season_total"] += n_whole
+        out[eid]["season_sections"] = whole
+        for sid, name, c in whole:
+            out[eid]["sections"].append(dict(
+                section_id=sid, section=name, seats=c, available=0, taken=c, season=c, sold_seen=0,
+                pre_taken=0, singles=0, revenue=0.0, gross=0.0, price=None, fee=None, price_max=None,
+                zones=[], opened_later=None, status="soldout", closed_at=None, history=[], whole=True))
         out[eid]["fan_sections"] = fans
         out[eid]["totals"]["fans_est"] = sum(n for _s, _n, n in fans)
         out[eid]["totals"]["expected"] = out[eid]["totals"]["taken"] + out[eid]["totals"]["fans_est"]
@@ -816,10 +844,12 @@ def capacity_table(ev, res=None):
         for r in load_snapshots(eid):
             titles[r["section_id"]] = r["section"]
     titles.update({sid: f"{name} (B Tribūna)" for sid, name in FAN_SECTIONS.items()})
+    titles.update({sid: f"{name} (abonementai)" for sid, name in SEASON_SECTIONS.items()})
     seen = defaultdict(list)          # section -> seats on sale per game
     for eid, r in res.items():
         for x in r["sections"]:
-            seen[x["section_id"]].append(x["seats"])
+            if not x.get("whole"):
+                seen[x["section_id"]].append(x["seats"])
     rows, totals = [], {}
     for conf in confs:
         cap = load_capacity(conf)
@@ -1107,6 +1137,10 @@ def cmd_season(args):
         print(f"  {'Section':<32}{'Season':>7}{'Seats':>7}")
         for sid, n in sorted(by_sec.items(), key=lambda kv: (titles.get(kv[0], kv[0]))):
             print(f"  {titles.get(sid, sid)[:30]:<32}{n:>7}{cap.get(sid, ''):>7}")
+        if group:
+            for sid, name in SEASON_SECTIONS.items():
+                if sid in cap:
+                    print(f"  {name + ' (whole section, memberships)':<32}{cap[sid]:>7}{cap[sid]:>7}")
     print(f"\nA seat counts once it is seen in {SEASON_MIN_GAMES}+ games (2+ while fewer games have data) "
           "and is taken the first time it is seen in every one. More games tracked = better estimate.")
     return 0
@@ -1211,9 +1245,11 @@ def cmd_export(args):
             if lo:
                 per[sid].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), cat, p, f, ts])
         fan_ids = {sid for sid, _n, _c in r["fan_sections"]}
-        for lo in layout.values():          # fan sectors: their seats from the venue plan
-            if lo["section_id"] in fan_ids:
-                per[lo["section_id"]].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), "F", None, None, None])
+        whole_ids = {sid for sid, _n, _c in r.get("season_sections", [])}
+        for lo in layout.values():          # B Tribūna / membership sections: seats from the venue plan
+            if lo["section_id"] in fan_ids or lo["section_id"] in whole_ids:
+                cat = "F" if lo["section_id"] in fan_ids else "S"
+                per[lo["section_id"]].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), cat, None, None, None])
         (out / "seats" / f"{eid}.json").write_text(json.dumps(per, ensure_ascii=False, separators=(",", ":")),
                                                   encoding="utf-8")
     shapes = defaultdict(list)
