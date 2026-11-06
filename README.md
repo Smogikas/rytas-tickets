@@ -91,6 +91,11 @@ Seat ids are the same in every game, so for each game:
 
 Played games are kept: tracking stops at tip-off, the data stays.
 
+**Warnings**: a small ⚠ badge next to "Duomenys atnaujinti" on the page (tap it for the list) when
+the page has not updated for 3+ hours, a game could not be read from bilietai.lt, saving to the
+Sheet or the new-game check failed, or a game's seat plans are missing or overdue. Details are in
+the run logs (GitHub → Actions). GitHub also emails the repository owner when a run fails.
+
 ## Data: Google Sheet
 
 Tabs: **Rungtynės** (overview, one row per game), **one tab per game** (e.g. `2026-11-11 Nanterre 92`: every price change and seat change, „Įrašas" = kaina / vieta) **Talpa** (seats per section and arena capacity) and hidden technical tabs (`_events`, `_series`, `_layout`, `_shapes`, `_capacity`).

@@ -99,6 +99,7 @@ jobs:
 
       # daily, in the run that starts at 23:xx Vilnius time (or on request)
       - name: Discover new games
+        id: disc
         if: env.COLLECT == 'true'
         env:
           ASKED: ${{ inputs.discover }}
@@ -114,7 +115,7 @@ jobs:
       # activity, and this job writes to the Sheet, not the repo. Re-enabling the
       # workflow twice a month (1st and 15th, 23:xx; also on manual runs) keeps the hourly schedule alive.
       - name: Keep the schedule alive
-        if: env.COLLECT == 'true'
+        if: ${{ !cancelled() && env.COLLECT == 'true' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -124,19 +125,22 @@ jobs:
             gh api -X PUT "repos/${{ github.repository }}/actions/workflows/snapshot.yml/enable" && echo "Schedule re-enabled"
           fi
 
+      # !cancelled(): a failed step above (e.g. the new-game check) must not stop collecting
       - name: Snapshot
-        if: env.COLLECT == 'true'
+        id: snap
+        if: ${{ !cancelled() && env.COLLECT == 'true' && steps.pull.outcome == 'success' }}
         env:
           SEATS: ${{ inputs.seats && '--seats' || '' }}
         run: python rytas.py snapshot $SEATS
 
       - name: Game starting soon?
         id: soon
-        if: env.COLLECT == 'true' && steps.pull.outcome == 'success'
+        if: ${{ !cancelled() && env.COLLECT == 'true' && steps.pull.outcome == 'success' }}
         run: python rytas.py final --check
 
       # only after a successful load, so rows are never uploaded twice
       - name: Save data
+        id: save
         if: always() && env.COLLECT == 'true' && steps.pull.outcome == 'success'
         run: |
           if [ "$STORE" = sheet ]; then
@@ -163,6 +167,9 @@ jobs:
       - name: Build page
         id: site
         if: always() && steps.pull.outcome == 'success'
+        env:
+          # failed steps of this run -> warnings on the page
+          RUN_OUTCOMES: snap=${{ steps.snap.outcome }} disc=${{ steps.disc.outcome }} save=${{ steps.save.outcome }}
         run: |
           python rytas.py export _site
           cp site/index.html _site/

@@ -14,7 +14,7 @@
 :root{
   --bg:#F6EFE2; --panel:#FFFAF0; --ink:#2A1C11; --muted:#6B5644; --line:#E2D3BA;
   --accent:#7B4A23; --accent-ink:#FFF8EC; --season:#6F6052; --single:#C47A2C; --free:#F6EFE2; --seat-line:#B8A386;
-  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46;
+  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46; --warn:#B4532A;
   color-scheme: light;
 }
 /* dark: charcoal with amber; teal for the data (as in light) */
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
     --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
+    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
   --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
+  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -141,6 +141,9 @@ td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration
 .hist{display:flex;flex-direction:column;gap:4px;font-size:13px;max-height:180px;overflow:auto}
 .hist div{display:flex;justify-content:space-between;gap:10px}
 .note{font-size:12px;color:var(--muted)}
+.warnbtn{font:inherit;font-size:12px;font-weight:700;color:var(--warn);background:transparent;border:1px solid currentColor;border-radius:999px;padding:0 8px;margin-left:6px;cursor:pointer;line-height:18px}
+.warnbox{margin-top:8px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;font-size:12px;max-width:600px;color:var(--ink)}
+.warnbox ul{margin:0 0 6px;padding-left:18px}.warnbox li{margin:2px 0}.warnbox a{color:var(--warn)}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 .err{padding:18px;border-radius:12px;border:1px solid var(--single)}
 @media (max-width:560px){.kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}h1{font-size:26px}.big{font-size:34px}.kpi .v{font-size:20px}}
@@ -153,6 +156,7 @@ td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration
       <div class="eyebrow" data-t="eyebrow"></div>
       <h1 data-t="title"></h1>
       <div class="small muted" id="updated"></div>
+      <div class="warnbox" id="warnBox" hidden></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <div class="seg small-seg" role="group" aria-label="Language" id="langSeg"></div>
@@ -201,6 +205,14 @@ const T = {
     noGames: "Šiame sąraše rungtynių nėra.", noData: "vietų duomenys dar renkami",
     modeTaken: "% užimta", modePrice: "Kaina", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
+    arenaCap: "bendra arenos talpa", warnBtn: "Įspėjimai: {n}", warnMore: "Plačiau: GitHub → Actions (paleidimų žurnalai)",
+    warn_old: "Duomenys neatnaujinti {h} val. – automatiniai paleidimai gali būti sustoję arba nepavykę.",
+    warn_readAll: "bilietai.lt šį kartą nepavyko nuskaityti nė vienų rungtynių ({detail}).",
+    warn_read: "Nepavyko nuskaityti rungtynių: {game} ({detail}).",
+    warn_save: "Nepavyko įrašyti į Google Sheet – šio paleidimo duomenys neišsaugoti.",
+    warn_discover: "Nepavyko patikrinti, ar atsirado naujų rungtynių ({detail}).",
+    warn_nodata: "{game}: dar nėra vietų duomenų.",
+    warn_stale: "{game}: vietų planas neatnaujintas nuo {d}.",
     pickSection: "Spustelėkite sektorių žemėlapyje arba lentelėje.",
     seats: "Vietos", season: "Abonementai", single: "Pavieniai", free: "Laisvos", full: "Užimta",
     price: "Kaina", value: "Vertė", fee: "Mokesčiai", section: "Sektorius",
@@ -236,6 +248,14 @@ const T = {
     noGames: "No games in this list.", noData: "seat data still being collected",
     modeTaken: "% taken", modePrice: "Price", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
+    arenaCap: "total arena capacity", warnBtn: "Warnings: {n}", warnMore: "Details: GitHub → Actions (run logs)",
+    warn_old: "Data not updated for {h} h – the automatic runs may have stopped or failed.",
+    warn_readAll: "bilietai.lt: no game could be read this time ({detail}).",
+    warn_read: "Could not read game: {game} ({detail}).",
+    warn_save: "Saving to the Google Sheet failed – this run's data was not saved.",
+    warn_discover: "The check for new games failed ({detail}).",
+    warn_nodata: "{game}: no seat data yet.",
+    warn_stale: "{game}: seat plan not updated since {d}.",
     pickSection: "Click a section on the map or in the table.",
     seats: "Seats", season: "Season", single: "Single", free: "Available", full: "Taken",
     price: "Price", value: "Value", fee: "Fees", section: "Section",
@@ -331,12 +351,31 @@ function render(){
   $("foot").textContent = t("foot");
   if (!DATA) return;
   $("updated").textContent = t("updated", { d: dTime(DATA.updated) });
+  renderHealth();
   renderKpis();
   if (S.tab === "games") renderGames(); else renderArena();
 }
 
 function listGames(){
   return DATA.games.filter((g) => (S.when === "played") === g.played);
+}
+
+// health: problems reported by the last run + a page that stopped updating (> 3 h old)
+function healthItems(){
+  const w = (DATA.warnings || []).slice(), h = (Date.now() - new Date(DATA.updated).getTime()) / 36e5;
+  if (h > 3) w.unshift({ code: "old", hours: Math.floor(h) });
+  return w;
+}
+function renderHealth(){
+  const items = healthItems(), box = $("warnBox");
+  if (!items.length){ box.hidden = true; return; }
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "warnbtn"; btn.textContent = "⚠ " + items.length;
+  btn.setAttribute("aria-label", t("warnBtn", { n: items.length })); btn.setAttribute("aria-expanded", String(!box.hidden));
+  btn.onclick = () => { box.hidden = !box.hidden; btn.setAttribute("aria-expanded", String(!box.hidden)); };
+  $("updated").appendChild(btn);
+  const text = (w) => t("warn_" + w.code, { game: w.game || "", detail: w.detail || "–", d: w.since ? dTime(w.since) : "", h: w.hours });
+  box.innerHTML = `<ul>${items.map((w) => `<li>${esc(text(w))}</li>`).join("")}</ul><a href="https://github.com/Smogikas/rytas-tickets/actions" target="_blank" rel="noopener">${esc(t("warnMore"))}</a>`;
 }
 
 function renderKpis(){
@@ -451,7 +490,7 @@ function renderArena(){
       <div class="panel mapbox">
         <div class="controls">
           <div><div class="disp" style="font-size:20px;font-weight:700">${esc(g.opp)}</div>
-          <div class="small muted">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
+          <div class="small muted">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${(DATA.arenaCap || {})[g.conf] ? " · " + t("arenaCap") + " " + nf(DATA.arenaCap[g.conf]) : ""}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg small-seg" role="group" id="modeSeg"></div>
             <button type="button" class="btn" id="arenaShare" aria-label="${esc(t("share") + ": " + t("arena") + " " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
         </div>

@@ -41,6 +41,7 @@ LAYOUT = DATA / "layout.csv"             # seat positions for drawing the seat p
 SHAPES = DATA / "shapes.csv"             # section outlines of the arena overview map
 CAPACITY = DATA / "capacity.csv"         # seats per section in the full venue plan
 EVENTS = ROOT / "events.json"
+RUN_STATUS = DATA / "run_status.json"    # what failed in this run, for the page's warnings
 # Local working copies. The GitHub job loads them from / saves them to the
 # Google Sheet (sheets.py), so no data is stored in the repository.
 
@@ -864,6 +865,13 @@ def cmd_add_series(args):
     print("Run `snapshot` (or wait for the hourly job) to log them.")
 
 
+def note_status(key, value):
+    """Record what failed in this run (data/run_status.json) for the page's warnings."""
+    st = load_json(RUN_STATUS, {})
+    st[key] = value
+    save_json(RUN_STATUS, st)
+
+
 def cmd_discover(args):
     ev = load_events()
     if not ev["series"]:
@@ -879,6 +887,7 @@ def cmd_discover(args):
         except Exception as e:
             failed = True
             print(f"{sid}: failed: {e}", file=sys.stderr)
+            note_status("discover", str(e)[:200])
     save_events(ev)
     return 1 if failed else 0
 
@@ -888,19 +897,21 @@ def cmd_snapshot(args):
     if not ev["events"]:
         print("No events tracked. Use: rytas.py add-series <url>", file=sys.stderr)
         return 1
-    failed = False
+    failed, tried = [], 0
     now = datetime.now(timezone.utc)
     try:
         for eid, meta in ev["events"].items():
             if parse_ts(meta["start_utc"]) < now:
                 continue  # game started, sales are over
+            tried += 1
             try:
                 print(f"{eid} {meta['start_utc'][:10]}: " + snapshot_event(eid, meta, now, args.seats))
             except Exception as e:  # keep going for other events
-                failed = True
+                failed.append({"id": eid, "error": str(e)[:200]})
                 print(f"{eid}: failed: {e}", file=sys.stderr)
     finally:
         save_events(ev)
+        note_status("snapshot", {"tried": tried, "failed": failed, "at": now_utc()})
     return 1 if failed else 0
 
 
@@ -1088,6 +1099,45 @@ def r2(x):
     return None if x is None else round(x, 2)
 
 
+def health_warnings(ev, res, now):
+    """Problems for the page's warning badge: [{code, game?, detail?, since?}].
+
+    From this run: games that could not be read (snapshot), the new-game check, saving to
+    the Sheet (RUN_OUTCOMES from the workflow). From the data: upcoming games without seat
+    data or whose seat plans are overdue. (A page that stops updating altogether is
+    detected by the page itself from `updated`.)"""
+    out = []
+    st = load_json(RUN_STATUS, {})
+    opp = {eid: split_name(m["name"])[1] for eid, m in ev["events"].items()}
+    snap = st.get("snapshot") or {}
+    failed = snap.get("failed") or []
+    if failed and len(failed) == snap.get("tried") and len(failed) > 1:
+        out.append({"code": "readAll", "detail": failed[0]["error"]})
+    else:
+        out += [{"code": "read", "game": opp.get(f["id"], f["id"]), "detail": f["error"]} for f in failed]
+    if st.get("discover"):
+        out.append({"code": "discover", "detail": st["discover"]})
+    outcomes = dict(x.split("=", 1) for x in os.environ.get("RUN_OUTCOMES", "").split() if "=" in x)
+    if outcomes.get("save") == "failure":
+        out.append({"code": "save"})
+    if outcomes.get("snap") == "failure" and not failed:
+        out.append({"code": "readAll", "detail": ""})
+    for eid, meta in ev["events"].items():
+        start = parse_ts(meta["start_utc"])
+        if start <= now:
+            continue
+        if not res[eid]["totals"]["sections"]:
+            out.append({"code": "nodata", "game": opp[eid]})
+            continue
+        last = meta.get("last_seats_utc")
+        if last:
+            hours_left = (start - now).total_seconds() / 3600
+            interval = 1 if hours_left <= 48 else 6 if hours_left <= 24 * 14 else 24
+            if now - parse_ts(last) > timedelta(hours=2 * interval + 1):
+                out.append({"code": "stale", "game": opp[eid], "since": last})
+    return out
+
+
 def cmd_export(args):
     """Write the website's data: <dir>/data.json (games, sections, map) and
     <dir>/seats/<game>.json (every seat with its category and price)."""
@@ -1145,8 +1195,14 @@ def cmd_export(args):
     for s in read_csv(SHAPES):
         shapes[s["conf_id"]].append([s["section_id"], s["points"]])
     any_res = next(iter(res.values()), {})
+    # total arena capacity: seats of every section drawn on the arena map (full venue plan)
+    arena_cap = {}
+    for conf, shp in shapes.items():
+        cap = load_capacity(conf)
+        arena_cap[conf] = sum(cap.get(sid, 0) for sid, _pts in shp)
     data = {"updated": now_utc(), "seasonSeats": any_res.get("season_total", 0),
-            "games": games, "sections": sections, "shapes": shapes}
+            "games": games, "sections": sections, "shapes": shapes, "arenaCap": arena_cap,
+            "warnings": health_warnings(ev, res, now)}
     (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Exported {len(games)} games to {out}")
     return 0

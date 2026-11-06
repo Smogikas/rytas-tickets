@@ -109,6 +109,7 @@ class Base(unittest.TestCase):
             "EVENTS": self.tmp / "events.json", "PAUSE": 0,
             "LAYOUT": self.tmp / "data" / "layout.csv", "SHAPES": self.tmp / "data" / "shapes.csv",
             "CAPACITY": self.tmp / "data" / "capacity.csv",
+            "RUN_STATUS": self.tmp / "data" / "run_status.json",
         }.items():
             p = unittest.mock.patch.object(rytas, name, value)
             p.start()
@@ -607,6 +608,50 @@ class Commands(Base):
             self.assertEqual(self.snapshot_all(), 1)
         self.assertTrue(rytas.seat_path("PNJMMUNJYB").exists())
         self.assertTrue(rytas.seat_path("JSAIJZ5XW2").exists())
+
+    def test_warnings_on_the_page(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        orig = self.site.get_json
+
+        def flaky(url):
+            if "ZPHZTQITUH" in url:
+                raise OSError("network down")
+            return orig(url)
+        with unittest.mock.patch.object(rytas, "get_json", flaky):
+            self.snapshot_all()
+
+        def export(env=""):
+            with unittest.mock.patch.dict(rytas.os.environ, {"RUN_OUTCOMES": env}), \
+                    unittest.mock.patch.object(rytas, "datetime", wraps=rytas.datetime) as dt:
+                dt.now.return_value = NOW
+                rytas.main(["export", str(self.tmp / "site")])
+            return json.loads((self.tmp / "site" / "data.json").read_text(encoding="utf-8"))
+        d = export("snap=failure disc=skipped save=failure")
+        codes = [(w["code"], w.get("game")) for w in d["warnings"]]
+        self.assertIn(("read", "Jonavos „Jonava Hipocredit“"), codes)
+        self.assertIn(("save", None), codes)
+        self.assertIn(("nodata", "Jonavos „Jonava Hipocredit“"), codes)   # never read: no seat data
+        self.assertEqual(d["arenaCap"], {"1769507581": 28 + 16 + 40 + 8 + 10})   # map sections only
+        # bilietai.lt answers nothing: one warning, not one per game
+        with unittest.mock.patch.object(rytas, "get_json", side_effect=OSError("HTTP 403")):
+            self.snapshot_all()
+        d = export("snap=failure")
+        self.assertEqual([w["code"] for w in d["warnings"] if w["code"].startswith("read")], ["readAll"])
+        # all fine
+        self.snapshot_all()
+        self.assertEqual(export("snap=success disc=skipped save=success")["warnings"], [])
+
+    def test_overdue_seat_plans_warning(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        self.snapshot_all()
+        ev = rytas.load_events()
+        ev["events"]["JSAIJZ5XW2"]["last_seats_utc"] = (NOW - rytas.timedelta(hours=50)).isoformat()  # game in 16 d: due daily
+        rytas.save_events(ev)
+        res = rytas.analyse_all(ev)
+        w = rytas.health_warnings(ev, res, NOW)
+        self.assertEqual([(x["code"], x["game"]) for x in w], [("stale", "Utenos „Juventus“")])
+        ev["events"]["JSAIJZ5XW2"]["last_seats_utc"] = (NOW - rytas.timedelta(hours=10)).isoformat()
+        self.assertEqual(rytas.health_warnings(ev, res, NOW), [])
 
     def test_past_games_skipped(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
