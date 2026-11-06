@@ -306,6 +306,41 @@ class Commands(Base):
     def test_split_name(self):
         self.assertEqual(rytas.split_name("LKL: Vilniaus ''Rytas'' - Kauno ''Žalgiris''"), ("LKL", "Kauno „Žalgiris“"))
 
+    def test_price_check_triggers_targeted_seat_checks(self):
+        E = "PNJMMUNJYB"
+        rytas.main(["add-series", E])
+        self.snapshot_all(seats=True)               # full scan of every game
+        seat_calls = lambda: [u for u in self.site.requests if "/sections/" in u]
+        n0, s0 = len(self.site.requests), len(seat_calls())
+
+        # nothing changed: hourly run = prices only
+        self.snapshot_all(seats=False)
+        self.assertEqual(len(self.site.requests) - n0, 3)
+
+        # 3 sold in Parteris 2 (22 left -> 19, visible under the cap): only that section is read
+        self.site.sell(E, "83548", 3)
+        s1 = len(seat_calls())
+        self.snapshot_all(seats=False)
+        self.assertEqual([u.split("/sections/")[1].split("/")[0] for u in seat_calls()[s1:]], ["83548"])
+        tl = rytas.timelines(rytas.load_seats(E))
+        self.assertEqual(sum(1 for rows in tl.values() if rows[0]["status"] == 1 and rows[-1]["status"] == 0), 3)
+
+        # 3 sold in 401 (34 left -> 31, shown as 22 both times): no signal, waits for the full scan
+        self.site.sell(E, "72935", 3)
+        s2 = len(seat_calls())
+        self.snapshot_all(seats=False)
+        self.assertEqual(seat_calls()[s2:], [])
+
+        # VIP closes: its remaining seats are marked taken right away; reopening brings them back
+        self.site.close_section(E, "94921")
+        self.snapshot_all(seats=False)
+        vip = [r for r in rytas.latest_by(rytas.load_seats(E), lambda r: r["seat_id"]).values() if r["section_id"] == "94921"]
+        self.assertEqual(sum(r["status"] for r in vip), 0)
+        self.site.prices[E]["eventSections"].append(copy.deepcopy(PRICES["eventSections"][1]))
+        self.snapshot_all(seats=False)
+        vip = [r for r in rytas.latest_by(rytas.load_seats(E), lambda r: r["seat_id"]).values() if r["section_id"] == "94921"]
+        self.assertEqual(sum(r["status"] for r in vip), 10)
+
     def test_add_single_event(self):
         self.assertEqual(rytas.main(["add", "ZPHZTQITUH"]), 0)
         self.assertTrue(rytas.seat_path("ZPHZTQITUH").exists())

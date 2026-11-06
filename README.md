@@ -47,8 +47,11 @@ Seat ids are the same in every game, so for each game:
 ## Schedule (GitHub Actions, `.github/workflows/snapshot.yml`)
 
 - **hourly (:17 UTC)**: tests → load data from the Sheet → prices for every upcoming game;
-  seat plans hourly in the last 48 h before a game, every 6 h within 14 days, daily otherwise
-  → save new rows to the Sheet → rebuild and publish the page.
+  full seat plans hourly in the last 48 h before a game, every 6 h within 14 days, daily
+  otherwise → save new rows to the Sheet → rebuild and publish the page.
+  Between full scans, when the hourly price check sees a section open or close, a price
+  change, or fewer tickets left in a section showing under 20, that section's seat plan is
+  read right away (sections showing "20+" give no signal and wait for the full scan).
 - **Mondays 05:41 UTC**: look for new or rescheduled games of the tracked season.
 - **code push**: tests, then the page is rebuilt (no data collection).
 - **manual** (Actions → *Ticket snapshot* → *Run workflow*): track a season or a game,

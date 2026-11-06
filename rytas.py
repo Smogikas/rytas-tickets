@@ -272,8 +272,9 @@ def take_snapshot(event_id, prices):
     return rows, written
 
 
-def take_seat_snapshot(event_id, prices):
-    """Fetch the seat plan of every open section and log seats whose status changed.
+def take_seat_snapshot(event_id, prices, only=None):
+    """Fetch the seat plan of every open section (or only the sections in
+    `only`) and log seats whose status changed.
 
     Sections only appear in the prices list while on sale; some open later.
     A section seen before that no longer returns a seat plan has its
@@ -285,6 +286,8 @@ def take_seat_snapshot(event_id, prices):
     open_ids = [str(s["id"]) for s in prices.get("eventSections", [])]
     had_available = {r["section_id"] for r in last.values() if r["status"] == 1}
     to_fetch = open_ids + sorted(had_available - set(open_ids))
+    if only is not None:
+        to_fetch = [sid for sid in to_fetch if sid in only]
 
     current = {}
     known_layout = {r["seat_id"] for r in read_csv(LAYOUT)}
@@ -349,6 +352,13 @@ def snapshot_event(event_id, meta, now, force_seats=False):
         meta["last_seats_utc"] = now_utc()
         avail = sum(r["status"] for r in current.values())
         msg += f"; seats: {len(current)} in {n} sections, {avail} available, {len(changed)} changed"
+    elif written:
+        # Between full scans: the hourly price check saw something change in
+        # these sections (opened, closed, price changed, or tickets left
+        # changed while under the 22 cap = sales), so read just their seat plans now.
+        changed_sections = {r["section_id"] for r in written}
+        current, changed, n = take_seat_snapshot(event_id, prices, only=changed_sections)
+        msg += f"; seats of {n} changed section(s): {len(changed)} seats changed"
     return msg
 
 
