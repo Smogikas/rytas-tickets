@@ -56,6 +56,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write   # only used until the Google key exists (data committed to the repo)
     env:
       GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
       COLLECT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -68,9 +70,18 @@ jobs:
           python-version: "3.12"
       - run: pip install google-auth==2.38.0 requests==2.32.3
 
-      - name: Load data from Google Sheet
+      # Google Sheet when the GOOGLE_SA_KEY secret exists; until then the data
+      # stays in the repo (data/, events.json) as before, so tracking never pauses
+      - name: Load data
         id: pull
-        run: python sheets.py pull
+        run: |
+          if [ -n "$GOOGLE_SA_KEY" ]; then
+            echo "STORE=sheet" >> "$GITHUB_ENV"
+            python sheets.py pull
+          else
+            echo "STORE=repo" >> "$GITHUB_ENV"
+            echo "No GOOGLE_SA_KEY secret yet: using the data in the repository"
+          fi
 
       - name: Add series
         if: env.COLLECT == 'true' && inputs.add_series != ''
@@ -95,9 +106,29 @@ jobs:
         run: python rytas.py snapshot $SEATS
 
       # only after a successful load, so rows are never uploaded twice
-      - name: Save data to Google Sheet
+      - name: Save data
         if: always() && env.COLLECT == 'true' && steps.pull.outcome == 'success'
-        run: python sheets.py push
+        run: |
+          if [ "$STORE" = sheet ]; then
+            python sheets.py push
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in data events.json; do
+            if [ -e "$f" ]; then git add "$f"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          exit 1
 
       - name: Build page
         id: site
