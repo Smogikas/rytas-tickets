@@ -730,7 +730,10 @@ def analyse_all(ev, with_seats=False):
     tls = {eid: timelines(load_seats(eid)) for eid in names}
     groups = season_groups(names)
     cache, out = {}, {}
-    zn = zone_names(read_csv(SNAPSHOTS))
+    all_prices = read_csv(SNAPSHOTS)
+    zn = zone_names(all_prices)
+    sec_titles = {r["section_id"]: r["section"] for r in all_prices}
+    seat_sec = {seat: rows[-1]["section_id"] for tl in tls.values() for seat, rows in tl.items()}
     for eid in names:
         g = groups[eid]
         if g not in cache:
@@ -741,6 +744,15 @@ def analyse_all(ev, with_seats=False):
         out[eid]["season_total"] = len(cache[g])
         if with_seats:
             out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows, zn), cache[g])
+        # season seats in sections not on sale online for this game: the holders still
+        # have their seats, so they count as season tickets / taken / expected crowd
+        seen = tls[eid]
+        off = Counter(seat_sec[s] for s in cache[g] if s not in seen)
+        t = out[eid]["totals"]
+        t["season_off"] = sum(off.values())
+        for k in ("seats", "taken", "season"):
+            t[k] += t["season_off"]
+        out[eid]["season_off_sections"] = sorted((sid, sec_titles.get(sid, sid), n) for sid, n in off.items())
         # fan sectors not on sale for this game: assume full (their whole capacity)
         cap = load_capacity(ev["events"][eid].get("conf_id", ""))
         on_sale = {rows[-1]["section_id"] for rows in tls[eid].values()}
@@ -954,6 +966,11 @@ def print_summary(ev, res):
         print(f"{meta['start_utc'][:10]:<11}{name[:43]:<44}{t['seats']:>7}{t['available']:>7}{t['taken']:>7}"
               f"{t['season']:>8}{t['singles']:>8}{t['sold_seen']:>6}{money(t['revenue']):>10}"
               f"{money(t['avg_price']):>6}{(att if att is not None else '-'):>8}")
+    for eid, meta in ev["events"].items():
+        off = res[eid].get("season_off_sections") or []
+        if off:
+            print(f"{meta['start_utc'][:10]} season seats in sections not on sale: "
+                  + ", ".join(f"{title} {n}" for _sid, title, n in off))
     print("\nSeason = seats never available in any tracked game (season tickets). Single = Taken - Season."
           "\nSeen = online sales observed while tracking. Revenue/Avg in EUR, excl. fees, singles only."
           "\nDetails: rytas.py report <id>")
@@ -1070,7 +1087,7 @@ def cmd_export(args):
             "id": eid, "name": meta["name"], "comp": comp, "opp": opp, "start": meta["start_utc"],
             "played": parse_ts(meta["start_utc"]) <= now, "conf": meta.get("conf_id", ""),
             "seats": t["seats"], "available": t["available"], "withdrawn": t["withdrawn_free"],
-            "taken": t["taken"], "season": t["season"],
+            "taken": t["taken"], "season": t["season"], "seasonOff": t["season_off"],
             "singles": t["singles"], "seen": t["sold_seen"], "before": t["pre_taken"],
             "fans": t["fans_est"], "expected": t["expected"],
             "fanSections": [{"id": sid, "title": name, "seats": n} for sid, name, n in r["fan_sections"]],

@@ -363,6 +363,20 @@ class Analysis(Base):
         rytas.main(["attendance", E, "70"])
         self.assertEqual(rytas.main(["report", E]), 0)
 
+    def test_season_seats_count_in_a_game_where_their_section_is_not_on_sale(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        G3 = "JSAIJZ5XW2"
+        self.site.close_section(G3, "72935")                  # never on sale online for game 3
+        with unittest.mock.patch.object(rytas, "SEASON_MIN_GAMES", 2):
+            self.assertEqual(self.snapshot_all(), 0)
+            res = rytas.analyse_all(rytas.load_events())
+        t1, t3 = res["PNJMMUNJYB"]["totals"], res[G3]["totals"]
+        self.assertEqual(t3["season_off"], 6)                  # its 6 season seats still count
+        self.assertEqual(t3["season"], t1["season"])
+        self.assertEqual(t3["taken"] - t3["season"], t1["taken"] - t1["season"])   # singles unchanged
+        self.assertEqual(res[G3]["season_off_sections"], [("72935", "401", 6)])
+        self.assertEqual(t1["season_off"], 0)
+
     def test_seat_sold_in_one_game_before_tracking_is_not_season(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
         self.site.sell("PNJMMUNJYB", "72935", 3)
