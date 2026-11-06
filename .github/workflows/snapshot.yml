@@ -2,8 +2,8 @@ name: Ticket snapshot
 
 on:
   schedule:
-    - cron: "17 * * * *"   # hourly at :17 UTC: prices every hour, seat plans when due
-    - cron: "41 5 * * 1"   # Mondays 05:41 UTC: look for new / rescheduled games
+    - cron: "17 * * * *"   # hourly at :17: prices every hour, seat plans when due;
+                           # the 23:17 (Vilnius) run also looks for new / rescheduled games
   workflow_dispatch:
     inputs:
       add_series:
@@ -58,6 +58,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write   # only used until the Google key exists (data committed to the repo)
+      actions: write    # keep-alive: re-enable this workflow's schedule (see below)
     env:
       GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
       COLLECT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -96,9 +97,32 @@ jobs:
           EVENT: ${{ inputs.add_event }}
         run: python rytas.py add "$EVENT"
 
+      # daily, in the run that starts at 23:xx Vilnius time (or on request)
       - name: Discover new games
-        if: github.event.schedule == '41 5 * * 1' || inputs.discover
-        run: python rytas.py discover
+        if: env.COLLECT == 'true'
+        env:
+          ASKED: ${{ inputs.discover }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$ASKED" = true ] || { [ "$EVENT_NAME" = schedule ] && [ "$(TZ=Europe/Vilnius date +%H)" = 23 ]; }; then
+            python rytas.py discover
+          else
+            echo "Not the 23:xx run: skipped"
+          fi
+
+      # GitHub switches off schedules of public repos after 60 days without repository
+      # activity, and this job writes to the Sheet, not the repo. Re-enabling the
+      # workflow twice a month (1st and 15th, 23:xx; also on manual runs) keeps the hourly schedule alive.
+      - name: Keep the schedule alive
+        if: env.COLLECT == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ] || { [ "$(TZ=Europe/Vilnius date +%H)" = 23 ] && { [ "$(date +%d)" = 01 ] || [ "$(date +%d)" = 15 ]; }; }; then
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/snapshot.yml/enable" && echo "Schedule re-enabled"
+          fi
 
       - name: Snapshot
         if: env.COLLECT == 'true'

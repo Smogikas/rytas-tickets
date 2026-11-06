@@ -80,7 +80,11 @@ Seat ids are the same in every game, so for each game:
   read right away (sections showing "22+" give no signal and wait for the full scan).
 - **10 minutes before tip-off**: a final full check (every seat and price) of that game, in
   its own job started by the hourly run that sees the game starting within 75 minutes.
-- **Mondays 05:41 UTC**: look for new or rescheduled games of the tracked season.
+- **daily at 23:17 (Vilnius)**: the hourly run also looks for new or rescheduled games of the
+  tracked season.
+- **1st and 15th of the month**: the workflow re-enables itself, since GitHub switches off
+  schedules of public repositories after 60 days without repository activity (the data goes to
+  the Sheet, not the repo).
 - **code push**: tests, then the page is rebuilt (no data collection).
 - **manual** (Actions → *Ticket snapshot* → *Run workflow*): track a season or a game,
   look for new games, fetch seat plans now.
