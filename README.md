@@ -51,6 +51,11 @@ Seat ids are the same in every game, so for each game:
   Only changed rows are written, so each zone's last price is carried forward to rebuild the
   full price list at any moment; a zone selling out is not a price change.
 - Only sections sold online are counted; sections that open later are picked up.
+- Seats with price class 0 are blocked (camera, press, ... places), never sold: left out of every
+  count, grey in the seat plan.
+- A section off the sale list still returns a seat plan, but with every seat "taken" (= can't be
+  bought), so it is not read; e.g. 409 is off sale for Nanterre and Žalgiris while almost empty
+  in other games. The sold-out / withdrawn rule decides instead.
 - **B Tribūna** (110–111, the ultras' sections) is not sold on bilietai.lt: its full capacity (from
   the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
   For some games (Žalgiris) B Tribūna covers 109–112: sections 109 and 112 count as B Tribūna (full)

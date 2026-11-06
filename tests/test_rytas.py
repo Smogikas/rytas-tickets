@@ -228,6 +228,39 @@ class Seats(Base):
         res = rytas.analyse_event(rytas.timelines(rytas.load_seats(J)), rytas.load_snapshots(J), set())
         self.assertEqual({x["section_id"]: x["status"] for x in res["sections"]}["72935"], "soldout")
 
+    def test_off_sale_section_seat_plan_is_not_read(self):
+        """bilietai.lt still returns the seat plan of a section off the sale list, with
+        every seat 'taken' (= can't be bought). It must not count as sold."""
+        prices = rytas.fetch_prices(self.E)
+        rytas.take_snapshot(self.E, prices)
+        rytas.take_seat_snapshot(self.E, prices)
+        orig, asked = self.site.get_json, []
+
+        def answers_off_sale(url):
+            if "/sections/72935/seat-map" in url:
+                asked.append(url)
+                return {"seatMapTickets": [{"seatId": f"72935-{i}", "row": "1", "place": str(i), "priceClass": 1,
+                                            "status": 0, "x": 0, "y": 0} for i in range(40)]}
+            return orig(url)
+        self.site.close_section(self.E, "72935")                  # 34 left: withdrawn
+        with unittest.mock.patch.object(rytas, "get_json", answers_off_sale):
+            prices = rytas.fetch_prices(self.E)
+            rytas.take_snapshot(self.E, prices)
+            _, w, _ = rytas.take_seat_snapshot(self.E, prices)
+        self.assertEqual([r for r in w if r["section_id"] == "72935"], [])
+        self.assertEqual(asked, [])                                # not even asked
+
+    def test_blocked_seats_are_not_counted(self):
+        T1 = "2026-11-06T10:00:00+00:00"
+        tl = {"a": [{"ts_utc": T1, "section_id": "S", "seat_id": "a", "status": 0, "price_class": "0"}],
+              "b": [{"ts_utc": T1, "section_id": "S", "seat_id": "b", "status": 0, "price_class": "1334"}],
+              "c": [{"ts_utc": T1, "section_id": "S", "seat_id": "c", "status": 1, "price_class": "1334"}]}
+        tls = {"g1": tl, "g2": tl, "g3": tl}
+        self.assertEqual(rytas.season_seats(("g1", "g2", "g3"), tls), {"b"})   # blocked seat a is not season
+        t = rytas.analyse_event(tl, [], {"b"})["totals"]
+        self.assertEqual((t["seats"], t["season"], t["available"], t["taken"]), (2, 1, 1, 1))
+        self.assertEqual(rytas.classify_seats(tl, {}, {"b"})["a"][1], rytas.BLOCKED)
+
     def test_section_opening_later_is_picked_up(self):
         self.site.close_section(self.E, "72935")
         cur, _, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))

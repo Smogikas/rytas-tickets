@@ -352,9 +352,11 @@ def take_seat_snapshot(event_id, prices, only=None, sellout=False):
     known_layout = {r["seat_id"] for r in read_csv(LAYOUT)}
     new_layout = []
     for i, sid in enumerate(to_fetch):
-        if i:
+        if i and sid in open_ids:
             time.sleep(PAUSE)
-        tickets = fetch_section_seats(event_id, sid)
+        # A section off the sale list still returns a seat plan, but with every seat
+        # "taken" (= can't be bought, not sold), so it is not read: the rule below decides.
+        tickets = None if sid not in open_ids else fetch_section_seats(event_id, sid)
         if tickets is None:
             if sid not in open_ids:
                 # The section left the sale list. It sold out (the last seats were sold) if
@@ -528,6 +530,8 @@ def season_seats(group, tls):
     seen, ever_free = Counter(), set()
     for eid in group:
         for seat, rows in tls.get(eid, {}).items():
+            if blocked(rows[-1]):
+                continue
             seen[seat] += 1
             if rows[0]["status"] == 1:         # free when first seen: not a season seat
                 ever_free.add(seat)
@@ -630,7 +634,13 @@ def price_history(prices, sid):
 
 
 # seat categories
-SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE = "S", "O", "B", "A"
+SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE, BLOCKED = "S", "O", "B", "A", "X"
+
+
+def blocked(row):
+    """A seat with price class 0 is not a ticket (camera, press, ... places): never
+    sold, so left out of every count."""
+    return norm_id(row.get("price_class", "")) == "0"
 
 
 def classify_seats(tl, prices, season):
@@ -646,6 +656,9 @@ def classify_seats(tl, prices, season):
     for seat, rows in tl.items():
         first, last = rows[0], rows[-1]
         sid = last["section_id"]
+        if blocked(last):
+            out[seat] = (sid, BLOCKED, None, None, None)
+            continue
         if last["status"] == 1:
             cat, ts = AVAILABLE, "9999"
         elif seat in season and not any(r["status"] == 1 for r in rows):
@@ -686,6 +699,8 @@ def analyse_event(tl, price_rows, season, names=None):
     sec = defaultdict(lambda: dict({k: 0 for k in keys}, revenue=0.0, gross=0.0))
     count_key = {SEASON: "season", SOLD_SEEN: "sold_seen", SOLD_BEFORE: "pre_taken", AVAILABLE: "available"}
     for seat, (sid, cat, p, f, _ts) in classify_seats(tl, prices, season).items():
+        if cat == BLOCKED:
+            continue
         x = sec[sid]
         x["seats"] += 1
         x[count_key[cat]] += 1

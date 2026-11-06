@@ -217,7 +217,7 @@ const T = {
     seats: "Vietos", season: "Abonementai", single: "Pavieniai", free: "Laisvos", full: "Užimta",
     price: "Kaina", value: "Vertė", fee: "Mokesčiai", section: "Sektorius",
     seatPlan: "Vietų planas", seatHint: "Užveskite arba palieskite vietą", row: "Eilė", place: "vieta",
-    catS: "abonementas", seatSingle: "parduota pavieniui", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
+    catS: "abonementas", catX: "neparduodama vieta", seatSingle: "parduota pavieniui", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
     paid: "pirkėjas moka {p}, klubui {v}",
     noLayout: "Šio sektoriaus vietų išdėstymas bus rodomas po kito vietų plano nuskaitymo.",
     priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
@@ -260,7 +260,7 @@ const T = {
     seats: "Seats", season: "Season", single: "Single", free: "Available", full: "Taken",
     price: "Price", value: "Value", fee: "Fees", section: "Section",
     seatPlan: "Seat plan", seatHint: "Hover or tap a seat", row: "Row", place: "seat",
-    catS: "season ticket", seatSingle: "single ticket sold", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
+    catS: "season ticket", catX: "not for sale", seatSingle: "single ticket sold", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
     paid: "buyer pays {p}, club gets {v}",
     noLayout: "Seat positions for this section appear after the next seat-plan scan.",
     priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
@@ -668,13 +668,13 @@ async function drawSeats(g, s){
   if (!list.length){ box.innerHTML = `<div class="note">${t("noLayout")}</div>`; return; }
   const xs = list.map((q) => q[2]), ys = list.map((q) => q[3]);
   const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 16, h = Math.max(...ys) - y0 + 16;
-  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)" };
-  const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
+  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)", X: "var(--closed)" };
+  const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" || q[4] === "X" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
   const K = 1.1;  // px per seat-map unit: the same seat size in every section
   box.innerHTML = `<div class="seatwrap sb" id="seatWrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
     <div class="legend">${list.some((q) => q[4] === "F") ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN} · ${t("catF")}</span>`
-      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>`}</div>`;
+      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>${list.some((q) => q[4] === "X") ? `<span><i class="sw" style="background:var(--closed);border-color:var(--seat-line)"></i>${t("catX")}</span>` : ""}`}</div>`;
   const svg = box.querySelector("svg");
   const show = (e) => { const r = e.target.closest("rect[data-i]"); if (!r) return; S.seat = +r.dataset.i; $("seatInfo").textContent = seatLabel(list[S.seat]); };
   svg.addEventListener("mouseover", show); svg.addEventListener("click", show);
@@ -682,7 +682,7 @@ async function drawSeats(g, s){
 
 function seatLabel(q){
   const [row, place, , , cat, price, fee, ts] = q;
-  let st = cat === "F" ? FAN + " · " + t("catF") : cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : t("catA");
+  let st = cat === "F" ? FAN + " · " + t("catF") : cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : cat === "X" ? t("catX") : t("catA");
   if (cat !== "S" && price != null) st += " · " + t("paid", { p: eur(price), v: eur(price - (fee || 0)) });
   return `${t("row")} ${row}, ${t("place")} ${place} · ${st}`;
 }
