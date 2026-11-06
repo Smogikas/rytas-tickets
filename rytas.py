@@ -638,9 +638,11 @@ SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE, BLOCKED = "S", "O", "B", "A", "X"
 
 
 def blocked(row):
-    """A seat with price class 0 has no price in any game, so it can't be bought: left
-    out of every count (what it is used for is not known)."""
-    return norm_id(row.get("price_class", "")) == "0"
+    """A placeholder in the seat plan, not a real seat (place "NĖRA" = none, e.g. 403-404
+    row 9): left out of every count. Other seats without a price class (price class 0,
+    e.g. a block in 119-120 rows 16-19) are counted like any seat: taken in every game,
+    they are season tickets."""
+    return "NĖRA" in str(row.get("place", "")).upper()
 
 
 def classify_seats(tl, prices, season):

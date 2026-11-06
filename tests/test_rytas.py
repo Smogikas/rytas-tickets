@@ -250,16 +250,18 @@ class Seats(Base):
         self.assertEqual([r for r in w if r["section_id"] == "72935"], [])
         self.assertEqual(asked, [])                                # not even asked
 
-    def test_blocked_seats_are_not_counted(self):
+    def test_placeholder_seats_are_not_counted(self):
         T1 = "2026-11-06T10:00:00+00:00"
-        tl = {"a": [{"ts_utc": T1, "section_id": "S", "seat_id": "a", "status": 0, "price_class": "0"}],
+        tl = {"a": [{"ts_utc": T1, "section_id": "S", "seat_id": "a", "status": 0, "price_class": "0", "place": "*NĖRA*"}],
+              "d": [{"ts_utc": T1, "section_id": "S", "seat_id": "d", "status": 0, "price_class": "0", "place": "1"}],
               "b": [{"ts_utc": T1, "section_id": "S", "seat_id": "b", "status": 0, "price_class": "1334"}],
               "c": [{"ts_utc": T1, "section_id": "S", "seat_id": "c", "status": 1, "price_class": "1334"}]}
         tls = {"g1": tl, "g2": tl, "g3": tl}
-        self.assertEqual(rytas.season_seats(("g1", "g2", "g3"), tls), {"b"})   # blocked seat a is not season
-        t = rytas.analyse_event(tl, [], {"b"})["totals"]
-        self.assertEqual((t["seats"], t["season"], t["available"], t["taken"]), (2, 1, 1, 1))
-        self.assertEqual(rytas.classify_seats(tl, {}, {"b"})["a"][1], rytas.BLOCKED)
+        season = rytas.season_seats(("g1", "g2", "g3"), tls)
+        self.assertEqual(season, {"b", "d"})          # placeholder a: no; price class 0 seat d: a season seat
+        t = rytas.analyse_event(tl, [], season)["totals"]
+        self.assertEqual((t["seats"], t["season"], t["available"], t["taken"]), (3, 2, 1, 2))
+        self.assertEqual(rytas.classify_seats(tl, {}, season)["a"][1], rytas.BLOCKED)
 
     def test_section_opening_later_is_picked_up(self):
         self.site.close_section(self.E, "72935")
