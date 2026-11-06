@@ -127,7 +127,7 @@ const T = {
     title: "Ryto bilietai", eyebrow: "Vilniaus „Rytas“ · namų rungtynės · Arena Vilnius", loading: "Kraunama…",
     updated: "Duomenys atnaujinti {d} · atnaujinama kas valandą", games: "Rungtynės", arena: "Arenos planas",
     upcoming: "Būsimos", played: "Sužaistos", all: "Visos", sort: "Rikiuoti", byDate: "Data", byExpected: "Žiūrovai",
-    bySingles: "Pavieniai", byRevenue: "Pajamos", theme: "Tema", auto: "Auto", light: "Šviesi", dark: "Tamsi",
+    bySingles: "Pavieniai", byRevenue: "Pajamos", byAvg: "Vid. vertė", theme: "Tema", auto: "Auto", light: "Šviesi", dark: "Tamsi",
     nextGame: "Kitos rungtynės", seasonSeats: "Abonementų vietos", seasonSub: "niekada nebuvo laisvos ({n} rungt.)",
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
     clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto vertė", avgValueSub: "pirkėjai mokėjo vid. {p}",
@@ -155,7 +155,7 @@ const T = {
     title: "Rytas tickets", eyebrow: "Vilniaus „Rytas“ · home games · Arena Vilnius", loading: "Loading…",
     updated: "Data updated {d} · refreshed hourly", games: "Games", arena: "Arena plan",
     upcoming: "Upcoming", played: "Played", all: "All", sort: "Sort", byDate: "Date", byExpected: "Crowd",
-    bySingles: "Singles", byRevenue: "Revenue", theme: "Theme", auto: "Auto", light: "Light", dark: "Dark",
+    bySingles: "Singles", byRevenue: "Revenue", byAvg: "Avg value", theme: "Theme", auto: "Auto", light: "Light", dark: "Dark",
     nextGame: "Next game", seasonSeats: "Season-ticket seats", seasonSub: "never available ({n} games)",
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
     clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket value", avgValueSub: "buyers paid avg {p}",
@@ -263,7 +263,7 @@ function renderKpis(){
 
 function renderGames(){
   let gs = listGames().filter((g) => S.comp === "all" || g.comp === S.comp);
-  const key = { date: (g) => g.start, expected: (g) => -g.taken, singles: (g) => -g.singles, revenue: (g) => -(g.revenue || 0) }[S.sort];
+  const key = { date: (g) => g.start, singles: (g) => -g.singles, revenue: (g) => -(g.revenue || 0), avg: (g) => -(g.avg || 0) }[S.sort];
   gs.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
   if (S.when === "played" && S.sort === "date") gs.reverse();
   const comps = ["all"].concat([...new Set(DATA.games.map((g) => g.comp))].sort());
@@ -292,7 +292,7 @@ function renderGames(){
     ${gs.length ? `<div class="cards">${cards}</div>` : `<div class="panel empty">${t("noGames")}</div>`}
   </div>`;
   segButtons($("compSeg"), comps.map((c) => [c, c === "all" ? t("all") : c]), S.comp, (v) => { S.comp = v; renderGames(); });
-  segButtons($("sortSeg"), [["date", t("byDate")], ["expected", t("byExpected")], ["singles", t("bySingles")], ["revenue", t("byRevenue")]], S.sort, (v) => { S.sort = v; renderGames(); }, t("sort"));
+  segButtons($("sortSeg"), [["date", t("byDate")], ["singles", t("bySingles")], ["revenue", t("byRevenue")], ["avg", t("byAvg")]], S.sort, (v) => { S.sort = v; renderGames(); }, t("sort"));
   $("view").querySelectorAll("[data-game]").forEach((b) => b.addEventListener("click", () => { S.tab = "arena"; S.game = b.dataset.game; S.sec = null; S.seat = null; store.set("tab", "arena"); store.set("game", S.game); render(); window.scrollTo({ top: 0 }); }));
 }
 
