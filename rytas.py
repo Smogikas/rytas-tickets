@@ -1058,18 +1058,21 @@ def cmd_season(args):
         with_data = sum(1 for e in group if tls[e])
         print(f"\n{'/'.join(comps)}: {len(group)} games ({with_data} with seat data) -> "
               f"{len(seats)} season-ticket seats (est.)")
-        by_sec = Counter()
-        titles = {}
+        titles, seat_sec = {}, {}
         for e in group:
             for r in load_snapshots(e):
                 titles[r["section_id"]] = r["section"]
             for seat, rows in tls[e].items():
-                if seat in seats:
-                    by_sec[rows[-1]["section_id"]] += 1
-        for sid, n in sorted(by_sec.items(), key=lambda kv: -kv[1]):
-            print(f"  {titles.get(sid, sid)[:30]:<32}{n // max(1, with_data):>6}")
+                seat_sec[seat] = rows[-1]["section_id"]
+        by_sec = Counter(seat_sec[x] for x in seats)
+        cap = {}
+        for e in group:
+            cap.update(load_capacity(ev["events"][e].get("conf_id", "")))
+        print(f"  {'Section':<32}{'Season':>7}{'Seats':>7}")
+        for sid, n in sorted(by_sec.items(), key=lambda kv: (titles.get(kv[0], kv[0]))):
+            print(f"  {titles.get(sid, sid)[:30]:<32}{n:>7}{cap.get(sid, ''):>7}")
     print(f"\nA seat counts once it is seen in {SEASON_MIN_GAMES}+ games (2+ while fewer games have data) "
-          "and never available. More games tracked = better estimate.")
+          "and is taken the first time it is seen in every one. More games tracked = better estimate.")
     return 0
 
 

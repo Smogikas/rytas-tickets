@@ -145,7 +145,8 @@ jobs:
           python rytas.py report > report.txt 2>&1 || true
           cat report.txt
           python rytas.py capacity > capacity.txt 2>&1 || true
-          head -4 capacity.txt; grep -E "^(B Trib|110|111)" capacity.txt || true
+          cat capacity.txt
+          python rytas.py season 2>&1 || true
           { echo '```'; cat report.txt; echo; cat capacity.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           echo "built=true" >> "$GITHUB_OUTPUT"
 
