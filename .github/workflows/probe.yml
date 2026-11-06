@@ -1,0 +1,32 @@
+name: Probe (temporary)
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+      SHEET_ID: 12u2OBPsVzivfjZopgrjTtUKfc-TtXARYcEODmzRVGaM
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install google-auth==2.38.0 requests==2.32.3
+      - run: |
+          python sheets.py pull
+          python - <<'PY'
+          import rytas
+          eid = "PNJMMUNJYB"
+          rows = sorted(rytas.load_snapshots(eid), key=lambda r: r["ts_utc"])
+          res = rytas.analyse_all(rytas.load_events())[eid]
+          for x in res["sections"]:
+              if x["status"] != "open":
+                  print("X", x["section_id"], x["section"], x["status"], "closed_at", x["closed_at"], "seats", x["seats"], "avail", x["available"])
+                  for r in rows:
+                      if r["section_id"] == x["section_id"]:
+                          print("   price", r["ts_utc"][:16], r["zone"], r["price"], r["fee"], r["available"], r.get("zone_id"))
+          now = rytas.fetch_prices(eid)
+          print("listed now:", sorted(s["title"] for s in now["eventSections"]))
+          PY
