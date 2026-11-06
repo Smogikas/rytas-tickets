@@ -32,9 +32,13 @@ CHUNK = 10000                     # rows per append request
 
 OVERVIEW = "Rungtynės"
 OVERVIEW_HEAD = ["ID", "Data (Vilnius)", "Turnyras", "Varžovas", "Būsena", "Laukiama žiūrovų",
+                 "iš jų B Tribūna (110–111, įvert.)",
                  "Abonementai", "Pavieniai bilietai", "Laisvi bilietai", "Klubo pajamos €",
                  "Vid. bilieto vertė €", "Lankomumas (įrašykite)"]
-ATT_COL = "L"                     # attendance column, typed by the user
+ATT_COL = chr(ord("A") + len(OVERVIEW_HEAD) - 1)   # attendance column (last), typed by the user
+CAPACITY_TAB = "Talpa"
+CAPACITY_HEAD = ["Sektoriaus ID", "Sektorius", "Vietų (pilnas planas)", "Daugiausia vietų pardavime",
+                 "Parduodamas rungtynėse", "Žemėlapyje"]
 GAME_HEAD = ["Laikas (UTC)", "Įrašas", "Sektoriaus ID", "Sektorius", "Zona / kainų klasė",
              "Bilieto tipas", "Kaina €", "Mokesčiai €", "Laisva sektoriuje (iki 22)",
              "Vietos ID", "Eilė", "Vieta", "Būsena (1 laisva, 0 užimta)"]
@@ -42,7 +46,7 @@ PRICE, SEAT = "kaina", "vieta"
 EVENT_FIELDS = ["id", "name", "start_utc", "series_id", "status", "conf_id", "last_seats_utc", "final_check_utc", "tab"]
 SERIES_FIELDS = ["id", "title"]
 HIDDEN = {"_events": EVENT_FIELDS, "_series": SERIES_FIELDS,
-          "_layout": rytas.LAYOUT_FIELDS, "_shapes": rytas.SHAPE_FIELDS}
+          "_layout": rytas.LAYOUT_FIELDS, "_shapes": rytas.SHAPE_FIELDS, "_capacity": rytas.CAP_FIELDS}
 DEFAULT_TABS = ("Sheet1", "Lapas1")
 
 
@@ -209,12 +213,12 @@ def pull():
         rytas.save_json(STATE, state)
         print("Sheet has no data yet")
         return
-    head = read_tabs([t for t in ("_events", "_series", "_layout", "_shapes", OVERVIEW) if t in tabs])
+    head = read_tabs([t for t in ("_events", "_series", "_layout", "_shapes", "_capacity", OVERVIEW) if t in tabs])
     events = to_dicts(head["_events"], EVENT_FIELDS)
     ev = {"series": {s["id"]: s["title"] for s in to_dicts(head.get("_series", []), SERIES_FIELDS)},
           "events": {e["id"]: {k: e[k] for k in EVENT_FIELDS[1:] if e[k] != ""} for e in events}}
     rytas.save_json(rytas.EVENTS, ev)
-    for name, path in (("_layout", rytas.LAYOUT), ("_shapes", rytas.SHAPES)):
+    for name, path in (("_layout", rytas.LAYOUT), ("_shapes", rytas.SHAPES), ("_capacity", rytas.CAPACITY)):
         dicts = to_dicts(head.get(name, []), HIDDEN[name])
         write_local(path, HIDDEN[name], dicts)
         state["counts"][name] = len(dicts)
@@ -256,7 +260,7 @@ def overview_rows(ev, order):
         comp, opp = rytas.split_name(m["name"])
         start = rytas.parse_ts(m["start_utc"])
         rows.append([eid, vilnius(start), comp, opp, "Sužaista" if start <= now else "Būsima",
-                     t["taken"], t["season"], t["singles"], t["available"],
+                     t["expected"], t["fans_est"], t["season"], t["singles"], t["available"],
                      round(t["revenue"], 2), round(t["avg_price"], 2) if t["avg_price"] else ""])
     return rows
 
@@ -278,14 +282,14 @@ def push():
     ev = rytas.load_events()
     pushed = []
 
-    for name, path in (("_layout", rytas.LAYOUT), ("_shapes", rytas.SHAPES)):
+    for name, path in (("_layout", rytas.LAYOUT), ("_shapes", rytas.SHAPES), ("_capacity", rytas.CAPACITY)):
         rows = rytas.read_csv(path)
         new = rows[counts.get(name, 0):]
         if new:
             if name not in tabs:
                 add_tab(name, HIDDEN[name], hidden=True)
                 tabs[name] = {}
-            append_rows(name, [[num(r[c]) if c in ("x", "y") else r[c] for c in HIDDEN[name]] for r in new])
+            append_rows(name, [[num(r[c]) if c in ("x", "y", "seats") else r[c] for c in HIDDEN[name]] for r in new])
             counts[name] = len(rows)
             pushed.append(f"{name} +{len(new)}")
 
@@ -329,6 +333,20 @@ def push():
     request("PUT", vpath(rng(OVERVIEW, f"A1:{last_col}{len(rows) + 1}")), {"valueInputOption": "RAW"},
             {"values": [OVERVIEW_HEAD[:-1]] + rows})
     request("PUT", vpath(rng(OVERVIEW, f"{ATT_COL}1")), {"valueInputOption": "RAW"}, {"values": [[OVERVIEW_HEAD[-1]]]})
+    # seats per section and arena capacity (visible tab, rewritten)
+    cap_rows, cap_tot = rytas.capacity_table(ev)
+    if cap_rows:
+        if CAPACITY_TAB not in tabs:
+            add_tab(CAPACITY_TAB, CAPACITY_HEAD, index=1)
+            tabs[CAPACITY_TAB] = {}
+        body = [[r["section_id"], r["title"], r["seats"], r["max_on_sale"] or "", r["games_on_sale"] or "",
+                 "taip" if r["on_map"] else ""] for r in cap_rows]
+        for conf, tot in cap_tot.items():
+            body += [[], ["", "Visa arena (žemėlapio sektoriai)", tot["map"]],
+                     ["", "Sektoriai, kurie buvo parduodami", tot["ever_on_sale"]],
+                     ["", "Visas salės planas (su ložėmis ir kt.)", tot["plan"]]]
+        rewrite(CAPACITY_TAB, CAPACITY_HEAD, body)
+
     # attendance recorded locally (rytas.py attendance) and not yet in the Sheet
     for i, eid in enumerate(order):
         local = rytas.latest_attendance(eid)

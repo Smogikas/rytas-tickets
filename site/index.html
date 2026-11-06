@@ -14,7 +14,7 @@
 :root{
   --bg:#F6EFE2; --panel:#FFFAF0; --ink:#2A1C11; --muted:#6B5644; --line:#E2D3BA;
   --accent:#7B4A23; --accent-ink:#FFF8EC; --season:#6F6052; --single:#C47A2C; --free:#F6EFE2; --seat-line:#B8A386;
-  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C;
+  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46;
   color-scheme: light;
 }
 /* dark: charcoal with amber; teal for the data (as in light) */
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
     --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4;
+    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
   --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4;
+  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -117,11 +117,13 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
 svg.map polygon{cursor:pointer;stroke:var(--line);stroke-width:2;vector-effect:non-scaling-stroke}
 svg.map polygon.closed{cursor:default;fill:transparent;stroke-dasharray:6 5;stroke:var(--seat-line);stroke-width:1.5}
+svg.map polygon.fan{fill:var(--fan);stroke:var(--line);stroke-width:2;cursor:pointer}
 svg.map polygon.withdrawn{fill:transparent;stroke-dasharray:6 5;stroke:var(--muted);stroke-width:2}
 svg.map polygon.stripes{pointer-events:none;stroke:none}
 .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:5px;vertical-align:middle;margin-left:6px;white-space:nowrap}
 .tag.soldout{background:var(--accent);color:var(--accent-ink)}
 .tag.closed{border:1px dashed var(--muted);color:var(--muted)}
+.tag.fan{background:var(--fan);color:#fff}
 .pchg{font-size:12px;font-weight:600;white-space:nowrap}
 .pchg.up{color:var(--single)} .pchg.down{color:var(--season)}
 .sw.striped{background:repeating-linear-gradient(45deg,var(--high) 0 3px,rgba(255,255,255,.55) 3px 5px)}
@@ -207,8 +209,10 @@ const T = {
     noLayout: "Šio sektoriaus vietų išdėstymas bus rodomas po kito vietų plano nuskaitymo.",
     priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
     sectionsTable: "Sektoriai", totalRow: "Iš viso",
-    foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai (jei ateitų visi abonementų turėtojai). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
+    foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai + B Tribūna (110–111, neparduodama internetu, įskaičiuota kaip pilna). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
     loadErr: "Nepavyko įkelti duomenų.",
+    fanPart: "iš jų B Tribūna ~{n} (įvert.)", fanNote: "Ultras sektorius, neparduodamas bilietai.lt. Į laukiamus žiūrovus įskaičiuotas kaip pilnas.",
+    catF: "neparduodama internetu", est: "įvert.",
     copy: "Kopijuoti", copied: "Nukopijuota", copyFailed: "Nepavyko – atsisiųskite",
     share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", making: "Ruošiamas paveikslėlis…",
     shareFoot: "Duomenys {d}",
@@ -240,8 +244,10 @@ const T = {
     noLayout: "Seat positions for this section appear after the next seat-plan scan.",
     priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
     sectionsTable: "Sections", totalRow: "Total",
-    foot: "Expected crowd = season-ticket seats + single tickets sold (attendance if every season holder comes). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
+    foot: "Expected crowd = season-ticket seats + single tickets sold + B Tribūna (110–111, not sold online, counted as full). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
     loadErr: "Could not load the data.",
+    fanPart: "incl. B Tribūna ~{n} (est.)", fanNote: "Ultras section, not sold on bilietai.lt. Counted as full in the expected crowd.",
+    catF: "not sold online", est: "est.",
     copy: "Copy", copied: "Copied", copyFailed: "Failed – download it",
     share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", making: "Making the picture…",
     shareFoot: "Data {d}",
@@ -294,6 +300,8 @@ function segButtons(el, items, current, onPick, label){
   el.innerHTML = items.map(([v, l]) => `<button type="button" data-v="${esc(v)}" aria-pressed="${v === current}">${esc(l)}</button>`).join("");
   el.onclick = (e) => { const b = e.target.closest("button[data-v]"); if (b) onPick(b.dataset.v); };
 }
+const FAN = "B Tribūna";   // ultras' name: the same in every language
+const expectedOf = (g) => g.expected != null ? g.expected : g.taken;
 const shortTitle = (s) => s.indexOf("Parteris") === 0 ? "P2" : s.indexOf("VIP") === 0 ? "VIP" : s.split(" ")[0];
 
 // ---------------------------------------------------------------- render
@@ -321,7 +329,7 @@ function renderKpis(){
   const next = DATA.games.filter((g) => !g.played).sort((a, b) => a.start < b.start ? -1 : 1)[0];
   const singles = gs.reduce((s, g) => s + g.singles, 0), rev = gs.reduce((s, g) => s + (g.revenue || 0), 0), gross = gs.reduce((s, g) => s + (g.gross || 0), 0);
   const k = [
-    [t("nextGame"), next ? next.opp : "–", next ? dFull(next.start) + " · " + whenText(next) + " · " + nf(next.taken) + " " + t("expected") : ""],
+    [t("nextGame"), next ? next.opp : "–", next ? dFull(next.start) + " · " + whenText(next) + " · " + nf(expectedOf(next)) + " " + t("expected") : ""],
     [t("seasonSeats"), nf(DATA.seasonSeats), t("seasonSub", { n: DATA.games.length })],
     [t("singlesSold"), nf(singles), (S.when === "played" ? t("played") : t("upcoming")) + " · " + t("gamesN", { n: gs.length })],
     [t("clubRevenue"), eur(rev), t("clubRevenueSub")],
@@ -339,13 +347,14 @@ function renderGames(){
   const cards = gs.map((g) => {
     const has = g.seats > 0;
     const att = g.played ? (g.attendance != null
-      ? `<div class="small"><b class="num">${t("attendance")}: ${nf(g.attendance)}</b> <span class="muted">· ${t("attVs", { e: nf(g.taken) })} (${(g.attendance - g.taken >= 0 ? "+" : "") + nf(g.attendance - g.taken)})</span></div>`
+      ? `<div class="small"><b class="num">${t("attendance")}: ${nf(g.attendance)}</b> <span class="muted">· ${t("attVs", { e: nf(expectedOf(g)) })} (${(g.attendance - expectedOf(g) >= 0 ? "+" : "") + nf(g.attendance - expectedOf(g))})</span></div>`
       : `<div class="small muted">${t("noAtt")}</div>`) : "";
     return `<article class="panel card"><button type="button" class="card-open" data-game="${esc(g.id)}" aria-label="${esc(t("arena") + ": " + g.opp)}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="badge ${esc(g.comp)}">${esc(g.comp)}</span><span class="small muted">${esc(dFull(g.start))}</span></div>
       <div><div class="small muted">${t("vs")}</div><div class="opp">${esc(g.opp)}</div><div class="small muted">${esc(whenText(g))}</div></div>
-      ${has ? `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="big num">${nf(g.taken)}</span><span class="small muted">${t("expected")}</span></div>
-      <div class="bar" aria-hidden="true"><i style="width:${pct(g.season, g.seats)}%;background:var(--season)"></i><i style="width:${pct(g.singles, g.seats)}%;background:var(--single)"></i></div>
+      ${has ? `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="big num">${nf(expectedOf(g))}</span><span class="small muted">${t("expected")}</span></div>
+      <div class="bar" aria-hidden="true"><i style="width:${pct(g.season, g.seats + (g.fans || 0))}%;background:var(--season)"></i><i style="width:${pct(g.fans || 0, g.seats + (g.fans || 0))}%;background:var(--fan)"></i><i style="width:${pct(g.singles, g.seats + (g.fans || 0))}%;background:var(--single)"></i></div>
+      ${g.fans ? `<div class="small muted" style="margin-top:-6px">${esc(t("fanPart", { n: nf(g.fans) }))}</div>` : ""}
       <div class="grid2"><div><span class="muted">${t("singles")}</span><b class="num">${nf(g.singles)}</b></div><div><span class="muted">${t("available")}</span><b class="num">${nf(g.available)}</b></div>
       <div><span class="muted">${t("revenue")}</span><b class="num">${eur(g.revenue)}</b></div><div><span class="muted">${t("avg")}</span><b class="num">${g.singles ? eur(g.avg, 2) : "–"}</b></div></div>
       ` : `<div class="small muted">${t("noData")}</div>`}
@@ -360,7 +369,7 @@ function renderGames(){
       <div class="seg small-seg" role="group" id="compSeg"></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="small muted">${t("sort")}</span><div class="seg small-seg" role="group" id="sortSeg"></div></div>
     </div>
-    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("legendSeason")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--free);border-color:var(--line)"></i>${t("legendFree")}</span></div>
+    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("legendSeason")}</span><span><i class="sw" style="background:var(--fan)"></i>${FAN}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--free);border-color:var(--line)"></i>${t("legendFree")}</span></div>
     ${gs.length ? `<div class="cards">${cards}</div>` : `<div class="panel empty">${t("noGames")}</div>`}
   </div>`;
   segButtons($("compSeg"), comps.map((c) => [c, c === "all" ? t("all") : c]), S.comp, (v) => { S.comp = v; renderGames(); });
@@ -395,24 +404,27 @@ function renderArena(){
   let g = gs.find((x) => x.id === S.game) || gs[0];
   S.game = g.id;
   const { secs, byId, prices, scale, closed, labelInk, shapes } = arenaColors(g);
-  if (!S.sec || !byId[S.sec]) S.sec = (secs.find((s) => s.title === "108") || secs[0] || {}).id || null;
+  const fanById = {}; (g.fanSections || []).forEach((f) => { fanById[f.id] = f; });
+  if (!S.sec || !(byId[S.sec] || fanById[S.sec])) S.sec = (secs.find((s) => s.title === "108") || secs[0] || {}).id || null;
   const polys = shapes.map(([id, pts]) => {
     const s = byId[id];
+    if (!s && fanById[id]) return `<polygon points="${esc(pts)}" class="fan ${id === S.sec ? "sel" : ""}" data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(fanById[id].title + " · " + FAN)}"></polygon>`;
     const fill = s ? scale(sectionValue(s)) : closed;
     const lbl = s ? s.title + (s.status === "soldout" ? " · " + t("soldOut") : s.status === "closed" ? " · " + t("closedSec") : "") : "";
     const cls = !s ? "closed" : s.status === "closed" ? "withdrawn" : "";
     const poly = `<polygon points="${esc(pts)}" fill="${fill}" class="${cls} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
     return poly + (s && s.status === "soldout" ? `<polygon points="${esc(pts)}" class="stripes" fill="url(#soldStripes)" aria-hidden="true"></polygon>` : "");
   }).join("");
-  const labels = shapes.filter(([id]) => byId[id]).map(([id, pts]) => {
+  const labels = shapes.filter(([id]) => byId[id] || fanById[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
     const cx = n.reduce((a, p) => a + p[0], 0) / n.length, cy = n.reduce((a, p) => a + p[1], 0) / n.length;
+    if (!byId[id]) return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="#FFFFFF">${esc(fanById[id].title)}</text>`;
     // label colour by the fill's brightness (withdrawn sections have no fill)
     const ink = byId[id].status === "closed" ? "var(--muted)" : labelInk(scale(sectionValue(byId[id])));
     return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${ink}">${esc(shortTitle(byId[id].title))}</text>`;
   }).join("");
   const legend = arenaColors(g).legend;
-  const s = byId[S.sec];
+  const s = byId[S.sec], fan = fanById[S.sec];
   const prevChips = $("chips") ? $("chips").scrollLeft : null;
   const tot = secs.reduce((a, x) => { ["seats", "season", "singles", "available", "revenue"].forEach((k) => { a[k] = (a[k] || 0) + (x[k] || 0); }); return a; }, {});
   const sorted = secs.slice().sort((a, b) => a.title.localeCompare(b.title, "lt", { numeric: true }));
@@ -424,7 +436,7 @@ function renderArena(){
       <div class="panel mapbox">
         <div class="controls">
           <div><div class="disp" style="font-size:20px;font-weight:700">${esc(g.opp)}</div>
-          <div class="small muted">${esc(dFull(g.start))} · ${nf(g.taken)} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
+          <div class="small muted">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg small-seg" role="group" id="modeSeg"></div>
             <button type="button" class="btn" id="arenaShare" aria-label="${esc(t("share") + ": " + t("arena") + " " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
         </div>
@@ -435,12 +447,13 @@ function renderArena(){
           <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="12" height="12" patternTransform="rotate(45)"><rect width="5" height="12" fill="rgba(255,255,255,.45)"></rect></pattern></defs>
           ${polys}${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
         <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
+          ${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}
           <span><i class="sw striped"></i>${t("soldOut")}</span>
           <span><i class="sw" style="border:2px dashed var(--muted)"></i>${t("closedSec")}</span>
           <span><i class="sw" style="border:1.5px dashed var(--seat-line)"></i>${t("notOnSale")}</span></div>
       </div>
       <div class="side">
-        ${s ? sectionPanel(s, g) : `<div class="panel note">${t("pickSection")}</div>`}
+        ${s ? sectionPanel(s, g) : fan ? fanPanel(fan) : `<div class="panel note">${t("pickSection")}</div>`}
       </div>
     </div>
     <div class="panel tablebox sb" id="secTable"><table>
@@ -449,6 +462,7 @@ function renderArena(){
       <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button>${statusTag(x)}</td>
         <td class="num">${priceChg(x)} ${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
         <tr><td><b>${t("totalRow")}</b></td><td></td><td></td><td class="num"><b>${nf(tot.seats)}</b></td><td class="num"><b>${nf(tot.season)}</b></td><td class="num"><b>${nf(tot.singles)}</b></td><td class="num"><b>${nf(tot.available)}</b></td><td class="num"><b>${pct(tot.seats - tot.available, tot.seats).toFixed(0)}%</b></td><td class="num"><b>${eur(tot.revenue)}</b></td></tr>
+        ${g.fans ? `<tr><td>${FAN} (${(g.fanSections || []).map((f) => f.title).join("–")}) <span class="tag fan">${t("est")}</span></td><td></td><td></td><td class="num">${nf(g.fans)}</td><td></td><td></td><td class="num">–</td><td class="num">100%</td><td></td></tr>` : ""}
       </tbody></table></div>
   </div>`;
 
@@ -464,6 +478,7 @@ function renderArena(){
     el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
   });
   if (s) loadSeats(g.id).then(() => drawSeats(g, s));
+  else if (fan) loadSeats(g.id).then(() => drawSeats(g, fan));
 }
 
 // keep the game bar where it was, then slide so the selected game is in the middle
@@ -541,6 +556,15 @@ function priceHistoryHtml(s){
   return head + rows;
 }
 
+function fanPanel(f){
+  return `<div class="panel">
+    <h2 style="margin:0;font-size:22px">${esc(f.title)} <span class="tag fan">${FAN}</span></h2>
+    <div class="small muted">${t("fanNote")}</div>
+    <div class="grid2"><div><span class="muted">${t("seats")}</span><b class="num">${nf(f.seats)}</b></div><div><span class="muted">${t("expectedLong")}</span><b class="num">~${nf(f.seats)}</b></div></div>
+  </div>
+  <div class="panel"><div style="font-weight:600">${t("seatPlan")}</div><div id="seatBox"><div class="note">${t("loading")}</div></div></div>`;
+}
+
 function sectionPanel(s, g){
   return `<div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}${statusTag(s)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${eur(s.price)}</div></div>
@@ -569,12 +593,13 @@ async function drawSeats(g, s){
   if (!list.length){ box.innerHTML = `<div class="note">${t("noLayout")}</div>`; return; }
   const xs = list.map((q) => q[2]), ys = list.map((q) => q[3]);
   const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 16, h = Math.max(...ys) - y0 + 16;
-  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)" };
+  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)" };
   const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
   const K = 1.1;  // px per seat-map unit: the same seat size in every section
   box.innerHTML = `<div class="seatwrap sb" id="seatWrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
-    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span></div>`;
+    <div class="legend">${list.some((q) => q[4] === "F") ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN} · ${t("catF")}</span>`
+      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>`}</div>`;
   const svg = box.querySelector("svg");
   const show = (e) => { const r = e.target.closest("rect[data-i]"); if (!r) return; S.seat = +r.dataset.i; $("seatInfo").textContent = seatLabel(list[S.seat]); };
   svg.addEventListener("mouseover", show); svg.addEventListener("click", show);
@@ -582,7 +607,7 @@ async function drawSeats(g, s){
 
 function seatLabel(q){
   const [row, place, , , cat, price, fee, ts] = q;
-  let st = cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : t("catA");
+  let st = cat === "F" ? FAN + " · " + t("catF") : cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : t("catA");
   if (cat !== "S" && price != null) st += " · " + t("paid", { p: eur(price), v: eur(price - (fee || 0)) });
   return `${t("row")} ${row}, ${t("place")} ${place} · ${st}`;
 }
@@ -642,7 +667,7 @@ function drawArenaShare(c, g, W, H){
   c.fillStyle = v("--panel"); c.fillRect(0, 0, W, H);
   let y = drawShareHeader(c, g, W, v, HEAD, BODY);
   y += 52; c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`;
-  c.fillText(`${nf(g.taken)} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()} · ${S.mode === "price" ? t("modePrice") : t("modeTaken")}`, x0, y);
+  c.fillText(`${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()} · ${S.mode === "price" ? t("modePrice") : t("modeTaken")}`, x0, y);
   // the map: section outlines in a 1000x1000 space, cropped to what is drawn
   y += 24;
   const pts = A.shapes.map(([id, p]) => [id, p.split(" ").map((q) => q.split(",").map(Number))]);
@@ -658,7 +683,9 @@ function drawArenaShare(c, g, W, H){
   for (const [id, p] of pts){
     const s = A.byId[id];
     c.beginPath(); p.forEach(([px, py], i) => (i ? c.lineTo(X(px), Y(py)) : c.moveTo(X(px), Y(py)))); c.closePath();
-    if (s && s.status === "closed"){ c.setLineDash([7, 6]); c.strokeStyle = v("--muted"); c.lineWidth = 2.5; c.stroke(); }
+    const isFan = !s && (g.fanSections || []).some((f) => f.id === id);
+    if (isFan){ c.setLineDash([]); c.fillStyle = v("--fan"); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke(); }
+    else if (s && s.status === "closed"){ c.setLineDash([7, 6]); c.strokeStyle = v("--muted"); c.lineWidth = 2.5; c.stroke(); }
     else if (s){
       c.setLineDash([]); c.fillStyle = A.scale(sectionValue(s)); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
       if (s.status === "soldout"){
@@ -671,7 +698,12 @@ function drawArenaShare(c, g, W, H){
   }
   c.setLineDash([]); c.textAlign = "center"; c.textBaseline = "middle"; c.font = `700 22px ${HEAD}`;
   for (const [id, p] of pts){
-    const s = A.byId[id]; if (!s) continue;
+    const s = A.byId[id], f = (g.fanSections || []).find((x) => x.id === id);
+    if (!s && f){
+      const fx = p.reduce((a, q) => a + q[0], 0) / p.length, fy = p.reduce((a, q) => a + q[1], 0) / p.length;
+      c.fillStyle = "#FFFFFF"; c.fillText(f.title, X(fx), Y(fy)); continue;
+    }
+    if (!s) continue;
     const cx = p.reduce((a, q) => a + q[0], 0) / p.length, cy = p.reduce((a, q) => a + q[1], 0) / p.length;
     c.fillStyle = A.labelInk(A.scale(sectionValue(s))); c.fillText(shortTitle(s.title), X(cx), Y(cy));
   }
@@ -717,17 +749,22 @@ function drawShare(c, g, W, H){
   for (const line of wrapLines(c, g.opp, x1 - x0).slice(0, 2)){ y += 86; c.fillText(line, x0, y); }
   y += 50; c.fillStyle = v("--muted"); c.font = `500 32px ${BODY}`; c.fillText(whenText(g), x0, y);
   // big number
-  y += 200; c.fillStyle = v("--ink"); c.font = `700 190px ${HEAD}`; const big = nf(g.taken); c.fillText(big, x0, y);
+  y += 200; c.fillStyle = v("--ink"); c.font = `700 190px ${HEAD}`; const big = nf(expectedOf(g)); c.fillText(big, x0, y);
   const bigW = c.measureText(big).width; c.fillStyle = v("--muted"); c.font = `500 36px ${BODY}`; c.fillText(t("expected"), x0 + bigW + 24, y - 12);
   // bar
   y += 56; const bwid = x1 - x0, bh = 34;
   roundRect(c, x0, y, bwid, bh, 17); c.fillStyle = v("--free"); c.fill(); c.lineWidth = 2; c.strokeStyle = v("--line"); c.stroke();
   c.save(); roundRect(c, x0, y, bwid, bh, 17); c.clip();
-  const ws = bwid * (g.seats ? g.season / g.seats : 0), wsi = bwid * (g.seats ? g.singles / g.seats : 0);
-  c.fillStyle = v("--season"); c.fillRect(x0, y, ws, bh); c.fillStyle = v("--single"); c.fillRect(x0 + ws, y, wsi, bh); c.restore();
+  const tot = g.seats + (g.fans || 0), ws = bwid * (tot ? g.season / tot : 0), wf = bwid * (tot ? (g.fans || 0) / tot : 0), wsi = bwid * (tot ? g.singles / tot : 0);
+  c.fillStyle = v("--season"); c.fillRect(x0, y, ws, bh); c.fillStyle = v("--fan"); c.fillRect(x0 + ws, y, wf, bh);
+  c.fillStyle = v("--single"); c.fillRect(x0 + ws + wf, y, wsi, bh); c.restore();
   // legend
   y += bh + 50; let lx = x0; c.font = `500 26px ${BODY}`;
-  for (const [col, label] of [["--season", t("legendSeason") + " " + nf(g.season)], ["--single", t("legendSingle") + " " + nf(g.singles)], ["--free", t("legendFree") + " " + nf(g.available)]]){
+  const items = [["--season", t("legendSeason") + " " + nf(g.season)]];
+  if (g.fans) items.push(["--fan", FAN + " ~" + nf(g.fans)]);
+  items.push(["--single", t("legendSingle") + " " + nf(g.singles)], ["--free", t("legendFree") + " " + nf(g.available)]);
+  for (const [col, label] of items){
+    if (lx + 38 + c.measureText(label).width > x1){ lx = x0; y += 44; }   // wrap to a second line
     roundRect(c, lx, y - 22, 26, 26, 6); c.fillStyle = v(col); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
     c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += 38 + c.measureText(label).width + 36;
   }

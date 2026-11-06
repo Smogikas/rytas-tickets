@@ -13,6 +13,7 @@ Commands:
   attendance <id> <number>             record actual attendance after the game
   report [<id>]                        season summary, or one game in detail
   season                               season-ticket seat estimate
+  capacity                             seats per section (full venue plan) and arena capacity
   final [--check]                      full check 10 min before a game starting within 75 min
 """
 import argparse
@@ -37,6 +38,7 @@ SEATS_DIR = DATA / "seats"               # one CSV per game, seat status changes
 ATTENDANCE = DATA / "attendance.csv"
 LAYOUT = DATA / "layout.csv"             # seat positions for drawing the seat plan
 SHAPES = DATA / "shapes.csv"             # section outlines of the arena overview map
+CAPACITY = DATA / "capacity.csv"         # seats per section in the full venue plan
 EVENTS = ROOT / "events.json"
 # Local working copies. The GitHub job loads them from / saves them to the
 # Google Sheet (sheets.py), so no data is stored in the repository.
@@ -52,6 +54,12 @@ SEAT_FIELDS = ["ts_utc", "section_id", "seat_id", "row", "place", "price_class",
 ATT_FIELDS = ["event_id", "attendance", "recorded_utc", "note"]
 LAYOUT_FIELDS = ["seat_id", "section_id", "row", "place", "x", "y"]
 SHAPE_FIELDS = ["conf_id", "section_id", "points"]
+CAP_FIELDS = ["conf_id", "section_id", "seats"]
+
+# B Tribūna: Rytas fan sectors 110-111 (ultras), not sold on bilietai.lt. Assumed full: their whole
+# capacity is added to the expected crowd unless they appear on sale (then real
+# seat data is used). Section id -> name.
+FAN_SECTIONS = {"79993": "110", "72934": "111"}
 # Ticket price on bilietai.lt = ticket value (club) + fees (booking, arena,
 # venue administration, lounge). The API gives "price" (total) and "fee";
 # the club's revenue is price - fee.
@@ -326,6 +334,43 @@ def take_seat_snapshot(event_id, prices, only=None):
     return current, written, len(to_fetch)
 
 
+def fetch_venue_map(conf_id):
+    """The full venue plan: every seat of the layout with its section, row,
+    place and position (also sections never on sale)."""
+    return get_json(f"{API}/store/seat-map/{conf_id}")
+
+
+def load_capacity(conf_id):
+    return {r["section_id"]: int(float(r["seats"])) for r in read_csv(CAPACITY) if r["conf_id"] == str(conf_id)}
+
+
+def ensure_capacity(conf_id):
+    """Once per venue layout: seats per section from the full venue plan, and
+    seat positions for arena-map sections not seen in any seat plan yet (so
+    sections that are never on sale, like the fan sectors, can be drawn)."""
+    if not conf_id or load_capacity(conf_id):
+        return 0
+    seats = fetch_venue_map(conf_id).get("seats") or []
+    counts = Counter(str(x["section"]) for x in seats)
+    append_csv(CAPACITY, CAP_FIELDS, [{"conf_id": str(conf_id), "section_id": sid, "seats": n}
+                                      for sid, n in sorted(counts.items())])
+    map_sections = {r["section_id"] for r in read_csv(SHAPES) if r["conf_id"] == str(conf_id)}
+    known = {r["seat_id"]: r for r in read_csv(LAYOUT)}
+    overlap = [x for x in seats if str(x["code"]) in known]
+    same = sum(1 for x in overlap if (int(float(known[str(x["code"])]["x"])), int(float(known[str(x["code"])]["y"])))
+               == (int(x["x"]), int(x["y"])))
+    new = [{"seat_id": str(x["code"]), "section_id": str(x["section"]), "row": x.get("row", ""),
+            "place": x.get("place", ""), "x": x["x"], "y": x["y"]}
+           for x in seats if str(x["section"]) in map_sections and str(x["code"]) not in known]
+    if overlap and same < 0.95 * len(overlap):
+        print(f"venue plan {conf_id}: positions differ from seat plans ({same}/{len(overlap)}), not using them")
+        new = []
+    append_csv(LAYOUT, LAYOUT_FIELDS, new)
+    print(f"venue plan {conf_id}: {len(counts)} sections, {len(seats)} seats; "
+          f"positions match {same}/{len(overlap)} known seats; +{len(new)} seat positions")
+    return len(counts)
+
+
 def ensure_shapes(conf_id):
     """Store the arena map's section outlines once per venue layout."""
     if not conf_id or any(r["conf_id"] == str(conf_id) for r in read_csv(SHAPES)):
@@ -350,6 +395,7 @@ def snapshot_event(event_id, meta, now, force_seats=False):
     if not meta.get("conf_id"):  # venue layout id, looked up once per game
         meta["conf_id"] = str(fetch_info(event_id).get("confId") or "")
     ensure_shapes(meta["conf_id"])
+    ensure_capacity(meta["conf_id"])
     prices = fetch_prices(event_id)
     rows, written = take_snapshot(event_id, prices)
     msg = f"prices: {len(written)} changed"
@@ -553,7 +599,41 @@ def analyse_all(ev, with_seats=False):
         out[eid]["season_total"] = len(cache[g])
         if with_seats:
             out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows), cache[g])
+        # fan sectors not on sale for this game: assume full (their whole capacity)
+        cap = load_capacity(ev["events"][eid].get("conf_id", ""))
+        on_sale = {rows[-1]["section_id"] for rows in tls[eid].values()}
+        fans = [(sid, name, cap[sid]) for sid, name in FAN_SECTIONS.items() if sid in cap and sid not in on_sale]
+        out[eid]["fan_sections"] = fans
+        out[eid]["totals"]["fans_est"] = sum(n for _s, _n, n in fans)
+        out[eid]["totals"]["expected"] = out[eid]["totals"]["taken"] + out[eid]["totals"]["fans_est"]
     return out
+
+
+def capacity_table(ev, res=None):
+    """Seats per section (full venue plan) with how often each was on sale.
+    Returns (rows, totals) for the Sheet's capacity tab and `rytas.py capacity`."""
+    res = res or analyse_all(ev)
+    confs = sorted({m.get("conf_id", "") for m in ev["events"].values()} - {""})
+    titles = {}
+    for eid in ev["events"]:
+        for r in load_snapshots(eid):
+            titles[r["section_id"]] = r["section"]
+    titles.update({sid: f"{name} (B Tribūna)" for sid, name in FAN_SECTIONS.items()})
+    seen = defaultdict(list)          # section -> seats on sale per game
+    for eid, r in res.items():
+        for x in r["sections"]:
+            seen[x["section_id"]].append(x["seats"])
+    rows, totals = [], {}
+    for conf in confs:
+        cap = load_capacity(conf)
+        on_map = {r["section_id"] for r in read_csv(SHAPES) if r["conf_id"] == conf}
+        for sid in sorted(cap, key=lambda k: (k not in on_map, titles.get(k, "~" + k))):
+            rows.append({"conf_id": conf, "section_id": sid, "title": titles.get(sid, ""), "seats": cap[sid],
+                         "max_on_sale": max(seen[sid], default=0), "games_on_sale": len(seen[sid]),
+                         "on_map": sid in on_map})
+        totals[conf] = {"plan": sum(cap.values()), "map": sum(n for k, n in cap.items() if k in on_map),
+                        "ever_on_sale": sum(n for k, n in cap.items() if seen[k])}
+    return rows, totals
 
 
 # ---------------------------------------------------------------- commands
@@ -698,6 +778,18 @@ def cmd_final(args):
     return 1 if failed else 0
 
 
+def cmd_capacity(args):
+    rows, totals = capacity_table(load_events())
+    for conf, tot in totals.items():
+        print(f"Layout {conf}: full plan {tot['plan']} seats, arena-map sections {tot['map']}, "
+              f"sections ever on sale {tot['ever_on_sale']}")
+    print(f"\n{'Section':<30}{'Seats':>7}{'Max on sale':>13}{'Games':>7}  Map")
+    for r in rows:
+        if r["on_map"] or r["games_on_sale"]:
+            print(f"{(r['title'] or r['section_id'])[:29]:<30}{r['seats']:>7}{r['max_on_sale']:>13}{r['games_on_sale']:>7}  {'yes' if r['on_map'] else ''}")
+    return 0
+
+
 def cmd_attendance(args):
     eid = event_id_from(args.event)
     append_csv(ATTENDANCE, ATT_FIELDS, [{
@@ -741,6 +833,7 @@ def print_detail(eid, meta, r):
               f"{x['season']:>8}{x['sold_seen']:>6}{x['pre_taken']:>8}{money(x['revenue']):>9}"
               f"  {(x['opened_later'] or '')[:16]}")
     print(f"""
+Expected crowd:              {t['expected']}  (taken {t['taken']} + B Tribūna {t['fans_est']}, est.)
 Seats in open sections:      {t['seats']}  ({t['sections']} sections)
 Available now:               {t['available']}
 Taken:                       {t['taken']}
@@ -836,6 +929,8 @@ def cmd_export(args):
             "played": parse_ts(meta["start_utc"]) <= now, "conf": meta.get("conf_id", ""),
             "seats": t["seats"], "available": t["available"], "taken": t["taken"], "season": t["season"],
             "singles": t["singles"], "seen": t["sold_seen"], "before": t["pre_taken"],
+            "fans": t["fans_est"], "expected": t["expected"],
+            "fanSections": [{"id": sid, "title": name, "seats": n} for sid, name, n in r["fan_sections"]],
             "revenue": r2(t["revenue"]), "gross": r2(t["gross"]),
             "avg": r2(t["avg_price"]), "avgPaid": r2(t["avg_paid"]),
             "attendance": attendance.get(eid), "dataFrom": t["first_ts"], "dataTo": t["last_ts"],
@@ -853,6 +948,10 @@ def cmd_export(args):
             lo = layout.get(seat)
             if lo:
                 per[sid].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), cat, p, f, ts])
+        fan_ids = {sid for sid, _n, _c in r["fan_sections"]}
+        for lo in layout.values():          # fan sectors: their seats from the venue plan
+            if lo["section_id"] in fan_ids:
+                per[lo["section_id"]].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), "F", None, None, None])
         (out / "seats" / f"{eid}.json").write_text(json.dumps(per, ensure_ascii=False, separators=(",", ":")),
                                                   encoding="utf-8")
     shapes = defaultdict(list)
@@ -880,6 +979,7 @@ def main(argv=None):
     t.set_defaults(fn=cmd_attendance)
     r = sub.add_parser("report"); r.add_argument("event", nargs="?"); r.set_defaults(fn=cmd_report)
     sub.add_parser("season").set_defaults(fn=cmd_season)
+    sub.add_parser("capacity", help="seats per section and arena capacity").set_defaults(fn=cmd_capacity)
     f = sub.add_parser("final", help="final full check shortly before tip-off")
     f.add_argument("--window", type=int, default=75, help="look for games starting within N minutes (default 75)")
     f.add_argument("--lead", type=int, default=10, help="check N minutes before tip-off (default 10)")

@@ -43,6 +43,10 @@ Seat ids are the same in every game, so for each game:
   e.g. a 45 € lounge ticket = 30 € ticket value + 15 € fees.
 - Prices are logged hourly whenever they change, so price changes before a game are kept.
 - Only sections sold online are counted; sections that open later are picked up.
+- **B Tribūna** (110–111, the ultras' sections) is not sold on bilietai.lt: its full capacity (from
+  the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
+- The full venue plan gives the seat count of every section and the arena capacity (Sheet tab
+  **Talpa**; `rytas.py capacity`) and seat positions of sections never on sale.
 - A section leaving the sale list with an exact count (< 20) left is **sold out** (last
   seats counted as sold, striped on the map); with "20+" left it was **withdrawn**
   (nothing counted as sold, dashed outline, closing date shown).

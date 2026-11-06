@@ -97,7 +97,7 @@ class SheetsTest(unittest.TestCase):
             "DATA": self.tmp / "data", "SNAPSHOTS": self.tmp / "data" / "snapshots.csv",
             "SEATS_DIR": self.tmp / "data" / "seats", "ATTENDANCE": self.tmp / "data" / "attendance.csv",
             "LAYOUT": self.tmp / "data" / "layout.csv", "SHAPES": self.tmp / "data" / "shapes.csv",
-            "EVENTS": self.tmp / "events.json",
+            "CAPACITY": self.tmp / "data" / "capacity.csv", "EVENTS": self.tmp / "events.json",
         }.items():
             p = unittest.mock.patch.object(rytas, name, value)
             p.start()
@@ -180,7 +180,7 @@ class SheetsTest(unittest.TestCase):
         sheets.pull()
         sheets.push()
         # the user types attendance next to the Žalgiris row (row 3), as a number
-        self.fake.write("Rungtynės", 11, 2, [[9800]])
+        self.fake.write("Rungtynės", 12, 2, [[9800]])
         self.wipe_local()
         sheets.pull()
         self.assertEqual(rytas.latest_attendance("G2"), 9800)
@@ -191,7 +191,7 @@ class SheetsTest(unittest.TestCase):
         sheets.push()
         ov = self.fake.tabs["Rungtynės"]
         self.assertEqual([r[0] for r in ov[1:]], ["G1", "G2", "G0"])
-        self.assertEqual(ov[2][11], 9800)
+        self.assertEqual(ov[2][12], 9800)
         self.assertEqual(ov[3][4], "Sužaista")
 
     def test_attendance_from_cli_goes_to_sheet(self):
@@ -199,10 +199,34 @@ class SheetsTest(unittest.TestCase):
         sheets.pull()
         rytas.main(["attendance", "G1", "4100"])
         sheets.push()
-        self.assertEqual(self.fake.tabs["Rungtynės"][1][11], 4100)
+        self.assertEqual(self.fake.tabs["Rungtynės"][1][12], 4100)
         n = len(self.fake.calls)
         sheets.push()                                   # not written again
         self.assertFalse(any("!L" in c[1] and "L1" not in c[1] for c in self.fake.calls[n:]))
+
+    def test_capacity_tab(self):
+        self.write_local_data()
+        rytas.append_csv(rytas.CAPACITY, rytas.CAP_FIELDS, [
+            {"conf_id": "77", "section_id": "10", "seats": 139}, {"conf_id": "77", "section_id": "72934", "seats": 246},
+            {"conf_id": "77", "section_id": "99999", "seats": 8}])
+        rytas.append_csv(rytas.SHAPES, rytas.SHAPE_FIELDS, [
+            {"conf_id": "77", "section_id": "10", "points": "1,1 2,2 3,3"}, {"conf_id": "77", "section_id": "72934", "points": "4,4 5,5 6,6"}])
+        sheets.pull()
+        sheets.push()
+        f = self.fake
+        self.assertEqual(f.order[:2], ["Rungtynės", "Talpa"])
+        cap = f.tabs["Talpa"]
+        self.assertEqual(cap[0], sheets.CAPACITY_HEAD)
+        self.assertIn(["10", "108", 139, 12, 2, "taip"], cap)
+        self.assertIn(["72934", "111 (B Tribūna)", 246, "", "", "taip"], cap)
+        self.assertIn(["", "Visa arena (žemėlapio sektoriai)", 385], cap)
+        self.assertIn(["", "Visas salės planas (su ložėmis ir kt.)", 393], cap)
+        ov = f.tabs["Rungtynės"]
+        self.assertEqual(ov[0][6], "iš jų B Tribūna (110–111, įvert.)")
+        self.assertEqual((ov[1][5], ov[1][6]), (6 + 246, 246))       # expected = taken 6 + fan sector 111 (246)
+        # the capacity table survives a fresh start (hidden _capacity tab)
+        self.wipe_local(); sheets.pull()
+        self.assertEqual(rytas.load_capacity("77"), {"10": 139, "72934": 246, "99999": 8})
 
     def test_tab_title(self):
         m = {"name": "LKL: Vilniaus ''Rytas'' - Kėdainių ''Nevėžis-Paskolų klubas''", "start_utc": "2027-01-24T17:10:00Z"}

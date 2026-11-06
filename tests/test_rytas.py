@@ -72,6 +72,14 @@ class FakeSite:
                     for t in z["ticketTypes"]:
                         t["availableTickets"] = n
             return p
+        if parts[:2] == ["store", "seat-map"]:                 # full venue plan
+            seats = [{"code": seat, "x": 10 + 16 * int(seat.split("-")[1]), "y": 20, "row": "1",
+                      "place": seat.split("-")[1], "section": sid}
+                     for sid, n in SECTION_SEATS.items() for seat in (f"{sid}-{i}" for i in range(n))]
+            seats += [{"code": f"F1-{i}", "x": 16 * i, "y": 40, "row": "1", "place": str(i), "section": "79993"} for i in range(8)]
+            seats += [{"code": f"F2-{i}", "x": 16 * i, "y": 40, "row": "1", "place": str(i), "section": "72934"} for i in range(10)]
+            seats += [{"code": f"BOX-{i}", "x": i, "y": 0, "row": "1", "place": str(i), "section": "99999"} for i in range(5)]
+            return {"seats": seats}
         if parts[:2] == ["store", "events"] and parts[3] == "sections":
             eid, sid = parts[2], parts[4]
             if sid not in {s["id"] for s in self.prices[eid]["eventSections"]}:
@@ -88,7 +96,8 @@ class FakeSite:
         return ("<svg>\r\n<image x='0'/>"
                 "<polygon id=\"section83548\" points=\"524,632 622,632 622,612 523,611 \" style=\"fill:#ccc\"/>\r\n"
                 "\t<polygon id='section94921' points=\"164,342 178,342\r\n 178,304 163,304 \"\r\n\tstyle=\"fill:#ccc\"/>"
-                "<polygon points=\"1,1 2,2 3,3\" id='section72935'/></svg>")
+                "<polygon points=\"1,1 2,2 3,3\" id='section72935'/>"
+                "<polygon id='section79993' points='4,4 5,5 6,6'/><polygon id='section72934' points='7,7 8,8 9,9'/></svg>")
 
 
 class Base(unittest.TestCase):
@@ -99,6 +108,7 @@ class Base(unittest.TestCase):
             "SEATS_DIR": self.tmp / "data" / "seats", "ATTENDANCE": self.tmp / "data" / "attendance.csv",
             "EVENTS": self.tmp / "events.json", "PAUSE": 0,
             "LAYOUT": self.tmp / "data" / "layout.csv", "SHAPES": self.tmp / "data" / "shapes.csv",
+            "CAPACITY": self.tmp / "data" / "capacity.csv",
         }.items():
             p = unittest.mock.patch.object(rytas, name, value)
             p.start()
@@ -301,9 +311,9 @@ class Commands(Base):
         self.assertEqual(self.snapshot_all(), 0)
         self.site.sell("PNJMMUNJYB", "83548", 1)
         self.snapshot_all()
-        self.assertEqual(len(rytas.read_csv(rytas.LAYOUT)), 84)   # every seat once, shared by all games
+        self.assertEqual(len(rytas.read_csv(rytas.LAYOUT)), 84 + 18)   # every seat once (+ fan sectors from the venue plan)
         shapes = rytas.read_csv(rytas.SHAPES)
-        self.assertEqual({s["section_id"] for s in shapes}, {"83548", "94921", "72935"})
+        self.assertEqual({s["section_id"] for s in shapes}, {"83548", "94921", "72935", "79993", "72934"})
         self.assertEqual([s["points"] for s in shapes if s["section_id"] == "94921"], ["164,342 178,342 178,304 163,304"])
         self.assertEqual(sum(u.endswith(".svg") for u in self.site.requests), 1)
         self.assertEqual(rytas.load_events()["events"]["PNJMMUNJYB"]["conf_id"], "1769507581")
@@ -319,7 +329,7 @@ class Commands(Base):
         self.assertAlmostEqual(g["revenue"], 3 * (89 - 7))
         self.assertAlmostEqual(g["gross"], 3 * 89)
         self.assertEqual(g["attendance"], 4100)
-        self.assertEqual(len(data["shapes"]["1769507581"]), 3)
+        self.assertEqual(len(data["shapes"]["1769507581"]), 5)
         self.assertEqual(data["seasonSeats"], 18)
         sec = next(s for s in data["sections"]["PNJMMUNJYB"] if s["id"] == "83548")
         self.assertEqual((sec["seats"], sec["seen"], sec["fee"]), (28, 1, 7.0))
@@ -329,6 +339,39 @@ class Commands(Base):
         sold = next(s for s in seats["83548"] if s[4] == "O")
         self.assertEqual((sold[5], sold[6]), (89.0, 7.0))
         self.assertTrue(sold[7])  # when the sale was seen
+
+    def test_venue_plan_capacity_and_fan_sectors(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        self.assertEqual(self.snapshot_all(), 0)
+        self.snapshot_all()
+        self.assertEqual(sum(u.split("?")[0].endswith("/store/seat-map/1769507581") for u in self.site.requests), 1)  # once
+        cap = rytas.load_capacity("1769507581")
+        self.assertEqual(cap, {"83548": 28, "94921": 16, "72935": 40, "79993": 8, "72934": 10, "99999": 5})
+        res = rytas.analyse_all(rytas.load_events())
+        t = res["PNJMMUNJYB"]["totals"]
+        self.assertEqual((t["taken"], t["fans_est"], t["expected"]), (18, 18, 36))   # fans assumed full
+        rows, totals = rytas.capacity_table(rytas.load_events(), res)
+        self.assertEqual(totals["1769507581"], {"plan": 107, "map": 102, "ever_on_sale": 84})
+        fan = next(r for r in rows if r["section_id"] == "72934")
+        self.assertEqual((fan["title"], fan["seats"], fan["games_on_sale"], fan["on_map"]), ("111 (B Tribūna)", 10, 0, True))
+        p2 = next(r for r in rows if r["section_id"] == "83548")
+        self.assertEqual((p2["max_on_sale"], p2["games_on_sale"]), (28, 3))
+        out = self.tmp / "site"
+        rytas.main(["export", str(out)])
+        g = next(x for x in json.loads((out / "data.json").read_text(encoding="utf-8"))["games"] if x["id"] == "PNJMMUNJYB")
+        self.assertEqual((g["fans"], g["expected"]), (18, 36))
+        self.assertEqual({f["title"] for f in g["fanSections"]}, {"110", "111"})
+        seats = json.loads((out / "seats" / "PNJMMUNJYB.json").read_text(encoding="utf-8"))
+        self.assertEqual([s[4] for s in seats["72934"]], ["F"] * 10)
+        self.assertEqual(rytas.main(["capacity"]), 0)
+
+        # if a fan sector goes on sale, real seat data replaces the estimate
+        self.site.prices["PNJMMUNJYB"]["eventSections"].append(
+            dict(copy.deepcopy(PRICES["eventSections"][0]), id="72934", title="111"))
+        self.site.seats["PNJMMUNJYB"]["72934"] = {f"F2-{i}": (0 if i < 4 else 1) for i in range(10)}
+        self.snapshot_all()
+        t = rytas.analyse_all(rytas.load_events())["PNJMMUNJYB"]["totals"]
+        self.assertEqual((t["fans_est"], t["taken"]), (8, 22))
 
     def test_split_name(self):
         self.assertEqual(rytas.split_name("LKL: Vilniaus ''Rytas'' - Kauno ''Žalgiris''"), ("LKL", "Kauno „Žalgiris“"))
