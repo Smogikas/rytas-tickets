@@ -143,7 +143,9 @@ jobs:
           python rytas.py export _site
           cp site/index.html _site/
           python rytas.py report > report.txt 2>&1 || true
-          { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          python rytas.py capacity > capacity.txt 2>&1 || true
+          head -4 capacity.txt; grep -E "^(B Trib|110|111)" capacity.txt || true
+          { echo '```'; cat report.txt; echo; cat capacity.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           echo "built=true" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-pages-artifact@v3
