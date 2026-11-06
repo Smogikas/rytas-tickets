@@ -137,6 +137,8 @@ th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;whit
 th{font-size:12px;color:var(--muted);font-weight:600}
 th:first-child,td:first-child{text-align:left}
 tr.sel td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.zone{display:inline-flex;align-items:center;gap:6px}.zone i{width:12px;height:12px;border-radius:3px;border:1px solid var(--line)}
+.minibar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle;overflow:hidden}.minibar i{display:block;height:100%;background:var(--season)}
 td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration:underline;font-weight:600}
 .hist{display:flex;flex-direction:column;gap:4px;font-size:13px;max-height:180px;overflow:auto}
 .hist div{display:flex;justify-content:space-between;gap:10px}
@@ -205,6 +207,13 @@ const T = {
     noGames: "Šiame sąraše rungtynių nėra.", noData: "vietų duomenys dar renkami",
     modeTaken: "% užimta", modePrice: "Kaina", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
+    seasonTab: "Abonementai", msSeats: "Abonementai", msSeatsSub: "vietos, užimtos abonementų visose rungtynėse",
+    msRevenue: "Abonementų pajamos (įvert.)", msRevenueSub: "pagal klubo skelbtas narysčių kainas",
+    msAvg: "Vid. narystės kaina", msAvgSub: "mažiausia – didžiausia", msPresale: "Uždaroje prekyboje",
+    msPresaleSub: "narysčių (klubo duomenys)", msTable: "Abonementai pagal sektorius", msZone: "Zona",
+    msShare: "Dalis", msRenew: "Pratęsimo kaina", msOpen: "Atviros prekybos kaina", msRange: "Pajamos (min – max)",
+    msAssumed: "kaina prilyginta", thousand: "tūkst.",
+    msNote: "Pajamos = abonementų vietos × narystės kaina. Mažiausia: visi, kurie galėjo, pratęsė už pratęsimo kainą; didžiausia: visi mokėjo atviros prekybos kainą. Tikroji suma tarp jų (uždaroje prekyboje parduota 1 375 narysčių, daugiausia pratęsimai). Tai sirgalių sumokėta suma: kiek iš jos tenka bilietai.lt mokesčiams, neskelbiama. 107 AMUSNET Lounge ir 112 kainos neskelbtos – prilygintos 107 ir 113.",
     arenaCap: "bendra arenos talpa", warnBtn: "Įspėjimai: {n}", warnMore: "Plačiau: GitHub → Actions (paleidimų žurnalai)",
     warn_old: "Duomenys neatnaujinti {h} val. – automatiniai paleidimai gali būti sustoję arba nepavykę.",
     warn_readAll: "bilietai.lt šį kartą nepavyko nuskaityti nė vienų rungtynių ({detail}).",
@@ -248,6 +257,13 @@ const T = {
     noGames: "No games in this list.", noData: "seat data still being collected",
     modeTaken: "% taken", modePrice: "Price", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
+    seasonTab: "Season tickets", msSeats: "Season tickets", msSeatsSub: "seats taken by memberships in every game",
+    msRevenue: "Season-ticket revenue (est.)", msRevenueSub: "from the club's published membership prices",
+    msAvg: "Avg membership price", msAvgSub: "lowest – highest", msPresale: "Closed presale",
+    msPresaleSub: "memberships (club figure)", msTable: "Season tickets by section", msZone: "Zone",
+    msShare: "Share", msRenew: "Renewal price", msOpen: "Open-sale price", msRange: "Revenue (min – max)",
+    msAssumed: "price assumed", thousand: "k",
+    msNote: "Revenue = season seats × membership price. Lowest: everyone who could renewed at the renewal price; highest: everyone paid the open-sale price. The real total is in between (1,375 memberships were sold in the closed presale, mostly renewals). It is what fans paid; how much of it goes to bilietai.lt fees is not published. Prices for 107 AMUSNET Lounge and 112 were not published – set equal to 107 and 113.",
     arenaCap: "total arena capacity", warnBtn: "Warnings: {n}", warnMore: "Details: GitHub → Actions (run logs)",
     warn_old: "Data not updated for {h} h – the automatic runs may have stopped or failed.",
     warn_readAll: "bilietai.lt: no game could be read this time ({detail}).",
@@ -346,14 +362,16 @@ function render(){
   document.querySelectorAll("[data-t]").forEach((n) => { n.textContent = t(n.dataset.t); });
   segButtons($("langSeg"), [["lt", "LT"], ["en", "EN"]], S.lang, (v) => { S.lang = v; store.set("lang", v); render(); }, "Language / Kalba");
   segButtons($("themeSeg"), [["auto", t("auto")], ["light", t("light")], ["dark", t("dark")]], S.theme, (v) => { S.theme = v; store.set("theme", v); setTheme(); render(); }, t("theme"));
-  segButtons($("tabSeg"), [["games", t("games")], ["arena", t("arena")]], S.tab, (v) => { S.tab = v; store.set("tab", v); render(); }, t("games") + " / " + t("arena"));
+  segButtons($("tabSeg"), [["games", t("games")], ["arena", t("arena")], ["season", t("seasonTab")]], S.tab, (v) => { S.tab = v; store.set("tab", v); render(); }, t("games") + " / " + t("arena") + " / " + t("seasonTab"));
+  $("whenSeg").style.display = S.tab === "season" ? "none" : "";
+  $("kpis").style.display = S.tab === "season" ? "none" : "";
   segButtons($("whenSeg"), [["upcoming", t("upcoming")], ["played", t("played")]], S.when, (v) => { S.when = v; S.game = null; render(); }, t("upcoming") + " / " + t("played"));
   $("foot").textContent = t("foot");
   if (!DATA) return;
   $("updated").textContent = t("updated", { d: dTime(DATA.updated) });
   renderHealth();
   renderKpis();
-  if (S.tab === "games") renderGames(); else renderArena();
+  if (S.tab === "games") renderGames(); else if (S.tab === "season") renderSeason(); else renderArena();
 }
 
 function listGames(){
@@ -376,6 +394,40 @@ function renderHealth(){
   $("updated").appendChild(btn);
   const text = (w) => t("warn_" + w.code, { game: w.game || "", detail: w.detail || "–", d: w.since ? dTime(w.since) : "", h: w.hours });
   box.innerHTML = `<ul>${items.map((w) => `<li>${esc(text(w))}</li>`).join("")}</ul><a href="https://github.com/Smogikas/rytas-tickets/actions" target="_blank" rel="noopener">${esc(t("warnMore"))}</a>`;
+}
+
+// ---------------------------------------------------------------- season tickets tab
+const ZONE_COLOR = { "Juoda": "#2B2B2B", "Juoda+": "#5A5A5A", "Balta": "#C9C9C9", "Balta+": "#F4F4F4", "Raudona": "#B3171D", "Raudona+": "#E3262E" };
+function renderSeason(){
+  const m = DATA.membership;
+  if (!m){ $("view").innerHTML = `<div class="empty">${t("noData")}</div>`; return; }
+  const cards = [
+    [t("msSeats"), nf(m.total), t("msSeatsSub")],
+    [t("msRevenue"), S.lang === "en" ? `€${nf(Math.round(m.low / 1000))}k–€${nf(Math.round(m.high / 1000))}k`
+      : `${nf(Math.round(m.low / 1000))}–${nf(Math.round(m.high / 1000))} ${t("thousand")} €`, t("msRevenueSub")],
+    [t("msAvg"), (S.lang === "en" ? eur(m.low / m.total) : nf(Math.round(m.low / m.total))) + "–" + eur(m.high / m.total), t("msAvgSub")],
+    [t("msPresale"), nf(m.presale), t("msPresaleSub")]
+  ];
+  const rows = m.rows.map((r) => {
+    const share = r.seats ? 100 * r.season / r.seats : 0;
+    return `<tr><td>${esc(r.title)}${r.assumed ? ` <span class="small muted">(${t("msAssumed")})</span>` : ""}</td>
+      <td style="text-align:left">${r.zone ? `<span class="zone"><i style="background:${ZONE_COLOR[r.zone] || "transparent"}"></i>${esc(r.zone)}</span>` : "–"}</td>
+      <td class="num"><b>${nf(r.season)}</b></td><td class="num">${nf(r.seats)}</td>
+      <td class="num"><span class="minibar"><i style="width:${share.toFixed(0)}%"></i></span> ${share.toFixed(0)}%</td>
+      <td class="num">${eur(r.renewal)}</td><td class="num">${eur(r.open)}</td>
+      <td class="num">${r.low == null ? "–" : r.low === r.high ? eur(r.low) : eur(r.low) + " – " + eur(r.high)}</td></tr>`;
+  }).join("");
+  const seats = m.rows.reduce((a, r) => a + (r.seats || 0), 0);
+  $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+    <section class="kpis">${cards.map(([l, v, s]) => `<div class="panel kpi"><span class="small muted">${esc(l)}</span><span class="v">${esc(v)}</span><span class="small muted">${esc(s)}</span></div>`).join("")}</section>
+    <div class="panel tablebox sb"><table>
+      <caption class="small muted" style="text-align:left;padding:10px 12px">${t("msTable")}</caption>
+      <thead><tr><th scope="col">${t("section")}</th><th scope="col" style="text-align:left">${t("msZone")}</th><th scope="col">${t("season")}</th><th scope="col">${t("seats")}</th><th scope="col">${t("msShare")}</th><th scope="col">${t("msRenew")}</th><th scope="col">${t("msOpen")}</th><th scope="col">${t("msRange")}</th></tr></thead>
+      <tbody>${rows}
+        <tr><td><b>${t("totalRow")}</b></td><td></td><td class="num"><b>${nf(m.total)}</b></td><td class="num"><b>${nf(seats)}</b></td><td class="num"><b>${seats ? (100 * m.total / seats).toFixed(0) : 0}%</b></td><td></td><td></td><td class="num"><b>${eur(m.low)} – ${eur(m.high)}</b></td></tr>
+      </tbody></table></div>
+    <div class="note">${esc(t("msNote"))}</div>
+  </div>`;
 }
 
 function renderKpis(){

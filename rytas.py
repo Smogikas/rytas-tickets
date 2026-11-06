@@ -70,6 +70,23 @@ FAN_EXTRA = ("109", "112")
 # season ticket in each game memberships cover (club posts, Aug 2026: 107 "išparduota").
 # Section id -> name. (107 AMUSNET Lounge, the 20-seat corner, is on sale and read normally.)
 SEASON_SECTIONS = {"87884": "107"}
+# 2026/27 membership prices (club posts, Jun-Aug 2026): section number -> (zone, renewal
+# price or None if no renewal there, open-sale price), EUR. Renewal was for last season's
+# holders; everyone else paid the open-sale price. Used for the season-ticket revenue range.
+MEMBERSHIP_PRICES = {
+    "113": ("Juoda", 250, 270), "114": ("Juoda", None, 270),
+    "401": ("Juoda+", None, 299), "408": ("Juoda+", None, 299), "409": ("Juoda+", None, 299),
+    "108": ("Balta", 270, 329), "115": ("Balta", 270, 329), "122": ("Balta", None, 329),
+    "402": ("Balta", None, 359), "403": ("Balta", None, 359), "406": ("Balta", None, 359), "407": ("Balta", None, 359),
+    "107": ("Balta+", 299, 389), "116": ("Balta+", 299, 389), "404": ("Balta+", None, 395), "405": ("Balta+", None, 395),
+    "117": ("Raudona", 399, 489), "118": ("Raudona", 399, 489), "119": ("Raudona", 470, 529),
+    "120": ("Raudona", 470, 529), "121": ("Raudona", 399, 489),
+    "102": ("Raudona+", 470, 589), "103": ("Raudona+", 539, 629), "104": ("Raudona+", 539, 629),
+    "105": ("Raudona+", 470, 589), "106": ("Raudona+", None, 589),
+}
+# sections without a published membership price, priced like a neighbour (assumption)
+MEMBERSHIP_ASSUMED = {"112": "113"}
+MEMBERSHIPS_PRESALE = 1375      # memberships sold in the closed presale (club post)
 # Games memberships don't cover (BCL Top 8; a league-run final four): every seat is a
 # normal ticket there, so no season tickets are counted.
 NO_SEASON = re.compile(r"top\s*-?\s*8|ketvirtfinal|quarter.?final|final\s*four|finalo\s+ketvert", re.I)
@@ -823,6 +840,9 @@ def analyse_all(ev, with_seats=False):
             t[k] += n_whole
         out[eid]["season_total"] += n_whole
         out[eid]["season_sections"] = whole
+        by_sec = Counter(seat_sec[x] for x in cache[g] if seat_sec[x] not in fan_set)
+        by_sec.update({sid: c for sid, _n, c in whole})
+        out[eid]["season_by_section"] = dict(by_sec)
         for sid, name, c in whole:
             out[eid]["sections"].append(dict(
                 section_id=sid, section=name, seats=c, available=0, taken=c, season=c, sold_seen=0,
@@ -1158,6 +1178,31 @@ def r2(x):
     return None if x is None else round(x, 2)
 
 
+def membership_table(ev, res):
+    """Season seats per section with membership prices and a revenue range: low = every
+    holder paid the renewal price (where there was one), high = all paid the open price."""
+    covered = [eid for eid in ev["events"] if res[eid].get("season_by_section")]
+    if not covered:
+        return None
+    eid = max(covered, key=lambda e: sum(res[e]["season_by_section"].values()))
+    titles = {r["section_id"]: r["section"] for r in read_csv(SNAPSHOTS)}
+    titles.update(SEASON_SECTIONS)
+    cap = load_capacity(ev["events"][eid].get("conf_id", ""))
+    rows = []
+    for sid, n in res[eid]["season_by_section"].items():
+        title = titles.get(sid, sid)
+        num = (title.split() or [""])[0]
+        key = MEMBERSHIP_ASSUMED.get(num, num)
+        zone, renew, open_ = MEMBERSHIP_PRICES.get(key, (None, None, None))
+        rows.append({"id": sid, "title": title, "zone": zone, "season": n, "seats": cap.get(sid),
+                     "renewal": renew, "open": open_, "assumed": key != num or (num == "107" and sid not in SEASON_SECTIONS),
+                     "low": n * (renew or open_) if open_ else None, "high": n * open_ if open_ else None})
+    rows.sort(key=lambda r: (r["title"].split() or [""])[0])
+    return {"rows": rows, "total": sum(r["season"] for r in rows),
+            "low": sum(r["low"] or 0 for r in rows), "high": sum(r["high"] or 0 for r in rows),
+            "presale": MEMBERSHIPS_PRESALE}
+
+
 def health_warnings(ev, res, now):
     """Problems for the page's warning badge: [{code, game?, detail?, since?}].
 
@@ -1263,6 +1308,7 @@ def cmd_export(args):
         arena_cap[conf] = sum(cap.get(sid, 0) for sid, _pts in shp)
     data = {"updated": now_utc(), "seasonSeats": any_res.get("season_total", 0),
             "games": games, "sections": sections, "shapes": shapes, "arenaCap": arena_cap,
+            "membership": membership_table(ev, res),
             "warnings": health_warnings(ev, res, now)}
     (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Exported {len(games)} games to {out}")

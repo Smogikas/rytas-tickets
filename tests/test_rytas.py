@@ -706,6 +706,10 @@ class Commands(Base):
         self.assertIn(("save", None), codes)
         self.assertIn(("nodata", "Jonavos „Jonava Hipocredit“"), codes)   # never read: no seat data
         self.assertEqual(d["arenaCap"], {"1769507581": 28 + 16 + 40 + 8 + 10})   # map sections only
+        m = d["membership"]                                   # 6 season seats in each of the sections read
+        self.assertEqual(m["presale"], rytas.MEMBERSHIPS_PRESALE)
+        self.assertEqual(m["total"], sum(r["season"] for r in m["rows"]))
+        self.assertLessEqual(m["low"], m["high"])
         # bilietai.lt answers nothing: one warning, not one per game
         with unittest.mock.patch.object(rytas, "get_json", side_effect=OSError("HTTP 403")):
             self.snapshot_all()

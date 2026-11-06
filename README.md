@@ -11,6 +11,9 @@ seat by seat, with a live web page:
 - **Arena plan**: pick a game; sections coloured by % taken, % single tickets or price; click
   a section for its numbers, every seat (season ticket / sold and at what price / available)
   and its price history; a table of all sections below.
+- **Season tickets** (Abonementai): season seats per section with the club's 2026/27 membership
+  prices and a revenue range (low = holders renewed at the renewal price where there was one,
+  high = all paid the open-sale price).
 - Lithuanian / English, light / dark (follows the system by default).
 
 Everything runs on GitHub Actions; the collected data is stored in a Google Sheet, not in
