@@ -61,6 +61,10 @@ CAP_FIELDS = ["conf_id", "section_id", "seats"]
 # capacity is added to the expected crowd unless they appear on sale (then real
 # seat data is used). Section id -> name.
 FAN_SECTIONS = {"79993": "110", "72934": "111"}
+# For some games (Žalgiris) B Tribūna is extended to the neighbouring sections 109 and 112:
+# such a section counts as B Tribūna (full) in a game where it is not on sale online
+# while it is on sale in other games. Section numbers (start of the section title).
+FAN_EXTRA = ("109", "112")
 # Games whose sections sell out rather than get withdrawn: a section of such a game
 # leaving the sale list counts as sold out even with "22+" left at the last check.
 SELLOUT_OPPONENTS = ("Žalgiris",)
@@ -734,6 +738,9 @@ def analyse_all(ev, with_seats=False):
     zn = zone_names(all_prices)
     sec_titles = {r["section_id"]: r["section"] for r in all_prices}
     seat_sec = {seat: rows[-1]["section_id"] for tl in tls.values() for seat, rows in tl.items()}
+    sold_somewhere = set(seat_sec.values())
+    extra_fans = {sid: (title.split() or [""])[0] for sid, title in sec_titles.items()
+                  if (title.split() or [""])[0] in FAN_EXTRA}
     for eid in names:
         g = groups[eid]
         if g not in cache:
@@ -744,19 +751,24 @@ def analyse_all(ev, with_seats=False):
         out[eid]["season_total"] = len(cache[g])
         if with_seats:
             out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows, zn), cache[g])
-        # season seats in sections not on sale online for this game: the holders still
-        # have their seats, so they count as season tickets / taken / expected crowd
+        # B Tribūna not on sale for this game: assume full (their whole capacity).
+        # 110-111 always; 109 / 112 when on sale in other games but not in this one.
+        cap = load_capacity(ev["events"][eid].get("conf_id", ""))
+        on_sale = {rows[-1]["section_id"] for rows in tls[eid].values()}
+        fan_ids = dict(FAN_SECTIONS)
+        fan_ids.update({sid: num for sid, num in extra_fans.items() if sid in sold_somewhere})
+        fans = sorted(((sid, name, cap[sid]) for sid, name in fan_ids.items() if sid in cap and sid not in on_sale),
+                      key=lambda x: x[1])
+        fan_set = {sid for sid, _n, _c in fans}
+        # season seats in other sections not on sale online for this game: the holders
+        # still have their seats, so they count as season tickets / taken / expected crowd
         seen = tls[eid]
-        off = Counter(seat_sec[s] for s in cache[g] if s not in seen)
+        off = Counter(seat_sec[s] for s in cache[g] if s not in seen and seat_sec[s] not in fan_set)
         t = out[eid]["totals"]
         t["season_off"] = sum(off.values())
         for k in ("seats", "taken", "season"):
             t[k] += t["season_off"]
         out[eid]["season_off_sections"] = sorted((sid, sec_titles.get(sid, sid), n) for sid, n in off.items())
-        # fan sectors not on sale for this game: assume full (their whole capacity)
-        cap = load_capacity(ev["events"][eid].get("conf_id", ""))
-        on_sale = {rows[-1]["section_id"] for rows in tls[eid].values()}
-        fans = [(sid, name, cap[sid]) for sid, name in FAN_SECTIONS.items() if sid in cap and sid not in on_sale]
         out[eid]["fan_sections"] = fans
         out[eid]["totals"]["fans_est"] = sum(n for _s, _n, n in fans)
         out[eid]["totals"]["expected"] = out[eid]["totals"]["taken"] + out[eid]["totals"]["fans_est"]

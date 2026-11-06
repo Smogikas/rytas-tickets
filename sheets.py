@@ -32,7 +32,7 @@ CHUNK = 10000                     # rows per append request
 
 OVERVIEW = "Rungtynės"
 OVERVIEW_HEAD = ["ID", "Data (Vilnius)", "Turnyras", "Varžovas", "Būsena", "Laukiama žiūrovų",
-                 "iš jų B Tribūna (110–111, įvert.)",
+                 "iš jų B Tribūna (įvert.)",
                  "Abonementai", "Pavieniai bilietai", "Laisvi bilietai", "Klubo pajamos €",
                  "Vid. bilieto kaina € (su mokesčiais)", "Lankomumas (įrašykite)"]
 ATT_COL = chr(ord("A") + len(OVERVIEW_HEAD) - 1)   # attendance column (last), typed by the user

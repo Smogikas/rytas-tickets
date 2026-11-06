@@ -51,6 +51,10 @@ Seat ids are the same in every game, so for each game:
 - Only sections sold online are counted; sections that open later are picked up.
 - **B Tribūna** (110–111, the ultras' sections) is not sold on bilietai.lt: its full capacity (from
   the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
+  For some games (Žalgiris) B Tribūna covers 109–112: sections 109 and 112 count as B Tribūna (full)
+  in a game where they are not on sale online but are on sale in other games.
+- Season seats in a section that is not on sale online for a game still count (as season tickets,
+  taken, expected crowd) in that game.
 - The full venue plan gives the seat count of every section and the arena capacity (Sheet tab
   **Talpa**; `rytas.py capacity`) and seat positions of sections never on sale.
 - A section leaving the sale list is **sold out** (last seats counted as sold, striped on the

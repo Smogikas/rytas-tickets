@@ -377,6 +377,23 @@ class Analysis(Base):
         self.assertEqual(res[G3]["season_off_sections"], [("72935", "401", 6)])
         self.assertEqual(t1["season_off"], 0)
 
+    def test_b_tribuna_extended_to_109_112_when_not_on_sale(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        G3 = "JSAIJZ5XW2"
+        self.site.close_section(G3, "83548")                  # stands in for 112: not on sale in game 3
+        with unittest.mock.patch.object(rytas, "FAN_EXTRA", ("Parteris",)), \
+                unittest.mock.patch.object(rytas, "SEASON_MIN_GAMES", 2):
+            self.assertEqual(self.snapshot_all(), 0)
+            res = rytas.analyse_all(rytas.load_events())
+        f1 = {sid for sid, _n, _c in res["PNJMMUNJYB"]["fan_sections"]}
+        f3 = {sid: n for sid, _n, n in res[G3]["fan_sections"]}
+        self.assertEqual(f1, {"79993", "72934"})               # on sale in game 1: a normal section there
+        self.assertEqual(f3, {"79993": 8, "72934": 10, "83548": 28})   # full capacity in game 3
+        t3 = res[G3]["totals"]
+        self.assertEqual(t3["fans_est"], 46)
+        self.assertEqual(t3["season_off"], 0)                  # its season seats are inside B Tribūna, not counted twice
+        self.assertEqual(t3["expected"], t3["taken"] + 46)
+
     def test_seat_sold_in_one_game_before_tracking_is_not_season(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
         self.site.sell("PNJMMUNJYB", "72935", 3)

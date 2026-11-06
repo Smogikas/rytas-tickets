@@ -209,7 +209,7 @@ const T = {
     noLayout: "Šio sektoriaus vietų išdėstymas bus rodomas po kito vietų plano nuskaitymo.",
     priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
     sectionsTable: "Sektoriai", totalRow: "Iš viso",
-    foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai + B Tribūna (110–111, neparduodama internetu, įskaičiuota kaip pilna). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
+    foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai + B Tribūna (110–111, kai kuriose rungtynėse ir 109, 112; neparduodama internetu, įskaičiuota kaip pilna). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
     loadErr: "Nepavyko įkelti duomenų.",
     fanPart: "iš jų B Tribūna ~{n} (įvert.)", fanNote: "Ultras sektorius, neparduodamas bilietai.lt. Į laukiamus žiūrovus įskaičiuotas kaip pilnas.",
     catF: "neparduodama internetu", est: "įvert.",
@@ -244,7 +244,7 @@ const T = {
     noLayout: "Seat positions for this section appear after the next seat-plan scan.",
     priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
     sectionsTable: "Sections", totalRow: "Total",
-    foot: "Expected crowd = season-ticket seats + single tickets sold + B Tribūna (110–111, not sold online, counted as full). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
+    foot: "Expected crowd = season-ticket seats + single tickets sold + B Tribūna (110–111, for some games also 109 and 112; not sold online, counted as full). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
     loadErr: "Could not load the data.",
     fanPart: "incl. B Tribūna ~{n} (est.)", fanNote: "Ultras section, not sold on bilietai.lt. Counted as full in the expected crowd.",
     catF: "not sold online", est: "est.",
@@ -462,7 +462,7 @@ function renderArena(){
       <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button>${statusTag(x)}</td>
         <td class="num">${priceChg(x)} ${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
         <tr><td><b>${t("totalRow")}</b></td><td></td><td></td><td class="num"><b>${nf(tot.seats)}</b></td><td class="num"><b>${nf(tot.season)}</b></td><td class="num"><b>${nf(tot.singles)}</b></td><td class="num"><b>${nf(tot.available)}</b></td><td class="num"><b>${pct(tot.seats - tot.available, tot.seats).toFixed(0)}%</b></td><td class="num"><b>${eur(tot.revenue)}</b></td></tr>
-        ${g.fans ? `<tr><td>${FAN} (${(g.fanSections || []).map((f) => f.title).join("–")}) <span class="tag fan">${t("est")}</span></td><td></td><td></td><td class="num">${nf(g.fans)}</td><td></td><td></td><td class="num">–</td><td class="num">100%</td><td></td></tr>` : ""}
+        ${g.fans ? `<tr><td>${FAN} (${(g.fanSections || []).length > 2 ? g.fanSections[0].title + "–" + g.fanSections[g.fanSections.length - 1].title : (g.fanSections || []).map((f) => f.title).join("–")}) <span class="tag fan">${t("est")}</span></td><td></td><td></td><td class="num">${nf(g.fans)}</td><td></td><td></td><td class="num">–</td><td class="num">100%</td><td></td></tr>` : ""}
       </tbody></table></div>
   </div>`;
 
