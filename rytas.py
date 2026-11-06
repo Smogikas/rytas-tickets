@@ -514,17 +514,21 @@ def season_groups(names):
 
 def season_seats(group, tls):
     """Seats observed in at least SEASON_MIN_GAMES games of the group (fewer if fewer
-    games have seat data, but at least 2) and never available in any. These are
-    taken before single-game sales could reach them: season tickets (and seats
-    held for guests, press, cameras, ...). Far-away games, with few single tickets
-    sold yet, keep seats sold to single buyers out of the estimate."""
+    games have seat data, but at least 2) and taken the first time they were seen in
+    every one of them. These were taken before single-game sales could reach them:
+    season tickets (and seats held for guests, press, cameras, ...). Far-away games,
+    with few single tickets sold yet, keep seats sold to single buyers out.
+
+    A season seat that becomes free later (the holder gives it back) stays a season
+    seat, so the set does not shrink during the season; in that game it counts as
+    available, or as a single ticket once resold (classify_seats)."""
     with_data = sum(1 for eid in group if tls.get(eid))
     need = max(2, min(SEASON_MIN_GAMES, with_data))
     seen, ever_free = Counter(), set()
     for eid in group:
         for seat, rows in tls.get(eid, {}).items():
             seen[seat] += 1
-            if any(r["status"] == 1 for r in rows):
+            if rows[0]["status"] == 1:         # free when first seen: not a season seat
                 ever_free.add(seat)
     return {s for s, n in seen.items() if n >= need and s not in ever_free}
 
@@ -631,8 +635,9 @@ SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE = "S", "O", "B", "A"
 def classify_seats(tl, prices, season):
     """seat_id -> (section_id, category, price, fee, ts).
 
-    S  season ticket (never available in any compared game)
-    O  sold while tracked: price/fee in force when the sale was seen
+    S  season ticket (taken when first seen in every compared game, never free in this one)
+    O  sold while tracked: price/fee in force when the sale was seen (also a season
+       seat given back and resold in this game)
     B  taken before tracking began, not season: first logged price (estimate)
     A  available: current price
     """
@@ -642,9 +647,9 @@ def classify_seats(tl, prices, season):
         sid = last["section_id"]
         if last["status"] == 1:
             cat, ts = AVAILABLE, "9999"
-        elif seat in season:
+        elif seat in season and not any(r["status"] == 1 for r in rows):
             cat, ts = SEASON, last["ts_utc"]
-        elif first["status"] == 1:
+        elif any(r["status"] == 1 for r in rows):
             cat, ts = SOLD_SEEN, last["ts_utc"]   # changes-only log: last row = the sale
         else:
             cat, ts = SOLD_BEFORE, first["ts_utc"]

@@ -394,6 +394,20 @@ class Analysis(Base):
         self.assertEqual(t3["season_off"], 0)                  # its season seats are inside B Tribūna, not counted twice
         self.assertEqual(t3["expected"], t3["taken"] + 46)
 
+    def test_season_seat_given_back_later_stays_season(self):
+        def tl(*seats):
+            return {seat: [{"ts_utc": f"T{i}", "section_id": "S", "seat_id": seat, "status": st}
+                           for i, st in enumerate(sts)] for seat, sts in seats}
+        tls = {"a": tl(("x", [0]), ("y", [0])), "b": tl(("x", [0]), ("y", [0])),
+               "c": tl(("x", [0, 1, 0]), ("y", [1, 0]))}    # x: given back, resold; y: free when first seen
+        season = rytas.season_seats(("a", "b", "c"), tls)
+        self.assertEqual(season, {"x"})                       # the set does not shrink
+        cats = {seat: v[1] for seat, v in rytas.classify_seats(tls["c"], {}, season).items()}
+        self.assertEqual(cats["x"], rytas.SOLD_SEEN)            # in game c: a resold single ticket
+        self.assertEqual(rytas.classify_seats(tls["a"], {}, season)["x"][1], rytas.SEASON)
+        tls["c"]["x"].append({"ts_utc": "T3", "section_id": "S", "seat_id": "x", "status": 1})
+        self.assertEqual(rytas.classify_seats(tls["c"], {}, season)["x"][1], rytas.AVAILABLE)
+
     def test_seat_sold_in_one_game_before_tracking_is_not_season(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
         self.site.sell("PNJMMUNJYB", "72935", 3)

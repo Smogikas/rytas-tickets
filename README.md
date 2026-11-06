@@ -33,7 +33,9 @@ Seat ids are the same in every game, so for each game:
 
 - **Taken** = seats − available = **expected crowd** if every season holder comes
 - **Season tickets** (estimate): seats seen in 3+ games (2 while fewer games have seat data) and
-  **never available in any** (games of the same competition; all games if it has fewer than 3).
+  **taken when first seen in every one** (games of the same competition; all games if it has
+  fewer than 3). The set does not shrink during the season: a season seat given back later stays
+  a season seat, and in that game counts as available, or as a single ticket once resold.
   Far-away games, with few single tickets sold yet, keep seats sold to single buyers out.
   They cluster in the central sideline sections (108, 116–120, lounges 102–104), mostly in
   the middle rows, in blocks of 2–10 seats.
