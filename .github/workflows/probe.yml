@@ -1,0 +1,43 @@
+name: Probe (temporary)
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+      SHEET_ID: 12u2OBPsVzivfjZopgrjTtUKfc-TtXARYcEODmzRVGaM
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install google-auth==2.38.0 requests==2.32.3
+      - run: |
+          python sheets.py pull
+          python - <<'PY'
+          import collections, rytas
+          ev = rytas.load_events()
+          titles = {r["section_id"]: r["section"] for r in rytas.read_csv(rytas.SNAPSHOTS)}
+          layout = {r["seat_id"]: r for r in rytas.read_csv(rytas.LAYOUT)}
+          per_game = {}
+          for eid in ev["events"]:
+              tl = rytas.timelines(rytas.load_seats(eid))
+              per_game[eid] = {s for s, rows in tl.items() if rytas.blocked(rows[-1])}
+          allb = set.intersection(*per_game.values())
+          print("blocked in every game:", len(allb), "| in any game:", len(set.union(*per_game.values())))
+          by = collections.defaultdict(list)
+          for s in allb:
+              lo = layout.get(s, {})
+              by[lo.get("section_id", "?")].append((lo.get("row", "?"), lo.get("place", "?")))
+          for sid, seats in sorted(by.items(), key=lambda kv: titles.get(kv[0], kv[0])):
+              rows = collections.defaultdict(list)
+              for r, p in seats:
+                  rows[r].append(p)
+              print("B", titles.get(sid, sid), len(seats), "|", "; ".join(f"row {r}: {','.join(sorted(ps, key=lambda x: (len(x), x)))}" for r, ps in sorted(rows.items(), key=lambda kv: (len(kv[0]), kv[0]))))
+          # their status in the seat plan of one game, and neighbours' categories
+          e = next(iter(ev["events"]))
+          tl = rytas.timelines(rytas.load_seats(e))
+          print("status counts (one game):", collections.Counter(tl[s][-1]["status"] for s in allb if s in tl))
+          PY
