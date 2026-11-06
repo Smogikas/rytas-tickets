@@ -1217,21 +1217,24 @@ def sales_curve(first_ts, before, sale_times):
     return out
 
 
-def popularity(res, ev):
-    """Per section across all games: share of seats on sale (not season tickets) that were
-    sold as single tickets -> {section_id: {"title", "pct", "games"}}."""
+def popularity(res, ev, now):
+    """Per section over PLAYED games only (final state at tip-off; far-away games would pull
+    the averages down): average fill rate = taken seats (season tickets + sold tickets) /
+    seats, and average seats taken per game -> {section_id: {"title", "fill", "taken",
+    "seats", "games"}}."""
     acc = defaultdict(lambda: [0, 0, 0, ""])
-    for eid in ev["events"]:
+    for eid, meta in ev["events"].items():
+        if parse_ts(meta["start_utc"]) > now:
+            continue
         for x in res[eid]["sections"]:
-            if x.get("whole"):
-                continue
             a = acc[x["section_id"]]
-            a[0] += x["singles"]
-            a[1] += max(0, x["seats"] - x["season"])
+            a[0] += x["taken"]
+            a[1] += x["seats"]
             a[2] += 1
             a[3] = x["section"]
-    return {sid: {"title": a[3], "pct": round(100 * a[0] / a[1], 1) if a[1] else None, "games": a[2]}
-            for sid, a in acc.items()}
+    return {sid: {"title": a[3], "fill": round(100 * a[0] / a[1], 1) if a[1] else None,
+                  "taken": round(a[0] / a[2], 1), "seats": round(a[1] / a[2]), "games": a[2]}
+            for sid, a in acc.items() if a[2]}
 
 
 def membership_table(ev, res):
@@ -1369,7 +1372,7 @@ def cmd_export(args):
         arena_cap[conf] = sum(cap.get(sid, 0) for sid, _pts in shp)
     data = {"updated": now_utc(), "seasonSeats": any_res.get("season_total", 0),
             "games": games, "sections": sections, "shapes": shapes, "arenaCap": arena_cap,
-            "membership": membership_table(ev, res), "popularity": popularity(res, ev),
+            "membership": membership_table(ev, res), "popularity": popularity(res, ev, now),
             "warnings": health_warnings(ev, res, now)}
     (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Exported {len(games)} games to {out}")

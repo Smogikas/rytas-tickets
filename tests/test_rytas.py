@@ -731,7 +731,13 @@ class Commands(Base):
         self.assertTrue(g["sales"] and g["sales"][0][1] == g["before"])   # curve starts with pre-tracking sales
         self.assertIn("sold24", g)
         self.assertIn("priceEvents", g)
-        self.assertTrue(d["popularity"])
+        self.assertEqual(d["popularity"], {})                       # no game played yet
+        ev = rytas.load_events()
+        res = rytas.analyse_all(ev)
+        pop = rytas.popularity(res, ev, rytas.parse_ts("2026-11-12T00:00:00+00:00"))   # after the first game only
+        sec = next(s for s in res["PNJMMUNJYB"]["sections"] if s["section_id"] == "72935")
+        self.assertEqual(pop["72935"], {"title": sec["section"], "fill": round(100 * sec["taken"] / sec["seats"], 1),
+                                        "taken": float(sec["taken"]), "seats": sec["seats"], "games": 1})
         # bilietai.lt answers nothing: one warning, not one per game
         with unittest.mock.patch.object(rytas, "get_json", side_effect=OSError("HTTP 403")):
             self.snapshot_all()

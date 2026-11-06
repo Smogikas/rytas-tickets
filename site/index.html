@@ -164,7 +164,8 @@ svg.chart .over{fill:transparent}
 .evbars{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:center;margin-top:4px}
 .evbars .bar{display:block;height:10px;border-radius:0 4px 4px 0;min-width:2px}
 .bygrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
-.byrow{display:grid;grid-template-columns:1fr 80px 52px;gap:8px;align-items:center;padding:2px 0}
+.byrow{display:grid;grid-template-columns:1fr 80px minmax(52px,auto);gap:8px;align-items:center;padding:2px 0}
+.byrow .num{white-space:nowrap;text-align:right}
 .minibar.wide{width:80px}
 .smgrid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px;margin-top:10px;align-items:start}
 @media (max-width:760px){.smgrid{grid-template-columns:1fr}}
@@ -241,7 +242,10 @@ const T = {
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
     salesMapTab: "Pardavimų žemėlapis", replay: "Pardavimų eiga", popular: "Populiarumas",
     replayAt: "Būsena", replayNote: "Spalva – kokia sektoriaus vietų dalis užimta (abonementai + parduoti bilietai) pasirinktu metu, nuo 0% iki 100%. Slinkite laiką arba spauskite „Groti“. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių. Tolimoms rungtynėms rinkitės 7–30 d.: anksčiau pardavimų būna mažai.",
-    popNote: "Spalva ir procentai – kiek sektoriaus laisvų vietų (be abonementų) jau nupirkta pavieniais bilietais, visų rungtynių vidurkis. Pvz. 122 – 25%: vidutiniškai ketvirtadalis jo parduodamų vietų jau parduota. Kuo daugiau, tuo populiaresnis sektorius. Spalvų skalė – nuo 0% iki didžiausio sektoriaus.",
+    popFill: "Užpildymas", popCount: "Užimta vietų", avgTakenLbl: "vid. užimta", seatsWord: "vietų",
+    popEmpty: "Bus rodoma po pirmųjų sužaistų rungtynių ({d}): skaičiuojama tik pagal sužaistas rungtynes (galutinė būsena rungtynių pradžioje), kad tolimos rungtynės neiškreiptų vidurkių.",
+    popNoteFill: "Vidutinis sektoriaus užpildymas sužaistose rungtynėse ({n}): užimtos vietos (abonementai + parduoti bilietai) ÷ visos sektoriaus vietos, rungtynių pradžioje.",
+    popNoteCount: "Vidutiniškai užimta vietų per rungtynes sužaistose rungtynėse ({n}), iš sektoriaus vietų skaičiaus: abonementai + parduoti bilietai, rungtynių pradžioje.",
     takenWord: "užimta", soldWord: "parduota",
     soldByThen: "Iki tol parduota pavienių: {n}", topSections: "Populiariausi sektoriai", play: "Groti", pause: "Stabdyti",
     last24Title: "Pardavimai per paskutines 24 val.", trendLbl: "pokytis",
@@ -305,7 +309,10 @@ const T = {
     cheap: "cheapest", notOnSale: "Not on sale for this game",
     salesMapTab: "Sales map", replay: "Sales replay", popular: "Popularity",
     replayAt: "As of", replayNote: "Colour: share of the section's seats taken (season tickets + tickets sold) at the chosen moment, 0% to 100%. Move the time or press Play. Tickets sold before tracking began show as taken from the start. For far-away games pick 7–30 days: earlier there are few sales.",
-    popNote: "Colour and percentage: how much of a section's free seats (excl. season tickets) has been bought as single tickets, averaged over all games. E.g. 122 at 25%: on average a quarter of its seats on sale is already sold. Higher = more popular. The colour scale runs from 0% to the top section.",
+    popFill: "Fill rate", popCount: "Seats taken", avgTakenLbl: "avg taken", seatsWord: "seats",
+    popEmpty: "Shown after the first played game ({d}): only played games count (final state at tip-off), so far-away games don't distort the averages.",
+    popNoteFill: "Average fill rate in played games ({n}): seats taken (season tickets + tickets sold) ÷ all seats of the section, at tip-off.",
+    popNoteCount: "Average seats taken per game in played games ({n}), out of the section's seats: season tickets + tickets sold, at tip-off.",
     takenWord: "taken", soldWord: "sold",
     soldByThen: "Single tickets sold by then: {n}", topSections: "Most popular sections", play: "Play", pause: "Pause",
     last24Title: "Sales in the last 24 hours", trendLbl: "change",
@@ -359,7 +366,7 @@ const store = {
 };
 const S = {
   lang: store.get("lang", "lt"), theme: store.get("theme", "auto"), tab: store.get("tab", "games"),
-  when: "upcoming", comp: "all", sort: "date", range: store.get("range", "14"), agame: null, smode: "replay", replayT: null, game: store.get("game", null), sec: null, mode: "taken", seat: null
+  when: "upcoming", comp: "all", sort: "date", range: store.get("range", "14"), agame: null, smode: "replay", replayT: null, pmode: "fill", game: store.get("game", null), sec: null, mode: "taken", seat: null
 };
 let DATA = null;
 const seatCache = {};
@@ -626,17 +633,26 @@ function renderSalesMap(){
       <div class="seg" role="group" id="smSeg"></div>
       ${S.smode === "replay" ? `<label class="small muted">${t("gameLbl")} <select id="smGame" class="sel">${opts}</select></label>` : ""}</div>`;
   if (S.smode === "popular"){
-    const pop = DATA.popularity || {};
-    const vals = Object.values(pop).map((p) => p.pct).filter((v) => v != null);
-    const hi = Math.max(1, ...vals);
-    const cell = (id) => { const p = pop[id]; if (!p || p.pct == null) return null; const fill = scale(p.pct / hi);
-      return { fill, label: shortTitle(p.title), ink: labelInk(fill), title: `${p.title}: ${p.pct.toFixed(0)}% (${gamesN(p.games)})` }; };
-    const top = Object.values(pop).filter((p) => p.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 8);
+    const pop = DATA.popularity || {}, rows = Object.values(pop).filter((p) => p.fill != null);
+    const byCount = S.pmode === "count";
+    const val = (p) => byCount ? p.taken : p.fill;
+    const hi = byCount ? Math.max(1, ...rows.map((p) => p.taken)) : 100;
+    const nPlayed = Math.max(0, ...rows.map((p) => p.games));
+    const next = DATA.games.filter((g) => !g.played).sort((a, b) => a.start.localeCompare(b.start))[0];
+    const fmtV = (p) => byCount ? `${nf(p.taken)} / ${nf(p.seats)}` : `${p.fill.toFixed(0)}%`;
+    const cell = (id) => { const p = pop[id]; if (!p || p.fill == null) return null; const fill = scale(val(p) / hi);
+      return { fill, label: shortTitle(p.title), ink: labelInk(fill), title: `${p.title}: ${p.fill.toFixed(0)}% · ${t("avgTakenLbl")} ${nf(p.taken)} / ${nf(p.seats)} (${gamesN(p.games)})` }; };
+    const top = rows.slice().sort((a, b) => val(b) - val(a)).slice(0, 10);
+    const body = !rows.length
+      ? `<div class="note" style="margin-top:12px">${t("popEmpty", { d: next ? dShort(next.start) + " (" + next.opp + ")" : "–" })}</div>`
+      : `<div class="smgrid"><div>${mapSvg(shapes, cell)}
+          <div class="legend"><span>0</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${byCount ? nf(hi) + " " + t("seatsWord") : "100% " + t("takenWord")}</span></div></div>
+        <div><h3 style="margin:0 0 6px;font-size:15px">${t("topSections")}</h3>${top.map((p) => `<div class="byrow small"><span>${esc(p.title)}</span><span class="minibar wide"><i style="width:${(100 * val(p) / hi).toFixed(0)}%"></i></span><span class="num">${fmtV(p)}</span></div>`).join("")}</div></div>`;
     $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
-      <div class="smgrid"><div>${mapSvg(shapes, cell)}
-        <div class="legend"><span>0%</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${hi.toFixed(0)}% ${t("soldWord")}</span></div></div>
-        <div><h3 style="margin:0 0 6px;font-size:15px">${t("topSections")}</h3>${top.map((p) => `<div class="byrow small"><span>${esc(p.title)}</span><span class="minibar wide"><i style="width:${(100 * p.pct / hi).toFixed(0)}%"></i></span><span class="num">${p.pct.toFixed(0)}%</span></div>`).join("")}</div></div>
-      <p class="note" style="margin:8px 0 0">${t("popNote")}</p></section></div>`;
+      ${rows.length ? `<div class="seg small-seg" role="group" id="popSeg" style="margin-top:10px"></div>` : ""}
+      ${body}
+      ${rows.length ? `<p class="note" style="margin:8px 0 0">${t(byCount ? "popNoteCount" : "popNoteFill", { n: gamesN(nPlayed) })}</p>` : ""}</section></div>`;
+    if (rows.length) segButtons($("popSeg"), [["fill", t("popFill")], ["count", t("popCount")]], byCount ? "count" : "fill", (v) => { S.pmode = v; render(); }, t("popular"));
   } else {
     $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
       <div id="smBody" class="note" style="margin-top:10px">…</div></section></div>`;
