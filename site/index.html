@@ -14,7 +14,7 @@
 :root{
   --bg:#F6EFE2; --panel:#FFFAF0; --ink:#2A1C11; --muted:#6B5644; --line:#E2D3BA;
   --accent:#7B4A23; --accent-ink:#FFF8EC; --season:#2F6467; --single:#C4572F; --free:#FBF6EC; --seat-line:#B8A386;
-  --closed:#EFE5D2; --low:#E3ECE7; --mid:#86B5AC; --high:#235E5C; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C4572F;
+  --closed:#EFE5D2; --low:#E3ECE7; --mid:#86B5AC; --high:#235E5C; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C4572F; --avail:#E9C46A;
   color-scheme: light;
 }
 /* dark: midnight navy and gold; gold scale for the data */
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#0D1422; --panel:#141D2E; --ink:#EEF0F4; --muted:#A3ACBD; --line:#283349;
     --accent:#D9AE4F; --accent-ink:#0D1422; --season:#6F95A0; --single:#E8B84A; --free:#141D2E; --seat-line:#4A5670;
-    --closed:#141D2E; --low:#283247; --mid:#86683A; --high:#E8B84A; --court:#3A4560; --focus:#E9C977; --bcl:#9DB4D6; --sel:#F4EEDC;
+    --closed:#141D2E; --low:#283247; --mid:#86683A; --high:#E8B84A; --court:#3A4560; --focus:#E9C977; --bcl:#9DB4D6; --sel:#F4EEDC; --avail:#EDE6D3;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0D1422; --panel:#141D2E; --ink:#EEF0F4; --muted:#A3ACBD; --line:#283349;
   --accent:#D9AE4F; --accent-ink:#0D1422; --season:#6F95A0; --single:#E8B84A; --free:#141D2E; --seat-line:#4A5670;
-  --closed:#141D2E; --low:#283247; --mid:#86683A; --high:#E8B84A; --court:#3A4560; --focus:#E9C977; --bcl:#9DB4D6; --sel:#F4EEDC;
+  --closed:#141D2E; --low:#283247; --mid:#86683A; --high:#E8B84A; --court:#3A4560; --focus:#E9C977; --bcl:#9DB4D6; --sel:#F4EEDC; --avail:#EDE6D3;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -409,11 +409,11 @@ async function drawSeats(g, s){
   if (!list.length){ box.innerHTML = `<div class="note">${t("noLayout")}</div>`; return; }
   const xs = list.map((q) => q[2]), ys = list.map((q) => q[3]);
   const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 16, h = Math.max(...ys) - y0 + 16;
-  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--free)" };
+  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)" };
   const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
   box.innerHTML = `<svg class="seats" viewBox="0 0 ${w} ${h}" style="width:100%;max-height:340px" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
-    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--free);border-color:var(--seat-line)"></i>${t("catA")}</span></div>`;
+    <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span></div>`;
   const svg = box.querySelector("svg");
   const show = (e) => { const r = e.target.closest("rect[data-i]"); if (!r) return; S.seat = +r.dataset.i; $("seatInfo").textContent = seatLabel(list[S.seat]); };
   svg.addEventListener("mouseover", show); svg.addEventListener("click", show);
