@@ -59,8 +59,22 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .sw{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid transparent}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.card{cursor:pointer;text-align:left;padding:20px;display:flex;flex-direction:column;gap:14px;border-radius:18px;width:100%}
+.card{display:flex;flex-direction:column;border-radius:18px;overflow:hidden}
 .card:hover{border-color:var(--accent)}
+.card-open{cursor:pointer;text-align:left;padding:20px 20px 10px;display:flex;flex-direction:column;gap:14px;background:none;border:0;width:100%;color:inherit;font:inherit}
+.card-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 14px 14px 20px;margin-top:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;border:1px solid var(--line);background:transparent;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;min-height:40px;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn svg{width:17px;height:17px;flex:none}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(10,10,12,.62);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal[hidden]{display:none}
+.modal-box{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:18px;width:100%;max-width:440px;max-height:calc(100vh - 32px);overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.modal-box img{width:100%;height:auto;border-radius:12px;display:block;border:1px solid var(--line)}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+.modal-actions .btn{flex:1 1 120px}
+.seatwrap{overflow:auto;max-height:440px}
+.seatwrap svg{display:block;margin:0 auto}
 .badge{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px;border:1px solid currentColor}
 .badge.LKL{color:var(--accent)} .badge.BCL{color:var(--bcl)}
 .opp{font-family:"Space Grotesk",Inter,sans-serif;font-size:22px;font-weight:700;line-height:1.15}
@@ -120,6 +134,21 @@ td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration
   <footer class="note" id="foot"></footer>
 </div>
 
+<div class="modal" id="shareModal" hidden role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <h2 id="shareTitle" style="margin:0;font-size:18px"></h2>
+      <button type="button" class="btn" id="shareX" style="min-width:40px;padding:8px" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="shareBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn primary" id="shareGo"></button>
+      <a class="btn" id="shareDl" download></a>
+      <button type="button" class="btn" id="shareClose"></button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 const T = {
@@ -137,7 +166,7 @@ const T = {
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
     noGames: "Šiame sąraše rungtynių nėra.", noData: "vietų duomenys dar renkami",
-    modeTaken: "% užimta", modeSingles: "% pavienių", modePrice: "Kaina", low: "mažai", high: "daug",
+    modeTaken: "% užimta", modePrice: "Kaina", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
     pickSection: "Spustelėkite sektorių žemėlapyje arba lentelėje.",
     seats: "Vietos", season: "Abonementai", single: "Pavieniai", free: "Laisvos", full: "Užimta",
@@ -149,7 +178,9 @@ const T = {
     priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
     sectionsTable: "Sektoriai", totalRow: "Iš viso",
     foot: "Laukiama žiūrovų = abonementų vietos + parduoti pavieniai bilietai (jei ateitų visi abonementų turėtojai). Klubo pajamos = bilieto vertė be bilietai.lt, arenos, administravimo ir ložės mokesčių. Iki stebėjimo pradžios (2026-11-05) parduotų bilietų kaina įvertinta pagal pirmą užfiksuotą kainą. Abonementai – vietos, kurios nebuvo laisvos nė vienose stebėtose rungtynėse. Rodomi tik internetu parduodami sektoriai.",
-    loadErr: "Nepavyko įkelti duomenų."
+    loadErr: "Nepavyko įkelti duomenų.",
+    share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", making: "Ruošiamas paveikslėlis…",
+    shareFoot: "Duomenys {d}"
   },
   en: {
     title: "Rytas tickets", eyebrow: "Vilniaus „Rytas“ · home games · Arena Vilnius", loading: "Loading…",
@@ -165,7 +196,7 @@ const T = {
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
     noGames: "No games in this list.", noData: "seat data still being collected",
-    modeTaken: "% taken", modeSingles: "% single", modePrice: "Price", low: "low", high: "high",
+    modeTaken: "% taken", modePrice: "Price", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
     pickSection: "Click a section on the map or in the table.",
     seats: "Seats", season: "Season", single: "Single", free: "Available", full: "Taken",
@@ -177,7 +208,9 @@ const T = {
     priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
     sectionsTable: "Sections", totalRow: "Total",
     foot: "Expected crowd = season-ticket seats + single tickets sold (attendance if every season holder comes). Club revenue = ticket value excl. bilietai.lt, arena, administration and lounge fees. Tickets sold before tracking began (5 Nov 2026) are priced at the first logged price. Season tickets = seats never available in any tracked game. Only sections sold online are shown.",
-    loadErr: "Could not load the data."
+    loadErr: "Could not load the data.",
+    share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", making: "Making the picture…",
+    shareFoot: "Data {d}"
   }
 };
 
@@ -272,16 +305,19 @@ function renderGames(){
     const att = g.played ? (g.attendance != null
       ? `<div class="small"><b class="num">${t("attendance")}: ${nf(g.attendance)}</b> <span class="muted">· ${t("attVs", { e: nf(g.taken) })} (${(g.attendance - g.taken >= 0 ? "+" : "") + nf(g.attendance - g.taken)})</span></div>`
       : `<div class="small muted">${t("noAtt")}</div>`) : "";
-    return `<button type="button" class="panel card" data-game="${esc(g.id)}" aria-label="${esc(t("arena") + ": " + g.opp)}">
+    return `<article class="panel card"><button type="button" class="card-open" data-game="${esc(g.id)}" aria-label="${esc(t("arena") + ": " + g.opp)}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="badge ${esc(g.comp)}">${esc(g.comp)}</span><span class="small muted">${esc(dFull(g.start))}</span></div>
       <div><div class="small muted">${t("vs")}</div><div class="opp">${esc(g.opp)}</div><div class="small muted">${esc(whenText(g))}</div></div>
       ${has ? `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="big num">${nf(g.taken)}</span><span class="small muted">${t("expected")}</span></div>
       <div class="bar" aria-hidden="true"><i style="width:${pct(g.season, g.seats)}%;background:var(--season)"></i><i style="width:${pct(g.singles, g.seats)}%;background:var(--single)"></i></div>
       <div class="grid2"><div><span class="muted">${t("singles")}</span><b class="num">${nf(g.singles)}</b></div><div><span class="muted">${t("available")}</span><b class="num">${nf(g.available)}</b></div>
       <div><span class="muted">${t("revenue")}</span><b class="num">${eur(g.revenue)}</b></div><div><span class="muted">${t("avg")}</span><b class="num">${g.singles ? eur(g.avg, 2) : "–"}</b></div></div>
-      <div class="small muted">${t("seen", { n: nf(g.seen) })}</div>` : `<div class="small muted">${t("noData")}</div>`}
+      ` : `<div class="small muted">${t("noData")}</div>`}
       ${att}
-    </button>`;
+    </button>
+    <div class="card-foot"><span class="small muted">${has ? t("seen", { n: nf(g.seen) }) : ""}</span>
+      <button type="button" class="btn" data-share="${esc(g.id)}" aria-label="${esc(t("share") + ": " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
+    </article>`;
   }).join("");
   $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
     <div class="controls">
@@ -293,13 +329,13 @@ function renderGames(){
   </div>`;
   segButtons($("compSeg"), comps.map((c) => [c, c === "all" ? t("all") : c]), S.comp, (v) => { S.comp = v; renderGames(); });
   segButtons($("sortSeg"), [["date", t("byDate")], ["singles", t("bySingles")], ["revenue", t("byRevenue")], ["avg", t("byAvg")]], S.sort, (v) => { S.sort = v; renderGames(); }, t("sort"));
+  $("view").querySelectorAll("[data-share]").forEach((b) => b.addEventListener("click", () => openShare(b.dataset.share)));
   $("view").querySelectorAll("[data-game]").forEach((b) => b.addEventListener("click", () => { S.tab = "arena"; S.game = b.dataset.game; S.sec = null; S.seat = null; store.set("tab", "arena"); store.set("game", S.game); render(); window.scrollTo({ top: 0 }); }));
 }
 
 function sectionValue(s){
   const seats = s.seats || 1;
   if (S.mode === "price") return s._p;
-  if (S.mode === "singles") return s.singles / seats;
   return (s.season + s.singles) / seats;
 }
 
@@ -331,7 +367,7 @@ function renderArena(){
     const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
     return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${lum > 0.55 ? "#1A1208" : "#FFFFFF"}">${esc(shortTitle(byId[id].title))}</text>`;
   }).join("");
-  const legend = { taken: [t("low"), "100%"], singles: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
+  const legend = { taken: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
   const s = byId[S.sec];
   const tot = secs.reduce((a, x) => { ["seats", "season", "singles", "available", "revenue"].forEach((k) => { a[k] = (a[k] || 0) + (x[k] || 0); }); return a; }, {});
   const sorted = secs.slice().sort((a, b) => a.title.localeCompare(b.title, "lt", { numeric: true }));
@@ -366,7 +402,7 @@ function renderArena(){
       </tbody></table></div>
   </div>`;
 
-  segButtons($("modeSeg"), [["taken", t("modeTaken")], ["singles", t("modeSingles")], ["price", t("modePrice")]], S.mode, (v) => { S.mode = v; renderArena(); });
+  segButtons($("modeSeg"), [["taken", t("modeTaken")], ["price", t("modePrice")]], S.mode, (v) => { S.mode = v; renderArena(); });
   const v = $("view");
   v.querySelectorAll(".chip[data-game]").forEach((b) => b.addEventListener("click", () => { S.game = b.dataset.game; S.seat = null; store.set("game", S.game); renderArena(); }));
   v.querySelectorAll("[data-sec]").forEach((el) => {
@@ -411,7 +447,8 @@ async function drawSeats(g, s){
   const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 16, h = Math.max(...ys) - y0 + 16;
   const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)" };
   const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
-  box.innerHTML = `<svg class="seats" viewBox="0 0 ${w} ${h}" style="width:100%;max-height:340px" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg>
+  const K = 1.1;  // px per seat-map unit: the same seat size in every section
+  box.innerHTML = `<div class="seatwrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
     <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span></div>`;
   const svg = box.querySelector("svg");
@@ -425,6 +462,124 @@ function seatLabel(q){
   if (cat !== "S" && price != null) st += " · " + t("paid", { p: eur(price), v: eur(price - (fee || 0)) });
   return `${t("row")} ${row}, ${t("place")} ${place} · ${st}`;
 }
+
+// ---------------------------------------------------------------- share picture
+const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+const ICON_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
+const share = { url: null, file: null, open: false, game: null };
+
+function roundRect(c, x, y, w, h, r){ c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function wrapLines(c, text, maxW){
+  const words = String(text).split(" "), out = []; let line = "";
+  for (const w of words){ const tr = line ? line + " " + w : w; if (c.measureText(tr).width > maxW && line){ out.push(line); line = w; } else line = tr; }
+  if (line) out.push(line); return out;
+}
+
+async function makeShareImage(g){
+  try { await Promise.all(["700 120px \"Space Grotesk\"", "500 30px Inter", "700 30px Inter"].map((f) => document.fonts.load(f))); } catch (e) {}
+  // first pass measures how tall the content is, second pass draws at that height
+  const probe = document.createElement("canvas"); probe.width = 1080; probe.height = 2000;
+  const contentEnd = drawShare(probe.getContext("2d"), g, 1080, 2000);
+  const cv = document.createElement("canvas"); cv.width = 1080; cv.height = Math.max(1080, Math.ceil(contentEnd + 170));
+  drawShare(cv.getContext("2d"), g, cv.width, cv.height);
+  return new Promise((res) => cv.toBlob(res, "image/png"));
+}
+
+function drawShare(c, g, W, H){
+  const P = 64, v = (n) => cssVar(n);
+  const HEAD = '"Space Grotesk", Inter, sans-serif', BODY = 'Inter, system-ui, sans-serif';
+  c.fillStyle = v("--bg"); c.fillRect(0, 0, W, H);
+  roundRect(c, P / 2, P / 2, W - P, H - P, 40); c.fillStyle = v("--panel"); c.fill(); c.lineWidth = 2; c.strokeStyle = v("--line"); c.stroke();
+  const x0 = P + 24, x1 = W - P - 24; let y = P + 70;
+  c.textBaseline = "alphabetic";
+  c.fillStyle = v("--muted"); c.font = `500 26px ${BODY}`; c.fillText(t("eyebrow").toUpperCase(), x0, y);
+  y += 58;
+  // badge + date
+  c.font = `700 26px ${BODY}`; const bw = c.measureText(g.comp).width + 28;
+  roundRect(c, x0, y - 32, bw, 44, 8); c.lineWidth = 2.5; c.strokeStyle = g.comp === "BCL" ? v("--bcl") : v("--accent"); c.stroke();
+  c.fillStyle = c.strokeStyle; c.fillText(g.comp, x0 + 14, y);
+  c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`; const dt = dFull(g.start); c.fillText(dt, x1 - c.measureText(dt).width, y);
+  y += 78;
+  c.fillStyle = v("--muted"); c.font = `500 34px ${BODY}`; c.fillText(t("vs"), x0, y);
+  c.fillStyle = v("--ink"); c.font = `700 76px ${HEAD}`;
+  for (const line of wrapLines(c, g.opp, x1 - x0).slice(0, 2)){ y += 86; c.fillText(line, x0, y); }
+  y += 50; c.fillStyle = v("--muted"); c.font = `500 32px ${BODY}`; c.fillText(whenText(g), x0, y);
+  // big number
+  y += 200; c.fillStyle = v("--ink"); c.font = `700 190px ${HEAD}`; const big = nf(g.taken); c.fillText(big, x0, y);
+  const bigW = c.measureText(big).width; c.fillStyle = v("--muted"); c.font = `500 36px ${BODY}`; c.fillText(t("expected"), x0 + bigW + 24, y - 12);
+  // bar
+  y += 56; const bwid = x1 - x0, bh = 34;
+  roundRect(c, x0, y, bwid, bh, 17); c.fillStyle = v("--free"); c.fill(); c.lineWidth = 2; c.strokeStyle = v("--line"); c.stroke();
+  c.save(); roundRect(c, x0, y, bwid, bh, 17); c.clip();
+  const ws = bwid * (g.seats ? g.season / g.seats : 0), wsi = bwid * (g.seats ? g.singles / g.seats : 0);
+  c.fillStyle = v("--season"); c.fillRect(x0, y, ws, bh); c.fillStyle = v("--single"); c.fillRect(x0 + ws, y, wsi, bh); c.restore();
+  // legend
+  y += bh + 50; let lx = x0; c.font = `500 26px ${BODY}`;
+  for (const [col, label] of [["--season", t("legendSeason") + " " + nf(g.season)], ["--single", t("legendSingle") + " " + nf(g.singles)], ["--free", t("legendFree") + " " + nf(g.available)]]){
+    roundRect(c, lx, y - 22, 26, 26, 6); c.fillStyle = v(col); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
+    c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += 38 + c.measureText(label).width + 36;
+  }
+  // metrics 2x2 (+ attendance for played games)
+  const cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avg, 2) : "–"]];
+  if (g.played && g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(g.taken)]);
+  y += 40; const colW = (x1 - x0) / 2, shown = cells.slice(0, 6);
+  shown.forEach(([label, val], i) => {
+    const cx = x0 + (i % 2) * colW, cy = y + Math.floor(i / 2) * 128;
+    c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`; c.fillText(label, cx, cy + 36);
+    c.fillStyle = v("--ink"); c.font = `700 58px ${HEAD}`; c.fillText(val, cx, cy + 100);
+  });
+  const contentEnd = y + Math.ceil(shown.length / 2) * 128;
+  // footer
+  c.fillStyle = v("--muted"); c.font = `500 26px ${BODY}`;
+  c.fillText(t("title") + " · " + t("shareFoot", { d: dTime(DATA.updated) }), x0, H - P - 30);
+  const site = location.host + location.pathname.replace(/index\.html$/, "");
+  c.fillText(site, x1 - c.measureText(site).width, H - P - 30);
+  return contentEnd;
+}
+
+async function openShare(gid){
+  const g = DATA.games.find((x) => x.id === gid); if (!g) return;
+  const m = $("shareModal");
+  $("shareTitle").textContent = t("shareTitle");
+  $("shareBody").innerHTML = `<div class="note" style="padding:40px 0;text-align:center">${esc(t("making"))}</div>`;
+  $("shareGo").innerHTML = ICON_SHARE + `<span>${esc(t("share"))}</span>`;
+  $("shareDl").innerHTML = ICON_DL + `<span>${esc(t("download"))}</span>`;
+  $("shareClose").textContent = t("close"); $("shareX").setAttribute("aria-label", t("close"));
+  m.hidden = false; share.open = true; share.game = g;
+  if (!(history.state && history.state.share)) history.pushState({ share: 1 }, "");   // phone/browser Back closes it
+  $("shareClose").focus();
+  const blob = await makeShareImage(g);
+  if (!share.open || share.game !== g) return;
+  if (share.url) URL.revokeObjectURL(share.url);
+  share.url = URL.createObjectURL(blob);
+  const name = `ryto-bilietai-${g.start.slice(0, 10)}-${g.opp.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase()}.png`;
+  share.file = new File([blob], name, { type: "image/png" });
+  $("shareBody").innerHTML = `<img src="${share.url}" alt="${esc(g.opp + " · " + nf(g.taken) + " " + t("expected"))}">`;
+  $("shareDl").href = share.url; $("shareDl").setAttribute("download", name);
+  const canFiles = !!(navigator.canShare && navigator.canShare({ files: [share.file] }));
+  $("shareGo").hidden = !(canFiles || navigator.share);
+}
+
+function closeShare(fromBack){
+  if (!share.open) return;
+  share.open = false; $("shareModal").hidden = true;
+  if (share.url){ URL.revokeObjectURL(share.url); share.url = null; }
+  if (!fromBack && history.state && history.state.share) history.back();
+}
+
+$("shareGo").addEventListener("click", async () => {
+  if (!share.file) return;
+  const g = share.game, text = `${g.opp} · ${dFull(g.start)} · ${nf(g.taken)} ${t("expected")}`;
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [share.file] })) await navigator.share({ files: [share.file], title: t("title"), text: text });
+    else if (navigator.share) await navigator.share({ title: t("title"), text: text, url: location.href });
+  } catch (e) { /* closed the share sheet */ }
+});
+$("shareClose").addEventListener("click", () => closeShare());
+$("shareX").addEventListener("click", () => closeShare());
+$("shareModal").addEventListener("click", (e) => { if (e.target === $("shareModal")) closeShare(); });   // tap outside
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && share.open) closeShare(); });
+window.addEventListener("popstate", () => { if (share.open) closeShare(true); });
 
 // ---------------------------------------------------------------- start
 setTheme();
