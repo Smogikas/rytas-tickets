@@ -41,7 +41,7 @@ CAPACITY_HEAD = ["Sektoriaus ID", "Sektorius", "Vietų (pilnas planas)", "Daugia
                  "Parduodamas rungtynėse", "Žemėlapyje"]
 GAME_HEAD = ["Laikas (UTC)", "Įrašas", "Sektoriaus ID", "Sektorius", "Zona / kainų klasė",
              "Bilieto tipas", "Kaina €", "Mokesčiai €", "Laisva sektoriuje (iki 22)",
-             "Vietos ID", "Eilė", "Vieta", "Būsena (1 laisva, 0 užimta)"]
+             "Vietos ID", "Eilė", "Vieta", "Būsena (1 laisva, 0 užimta)", "Zonos ID"]
 PRICE, SEAT = "kaina", "vieta"
 EVENT_FIELDS = ["id", "name", "start_utc", "series_id", "status", "conf_id", "last_seats_utc", "final_check_utc", "tab"]
 SERIES_FIELDS = ["id", "title"]
@@ -188,12 +188,12 @@ def game_tab_title(meta, taken):
 
 def price_to_row(r):
     return [r["ts_utc"], PRICE, r["section_id"], r["section"], r["zone"], r["ticket_type_id"],
-            num(r["price"]), num(r["fee"]), num(r["available"]), "", "", "", ""]
+            num(r["price"]), num(r["fee"]), num(r["available"]), "", "", "", "", r.get("zone_id", "")]
 
 
 def seat_to_row(r, titles):
     return [r["ts_utc"], SEAT, r["section_id"], titles.get(r["section_id"], ""), r["price_class"], "",
-            "", "", "", r["seat_id"], r["row"], r["place"], num(r["status"])]
+            "", "", "", r["seat_id"], r["row"], r["place"], num(r["status"]), ""]
 
 
 def split_game_rows(eid, rows):
@@ -204,7 +204,7 @@ def split_game_rows(eid, rows):
         if kind == PRICE:
             prices.append({"ts_utc": cell(r, 0), "event_id": eid, "section_id": cell(r, 2), "section": cell(r, 3),
                            "zone": cell(r, 4), "ticket_type_id": cell(r, 5), "price": cell(r, 6),
-                           "fee": cell(r, 7), "available": cell(r, 8)})
+                           "fee": cell(r, 7), "available": cell(r, 8), "zone_id": rytas.norm_id(cell(r, 13))})
         elif kind == SEAT:
             seats.append({"ts_utc": cell(r, 0), "section_id": cell(r, 2), "seat_id": cell(r, 9), "row": cell(r, 10),
                           "place": cell(r, 11), "price_class": cell(r, 4), "status": cell(r, 12)})
@@ -321,6 +321,9 @@ def push():
             if meta["tab"] not in tabs:
                 tabs[meta["tab"]] = add_tab(meta["tab"], GAME_HEAD)
         titles = {r["section_id"]: r["section"] for r in prices}
+        ensure_columns(tabs, meta["tab"], len(GAME_HEAD))
+        if (tabs.get(meta["tab"]) or {}).get("sheetId") is not None and meta.get("_head") != len(GAME_HEAD):
+            pass
         rows = [price_to_row(r) for r in new_p] + [seat_to_row(r, titles) for r in new_s]
         rows.sort(key=lambda r: r[0])
         append_rows(meta["tab"], rows)

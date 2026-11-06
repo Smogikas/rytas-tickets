@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import time
+from bisect import bisect_right
 import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
@@ -49,7 +50,7 @@ CAP = 22
 PAUSE = 0.4  # seconds between seat-plan requests, be polite to the site
 
 SNAP_FIELDS = ["ts_utc", "event_id", "section_id", "section", "zone",
-               "ticket_type_id", "price", "fee", "available"]
+               "ticket_type_id", "price", "fee", "available", "zone_id"]
 SEAT_FIELDS = ["ts_utc", "section_id", "seat_id", "row", "place", "price_class", "status"]
 ATT_FIELDS = ["event_id", "attendance", "recorded_utc", "note"]
 LAYOUT_FIELDS = ["seat_id", "section_id", "row", "place", "x", "y"]
@@ -60,6 +61,17 @@ CAP_FIELDS = ["conf_id", "section_id", "seats"]
 # capacity is added to the expected crowd unless they appear on sale (then real
 # seat data is used). Section id -> name.
 FAN_SECTIONS = {"79993": "110", "72934": "111"}
+# Games whose sections sell out rather than get withdrawn: a section of such a game
+# leaving the sale list counts as sold out even with "22+" left at the last check.
+SELLOUT_OPPONENTS = ("Žalgiris",)
+# Games that can sell fast: full seat plans every hour, however far away the game is.
+# Any game selling HOT_SALES+ seats in 24 h is treated the same.
+HOT_OPPONENTS = ("Žalgiris",)
+HOT_COMPETITIONS = ("BCL",)
+HOT_SALES = 50
+# Season-ticket estimate: a seat must be seen in this many games (fewer if fewer
+# games have seat data, but at least 2) and never be available in any of them.
+SEASON_MIN_GAMES = 3
 # Ticket price on bilietai.lt = ticket value (club) + fees (booking, arena,
 # venue administration, lounge). The API gives "price" (total) and "fee";
 # the club's revenue is price - fee.
@@ -166,8 +178,15 @@ def append_csv(path, fields, rows):
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     new = not path.exists()
+    if not new:
+        with path.open(newline="", encoding="utf-8") as f:
+            head = next(csv.reader(f), [])
+        if head != list(fields):          # older file without a new column: rewrite it
+            old = read_csv(path)
+            path.unlink()
+            append_csv(path, fields, old)
     with path.open("a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         if new:
             w.writeheader()
         w.writerows(rows)
@@ -243,6 +262,18 @@ def event_id_from(text):
 
 # --------------------------------------------------------------- snapshots
 
+def norm_id(v):
+    """Ids may come back from the Sheet as numbers: 1370.0 -> '1370'."""
+    v = str(v if v is not None else "").strip()
+    return v[:-2] if v.endswith(".0") else v
+
+
+def price_key(r):
+    """A price row's identity: section + price zone + ticket type (zones of one
+    section share the ticket type id, so the zone is needed)."""
+    return (r["section_id"], r.get("zone", ""), r["ticket_type_id"])
+
+
 def flatten(event_id, ts, prices):
     """One row per (section, price zone, ticket type)."""
     rows = []
@@ -254,7 +285,7 @@ def flatten(event_id, ts, prices):
                     "section_id": str(sec["id"]), "section": sec["title"],
                     "zone": zone.get("description", ""), "ticket_type_id": str(tt["id"]),
                     "price": tt["price"], "fee": tt.get("fee", 0),
-                    "available": tt["availableTickets"],
+                    "available": tt["availableTickets"], "zone_id": norm_id(zone.get("id", "")),
                 })
     return rows
 
@@ -267,22 +298,34 @@ def take_snapshot(event_id, prices):
     """
     ts = now_utc()
     rows = flatten(event_id, ts, prices)
-    last = latest_by(load_snapshots(event_id), lambda r: (r["section_id"], r["ticket_type_id"]))
-    current = {(r["section_id"], r["ticket_type_id"]) for r in rows}
+    last = latest_by(load_snapshots(event_id), price_key)
+    current = {price_key(r) for r in rows}
     for key, prev in last.items():
         if key not in current and prev["available"] > 0:
             rows.append(dict(prev, ts_utc=ts, available=0))
     written = [
         r for r in rows
-        if (k := (r["section_id"], r["ticket_type_id"])) not in last
+        if (k := price_key(r)) not in last
         or (float(r["price"]), float(r["fee"]), int(r["available"]))
         != (last[k]["price"], last[k]["fee"], last[k]["available"])
+        or (r.get("zone_id") and not last[k].get("zone_id"))   # once: rows logged before zone ids were kept
     ]
     append_csv(SNAPSHOTS, SNAP_FIELDS, written)
     return rows, written
 
 
-def take_seat_snapshot(event_id, prices, only=None):
+def recent_sales(rows, since, section=None):
+    """Seats seen going available -> taken at or after `since` (ISO ts)."""
+    n = 0
+    for seat_rows in timelines(r for r in rows if section is None or r["section_id"] == section).values():
+        for a, b in zip(seat_rows, seat_rows[1:]):
+            if a["status"] == 1 and b["status"] == 0 and b["ts_utc"] >= since:
+                n += 1
+                break
+    return n
+
+
+def take_seat_snapshot(event_id, prices, only=None, sellout=False):
     """Fetch the seat plan of every open section (or only the sections in
     `only`) and log seats whose status changed.
 
@@ -292,7 +335,8 @@ def take_seat_snapshot(event_id, prices, only=None):
     Returns (current seat rows, rows written, sections fetched).
     """
     ts = now_utc()
-    last = latest_by(load_seats(event_id), lambda r: r["seat_id"])
+    log = load_seats(event_id)
+    last = latest_by(log, lambda r: r["seat_id"])
     open_ids = [str(s["id"]) for s in prices.get("eventSections", [])]
     had_available = {r["section_id"] for r in last.values() if r["status"] == 1}
     to_fetch = open_ids + sorted(had_available - set(open_ids))
@@ -308,11 +352,15 @@ def take_seat_snapshot(event_id, prices, only=None):
         tickets = fetch_section_seats(event_id, sid)
         if tickets is None:
             if sid not in open_ids:
-                # The section left the sale list. With fewer than CAP seats left
-                # (an exact count, watched hourly) it sold out: the last seats were
-                # sold. With CAP+ left it was withdrawn: nothing is counted as sold.
+                # The section left the sale list. It sold out (the last seats were sold) if
+                # - fewer than CAP seats were left (an exact count, watched hourly), or
+                # - the game is one whose sections sell out, not get withdrawn (Žalgiris), or
+                # - in the last 24 h it sold at least as many seats as it had left.
+                # Otherwise it was withdrawn: nothing is counted as sold.
                 remaining = [r for r in last.values() if r["section_id"] == sid and r["status"] == 1]
-                if len(remaining) < CAP:
+                day_ago = (parse_ts(ts) - timedelta(hours=24)).isoformat()
+                if (len(remaining) < CAP or sellout
+                        or recent_sales(log, day_ago, sid) >= len(remaining)):
                     for r in remaining:
                         current[r["seat_id"]] = dict(r, ts_utc=ts, status=0)
             continue
@@ -380,14 +428,28 @@ def ensure_shapes(conf_id):
     return len(rows)
 
 
-def seats_due(meta, now):
+def opponent_in(name, teams):
+    _comp, opp = split_name(name)
+    return any(t.lower() in opp.lower() for t in teams)
+
+
+def is_hot(meta, seat_rows, now):
+    """A game that can sell out fast: a big opponent or competition, or 50+ seats
+    sold in the last 24 h."""
+    if opponent_in(meta.get("name", ""), HOT_OPPONENTS) or competition(meta.get("name", "")) in HOT_COMPETITIONS:
+        return True
+    return recent_sales(seat_rows, (now - timedelta(hours=24)).isoformat()) >= HOT_SALES
+
+
+def seats_due(meta, now, hot=False):
     """Seat plans cost one request per section, so fetch them less often for
-    games far away: hourly in the last 48 h, every 6 h within 14 days, else daily."""
+    games far away: hourly in the last 48 h (and always for hot games), every 6 h
+    within 14 days, else daily."""
     last = meta.get("last_seats_utc")
     if not last:
         return True
     hours_left = (parse_ts(meta["start_utc"]) - now).total_seconds() / 3600
-    interval = 1 if hours_left <= 48 else 6 if hours_left <= 24 * 14 else 24
+    interval = 1 if hours_left <= 48 or hot else 6 if hours_left <= 24 * 14 else 24
     return now - parse_ts(last) >= timedelta(hours=interval * 0.9)
 
 
@@ -399,8 +461,12 @@ def snapshot_event(event_id, meta, now, force_seats=False):
     prices = fetch_prices(event_id)
     rows, written = take_snapshot(event_id, prices)
     msg = f"prices: {len(written)} changed"
-    if force_seats or seats_due(meta, now):
-        current, changed, n = take_seat_snapshot(event_id, prices)
+    sellout = opponent_in(meta.get("name", ""), SELLOUT_OPPONENTS)
+    hot = is_hot(meta, load_seats(event_id), now)
+    if hot:
+        msg += " [hot: hourly seat plans]"
+    if force_seats or seats_due(meta, now, hot):
+        current, changed, n = take_seat_snapshot(event_id, prices, sellout=sellout)
         meta["last_seats_utc"] = now_utc()
         avail = sum(r["status"] for r in current.values())
         msg += f"; seats: {len(current)} in {n} sections, {avail} available, {len(changed)} changed"
@@ -409,7 +475,7 @@ def snapshot_event(event_id, meta, now, force_seats=False):
         # these sections (opened, closed, price changed, or tickets left
         # changed while under the 22 cap = sales), so read just their seat plans now.
         changed_sections = {r["section_id"] for r in written}
-        current, changed, n = take_seat_snapshot(event_id, prices, only=changed_sections)
+        current, changed, n = take_seat_snapshot(event_id, prices, only=changed_sections, sellout=sellout)
         msg += f"; seats of {n} changed section(s): {len(changed)} seats changed"
     return msg
 
@@ -443,49 +509,103 @@ def season_groups(names):
 
 
 def season_seats(group, tls):
-    """Seats observed in at least 2 games of the group and never available in any.
-    These are taken before single-game sales could reach them: season tickets
-    (and any permanently held seats)."""
+    """Seats observed in at least SEASON_MIN_GAMES games of the group (fewer if fewer
+    games have seat data, but at least 2) and never available in any. These are
+    taken before single-game sales could reach them: season tickets (and seats
+    held for guests, press, cameras, ...). Far-away games, with few single tickets
+    sold yet, keep seats sold to single buyers out of the estimate."""
+    with_data = sum(1 for eid in group if tls.get(eid))
+    need = max(2, min(SEASON_MIN_GAMES, with_data))
     seen, ever_free = Counter(), set()
     for eid in group:
         for seat, rows in tls.get(eid, {}).items():
             seen[seat] += 1
             if any(r["status"] == 1 for r in rows):
                 ever_free.add(seat)
-    return {s for s, n in seen.items() if n >= 2 and s not in ever_free}
+    return {s for s, n in seen.items() if n >= need and s not in ever_free}
 
 
 def price_lookup(price_rows):
-    """section_id -> sorted [(ts, price, fee)] of the cheapest ticket type, from the price snapshots."""
-    per = defaultdict(dict)
-    for r in price_rows:
-        cur = per[r["section_id"]].get(r["ts_utc"])
-        if cur is None or r["price"] < cur[0]:
-            per[r["section_id"]][r["ts_utc"]] = (r["price"], r["fee"])
-    return {sid: [(t, p, f) for t, (p, f) in sorted(d.items())] for sid, d in per.items()}
+    """section_id -> {"times": [ts], "states": [{zone: (price, fee, available)}], "ids": {zone_id: zone}}.
+
+    Rows are logged only when they change, so the full price list in force at a
+    moment is rebuilt by carrying every zone's last row forward."""
+    per = defaultdict(list)
+    for r in sorted(price_rows, key=lambda r: r["ts_utc"]):
+        per[r["section_id"]].append(r)
+    out = {}
+    for sid, rows in per.items():
+        state, times, states, ids = {}, [], [], {}
+        for r in rows:
+            zone = r.get("zone", "")
+            state[(zone, r["ticket_type_id"])] = (r["price"], r["fee"], r["available"])
+            if r.get("zone_id"):
+                ids[norm_id(r["zone_id"])] = zone
+            zones = {}
+            for (z, _tt), (p, f, a) in state.items():      # a zone's price: its cheapest ticket type
+                if z not in zones or p < zones[z][0]:
+                    zones[z] = (p, f, max(a, zones.get(z, (0, 0, 0))[2]))
+            if times and times[-1] == r["ts_utc"]:
+                states[-1] = zones
+            else:
+                times.append(r["ts_utc"])
+                states.append(zones)
+        out[sid] = {"times": times, "states": states, "ids": ids}
+    return out
 
 
-def price_at(prices, sid, ts):
-    """(price, fee) in force at ts (the first logged one if ts is earlier), or (None, None)."""
-    series = prices.get(sid)
-    if not series:
+def state_at(sec, ts):
+    """The section's zones in force at ts (the first logged ones if ts is earlier)."""
+    i = bisect_right(sec["times"], ts) - 1
+    return sec["states"][max(i, 0)]
+
+
+def price_at(prices, sid, ts, zone_id=None):
+    """(price, fee) in force at ts for the seat's price zone (its priceClass); without
+    a known zone the cheapest zone still on sale. (None, None) without prices."""
+    sec = prices.get(sid)
+    if not sec or not sec["states"]:
         return None, None
-    p, f = series[0][1], series[0][2]
-    for t, price, fee in series:
-        if t <= ts:
-            p, f = price, fee
-        else:
-            break
+    zones = state_at(sec, ts)
+    z = sec["ids"].get(norm_id(zone_id)) if zone_id not in (None, "") else None
+    if z is None and len(zones) == 1:
+        z = next(iter(zones))
+    if z in zones:
+        return zones[z][0], zones[z][1]
+    pick = [v for v in zones.values() if v[2] > 0] or list(zones.values())
+    p, f, _a = min(pick)
     return p, f
 
 
-def price_history(prices, sid):
-    """Only the moments the price or fee changed: [(ts, price, fee)]."""
-    out = []
-    for t, p, f in prices.get(sid, []):
-        if not out or (out[-1][1], out[-1][2]) != (p, f):
-            out.append((t, p, f))
+def zone_histories(prices, sid):
+    """zone -> [(ts, price, fee)]: only the moments that zone's price or fee changed."""
+    out = {}
+    sec = prices.get(sid)
+    if not sec:
+        return out
+    for t, zones in zip(sec["times"], sec["states"]):
+        for z, (p, f, _a) in zones.items():
+            h = out.setdefault(z, [])
+            if not h or (h[-1][1], h[-1][2]) != (p, f):
+                h.append((t, p, f))
     return out
+
+
+def current_zones(prices, sid):
+    """[(zone, price, fee, on sale)] now, cheapest first."""
+    sec = prices.get(sid)
+    if not sec or not sec["states"]:
+        return []
+    return sorted(((z, p, f, a > 0) for z, (p, f, a) in sec["states"][-1].items()), key=lambda x: (x[1], x[0]))
+
+
+def price_history(prices, sid):
+    """Changes of the section's headline price (the zone that is cheapest now)."""
+    zs = current_zones(prices, sid)
+    if not zs:
+        return []
+    open_zs = [z for z in zs if z[3]] or zs
+    return zone_histories(prices, sid).get(open_zs[0][0], [])
 
 
 # seat categories
@@ -512,7 +632,7 @@ def classify_seats(tl, prices, season):
             cat, ts = SOLD_SEEN, last["ts_utc"]   # changes-only log: last row = the sale
         else:
             cat, ts = SOLD_BEFORE, first["ts_utc"]
-        p, f = price_at(prices, sid, ts)
+        p, f = price_at(prices, sid, ts, last.get("price_class"))
         out[seat] = (sid, cat, p, f, last["ts_utc"] if cat == SOLD_SEEN else None)
     return out
 
@@ -562,7 +682,10 @@ def analyse_event(tl, price_rows, season):
     for sid, x in sec.items():
         x["singles"] = x["taken"] - x["season"]
         later = first_ts and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1)
-        p, f = price_at(prices, sid, "9999")
+        zs = current_zones(prices, sid)
+        open_zs = [z for z in zs if z[3]] or zs
+        p, f = (open_zs[0][1], open_zs[0][2]) if open_zs else (None, None)
+        hist = zone_histories(prices, sid)
         on_sale, since = listed.get(sid, (True, None))
         if x["seats"] and x["available"] == 0:
             status = "soldout"        # every seat taken
@@ -571,11 +694,17 @@ def analyse_event(tl, price_rows, season):
         else:
             status = "open"
         sections.append(dict(x, section_id=sid, section=titles.get(sid, sid), price=p, fee=f,
+                             price_max=max((z[1] for z in open_zs), default=None),
+                             zones=[{"name": z, "price": zp, "fee": zf, "open": zo, "history": hist.get(z, [])}
+                                    for z, zp, zf, zo in zs],
                              opened_later=first_seen[sid] if later else None,
                              status=status, closed_at=since if status != "open" and not on_sale else None,
-                             history=price_history(prices, sid)))
+                             history=hist.get(open_zs[0][0], []) if open_zs else []))
     sections.sort(key=lambda x: x["section"])
     tot = {k: sum(x[k] for x in sections) for k in keys + ["singles", "revenue", "gross"]}
+    # free seats in withdrawn sections cannot be bought: not counted as available
+    tot["withdrawn_free"] = sum(x["available"] for x in sections if x["status"] == "closed")
+    tot["available"] -= tot["withdrawn_free"]
     tot["avg_price"] = tot["revenue"] / tot["singles"] if tot["singles"] else None
     tot["avg_paid"] = tot["gross"] / tot["singles"] if tot["singles"] else None
     tot["sections"] = len(sections)
@@ -835,7 +964,7 @@ def print_detail(eid, meta, r):
     print(f"""
 Expected crowd:              {t['expected']}  (taken {t['taken']} + B Tribūna {t['fans_est']}, est.)
 Seats in open sections:      {t['seats']}  ({t['sections']} sections)
-Available now:               {t['available']}
+Available now:               {t['available']}  (+ {t['withdrawn_free']} in withdrawn sections)
 Taken:                       {t['taken']}
   season tickets (est.):     {t['season']}
   single tickets (est.):     {t['singles']}
@@ -888,8 +1017,8 @@ def cmd_season(args):
                     by_sec[rows[-1]["section_id"]] += 1
         for sid, n in sorted(by_sec.items(), key=lambda kv: -kv[1]):
             print(f"  {titles.get(sid, sid)[:30]:<32}{n // max(1, with_data):>6}")
-    print("\nA seat counts once it is seen in 2+ games and never available. "
-          "More games tracked = better estimate.")
+    print(f"\nA seat counts once it is seen in {SEASON_MIN_GAMES}+ games (2+ while fewer games have data) "
+          "and never available. More games tracked = better estimate.")
     return 0
 
 
@@ -927,7 +1056,8 @@ def cmd_export(args):
         games.append({
             "id": eid, "name": meta["name"], "comp": comp, "opp": opp, "start": meta["start_utc"],
             "played": parse_ts(meta["start_utc"]) <= now, "conf": meta.get("conf_id", ""),
-            "seats": t["seats"], "available": t["available"], "taken": t["taken"], "season": t["season"],
+            "seats": t["seats"], "available": t["available"], "withdrawn": t["withdrawn_free"],
+            "taken": t["taken"], "season": t["season"],
             "singles": t["singles"], "seen": t["sold_seen"], "before": t["pre_taken"],
             "fans": t["fans_est"], "expected": t["expected"],
             "fanSections": [{"id": sid, "title": name, "seats": n} for sid, name, n in r["fan_sections"]],
@@ -937,6 +1067,9 @@ def cmd_export(args):
         })
         sections[eid] = [{
             "id": x["section_id"], "title": x["section"], "price": x["price"], "fee": x["fee"],
+            "priceMax": x["price_max"],
+            "zones": [{"name": z["name"], "price": z["price"], "fee": z["fee"], "open": z["open"],
+                       "history": [[h[0], h[1], h[2]] for h in z["history"]]} for z in x["zones"]],
             "seats": x["seats"], "available": x["available"], "season": x["season"], "singles": x["singles"],
             "seen": x["sold_seen"], "before": x["pre_taken"], "revenue": r2(x["revenue"]), "gross": r2(x["gross"]),
             "openedLater": x["opened_later"], "status": x["status"], "closedAt": x["closed_at"],

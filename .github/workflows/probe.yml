@@ -9,23 +9,23 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           python - <<'PY'
-          import collections, rytas
-          for eid in ("PNJMMUNJYB", "XQJJRQXKLA"):
+          import json, rytas
+          A = rytas.API
+          def show(name, url, depth=600):
               try:
-                  p = rytas.fetch_prices(eid)
+                  j = rytas.get_json(url)
               except Exception as e:
-                  print(eid, "ERR", e); continue
-              print("== prices", eid, "top keys", list(p))
-              secs = p.get("eventSections", [])
-              multi = [s for s in secs if len(s.get("priceZones", [])) > 1 or any(len(z.get("ticketTypes", [])) > 1 for z in s.get("priceZones", []))]
-              print("sections", len(secs), "with >1 zone or >1 ticket type:", len(multi))
-              for s in (multi[:4] or secs[:1]):
-                  print(" section", s["id"], s["title"], "keys", [k for k in s if k != "priceZones"])
-                  for z in s["priceZones"]:
-                      print("   zone", {k: v for k, v in z.items() if k != "ticketTypes"})
-                      for t in z["ticketTypes"]:
-                          print("     tt", t)
-                  seats = rytas.fetch_section_seats(eid, str(s["id"])) or []
-                  print("   seat priceClass counts", collections.Counter((t.get("priceClass"), t.get("status")) for t in seats))
-                  if seats: print("   seat keys", list(seats[0]))
+                  print("==", name, "ERR", e); return None
+              print("==", name, "keys", list(j) if isinstance(j, dict) else type(j))
+              print("  ", json.dumps({k: v for k, v in j.items() if k not in ("seatMapTickets", "seats")} if isinstance(j, dict) else j, ensure_ascii=False)[:depth])
+              return j
+          sm = show("seat-map 83548", f"{A}/store/events/PNJMMUNJYB/sections/83548/seat-map?language=lt", 1500)
+          ev = show("event", f"{A}/events/PNJMMUNJYB?language=lt", 2500)
+          st = show("store event", f"{A}/store/events/PNJMMUNJYB?language=lt", 2500)
+          pc = show("price classes", f"{A}/store/events/PNJMMUNJYB/price-classes?language=lt", 1500)
+          pz = show("price zones", f"{A}/store/events/PNJMMUNJYB/price-zones?language=lt", 1500)
+          j = rytas.fetch_prices("ZPHZTQITUH")
+          for s in j["eventSections"]:
+              if len(s["priceZones"]) > 1 or any(len(z["ticketTypes"]) > 1 for z in s["priceZones"]):
+                  print("multi", s["id"], s["title"], [(z["id"], z["description"], [(t["name"], t["price"], t["fee"], t["availableTickets"]) for t in z["ticketTypes"]]) for z in s["priceZones"]])
           PY
