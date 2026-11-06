@@ -1220,7 +1220,7 @@ function drawShare(c, g, W, H){
     cols = 2;
   } else {
     cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("per24"), "+" + nf(a24) + (a24 > b24 ? " ▲" : a24 < b24 ? " ▼" : "")],
-             [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"], [t("seenLbl"), nf(g.seen)]];
+             [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
     cols = 3;
   }
   y += 40; const colW = (x1 - x0) / cols, shown = cells.slice(0, 6);
