@@ -52,6 +52,7 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .seg.small-seg button{padding:5px 9px;font-size:12px}
 .chip{border-color:var(--line);text-align:left}
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+@media (max-width:420px){.hide-xs{display:none}}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .kpi{padding:14px 16px;display:flex;flex-direction:column;gap:3px;min-width:0}
 .kpi .v{font-family:"Space Grotesk",Inter,sans-serif;font-size:24px;font-weight:700;overflow-wrap:anywhere}
@@ -143,8 +144,9 @@ svg.chart .grid{stroke:var(--line);stroke-width:1}
 svg.chart .zero{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
 svg.chart .ax{fill:var(--muted);font:12px Inter,sans-serif}
 svg.chart .other{fill:none;stroke:var(--muted);stroke-width:1.5;opacity:.35}
-svg.chart .hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
-svg.chart .hit:hover+.other,svg.chart .other:hover{opacity:.8}
+svg.chart .other.hov{opacity:1;stroke:var(--ink);stroke-width:2}
+svg.chart .hdot{fill:var(--ink);stroke:var(--panel);stroke-width:2}svg.chart .hdot.me{fill:var(--c2)}
+svg.chart .over{cursor:crosshair}
 svg.chart .me{fill:none;stroke:var(--c2);stroke-width:2.5;stroke-linejoin:round}
 svg.chart .medot{fill:var(--c2);stroke:var(--panel);stroke-width:2}
 svg.chart .lbl{fill:var(--ink);font:700 13px Inter,sans-serif}
@@ -230,7 +232,7 @@ const T = {
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
     clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto kaina", avgValueSub: "su mokesčiais · klubui vid. {p}",
     vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
-    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", per24: "Per 24 val.", per24prev: "prieš tai",
+    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", seenLbl: "Stebint parduota", per24: "Per 24 val.", per24prev: "prieš tai",
     attendance: "Lankomumas", attVs: "laukta {e}", noAtt: "lankomumas dar neįrašytas",
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
@@ -238,13 +240,14 @@ const T = {
     modeTaken: "% užimta", modePrice: "Kaina", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
     salesMapTab: "Pardavimų žemėlapis", replay: "Pardavimų eiga", popular: "Populiarumas",
-    replayAt: "Būsena", replayNote: "Slinkite laiką: sektoriai nuspalvinti pagal tuo metu užimtų vietų dalį. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių.",
-    popNote: "Visų stebimų rungtynių vidurkis: kokia dalis parduodamų vietų (be abonementų) parduota pavieniais bilietais. Rodo, kurie sektoriai populiariausi.",
+    replayAt: "Būsena", replayNote: "Spalva – kokia sektoriaus vietų dalis užimta (abonementai + parduoti bilietai) pasirinktu metu, nuo 0% iki 100%. Slinkite laiką arba spauskite „Groti“. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių. Tolimoms rungtynėms rinkitės 7–30 d.: anksčiau pardavimų būna mažai.",
+    popNote: "Spalva ir procentai – kiek sektoriaus laisvų vietų (be abonementų) jau nupirkta pavieniais bilietais, visų rungtynių vidurkis. Pvz. 122 – 25%: vidutiniškai ketvirtadalis jo parduodamų vietų jau parduota. Kuo daugiau, tuo populiaresnis sektorius. Spalvų skalė – nuo 0% iki didžiausio sektoriaus.",
+    takenWord: "užimta", soldWord: "parduota",
     soldByThen: "Iki tol parduota pavienių: {n}", topSections: "Populiariausi sektoriai", play: "Groti", pause: "Stabdyti",
     last24Title: "Pardavimai per paskutines 24 val.", trendLbl: "pokytis",
     analysisTab: "Analizė", curveTitle: "Pavienių bilietų pardavimai iki rungtynių",
     curveSub: "Parduota pavienių bilietų (iš viso) pagal dienas iki rungtynių pradžios. Linija prasideda nuo stebėjimo pradžios; pirmas taškas – bilietai, parduoti iki tol.",
-    rangeAll: "Visas", daysShort: "d.", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
+    rangeAll: "Visas", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
     priceChange: "kainos pokytis", priceChanges: "Kainų pokyčiai", noPriceChanges: "Šių rungtynių kainos nesikeitė.",
     gameLbl: "Rungtynės", tipoff: "pradžia", evaTitle: "Laukta ir atėjo", evaSub: "Laukiama žiūrovų (prieš rungtynes) ir įrašytas lankomumas sužaistose rungtynėse.",
     evaEmpty: "Bus rodoma, kai įrašysite lankomumą (Google Sheet, skirtukas „Rungtynės“, paskutinis stulpelis).",
@@ -293,7 +296,7 @@ const T = {
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
     clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket price", avgValueSub: "incl. fees · club gets avg {p}",
     vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
-    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", per24: "Last 24 h", per24prev: "24 h before",
+    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", seenLbl: "Sold while tracked", per24: "Last 24 h", per24prev: "24 h before",
     attendance: "Attendance", attVs: "expected {e}", noAtt: "attendance not recorded yet",
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
@@ -301,13 +304,14 @@ const T = {
     modeTaken: "% taken", modePrice: "Price", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
     salesMapTab: "Sales map", replay: "Sales replay", popular: "Popularity",
-    replayAt: "As of", replayNote: "Move the time: sections are coloured by the share of seats taken at that moment. Tickets sold before tracking began show as taken from the start.",
-    popNote: "Average over all tracked games: share of seats on sale (excl. season tickets) sold as single tickets. Shows which sections are most popular.",
+    replayAt: "As of", replayNote: "Colour: share of the section's seats taken (season tickets + tickets sold) at the chosen moment, 0% to 100%. Move the time or press Play. Tickets sold before tracking began show as taken from the start. For far-away games pick 7–30 days: earlier there are few sales.",
+    popNote: "Colour and percentage: how much of a section's free seats (excl. season tickets) has been bought as single tickets, averaged over all games. E.g. 122 at 25%: on average a quarter of its seats on sale is already sold. Higher = more popular. The colour scale runs from 0% to the top section.",
+    takenWord: "taken", soldWord: "sold",
     soldByThen: "Single tickets sold by then: {n}", topSections: "Most popular sections", play: "Play", pause: "Pause",
     last24Title: "Sales in the last 24 hours", trendLbl: "change",
     analysisTab: "Insights", curveTitle: "Single-ticket sales before the game",
     curveSub: "Single tickets sold (total) by days before tip-off. A line starts when tracking began; its first point is the tickets sold before then.",
-    rangeAll: "All", daysShort: "d", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
+    rangeAll: "All", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
     priceChange: "price change", priceChanges: "Price changes", noPriceChanges: "No price changes for this game.",
     gameLbl: "Game", tipoff: "tip-off", evaTitle: "Expected vs attended", evaSub: "Expected crowd (before the game) and recorded attendance of played games.",
     evaEmpty: "Shown once attendance is entered (Google Sheet, tab „Rungtynės“, last column).",
@@ -499,9 +503,9 @@ function renderAnalysis(){
     ${yTicks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${L - 8}" y="${Y(v)}" class="ax" text-anchor="end" dominant-baseline="central">${nf(v)}</text>`).join("")}
     ${xTicks.map((d) => `<text x="${X(d)}" y="${H - B + 18}" class="ax" text-anchor="middle">${d === 0 ? t("tipoff") : d + " " + t("daysShort")}</text>`).join("")}
     <line x1="${X(0)}" x2="${X(0)}" y1="${Tp}" y2="${H - B}" class="zero"/>
-    ${others.map((c) => `<path d="${step(c.pts)}" class="other" data-g="${esc(c.g.id)}"><title>${esc(c.g.opp + " · " + dShort(c.g.start) + " · " + nf(c.pts[c.pts.length - 1][1]) + " " + t("sold"))}</title></path>`).join("")}
-    ${others.map((c) => `<path d="${step(c.pts)}" class="hit" data-g="${esc(c.g.id)}"><title>${esc(c.g.opp + " · " + dShort(c.g.start))}</title></path>`).join("")}
-    <path d="${step(me.pts)}" class="me"/>
+    ${others.map((c) => `<path d="${step(c.pts)}" class="other" data-g="${esc(c.g.id)}"/>`).join("")}
+    <path d="${step(me.pts)}" class="me" data-g="${esc(sel.id)}"/>
+    <circle class="hdot" r="4.5" style="display:none"/>
     ${evs.map(({ e, d }) => { const v = valueAt(me.all, d) || 0, up = e.to > e.from;
       return `<path d="M${X(d) - 6},${Y(v) - 16} h12 l-6,${up ? -9 : 9} z" transform="${up ? `translate(0,9)` : ""}" class="ev"><title>${esc(dTime(e.ts) + " · " + e.section + (e.zone ? " (" + e.zone + ")" : "") + ": " + eur(e.from) + " → " + eur(e.to))}</title></path>`; }).join("")}
     ${last ? `<circle cx="${X(last[0])}" cy="${Y(last[1])}" r="4.5" class="medot"/><text x="${X(last[0]) - 8}" y="${Math.min(Y(last[1]) + 20, H - B - 4)}" class="lbl" text-anchor="end">${nf(last[1])}</text>` : ""}
@@ -526,39 +530,49 @@ function renderAnalysis(){
       <div class="clegend small"><span><i class="ln me"></i>${esc(sel.opp)}</span><span><i class="ln other"></i>${t("otherGames")}</span>${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
       <p class="note" style="margin:6px 0 0">${t("curveSub")}</p>
     </section>
-    ${last24Table(upcoming)}
-    <section class="panel" style="padding:14px 16px">
+    ${evList.length ? `<section class="panel" style="padding:14px 16px">
       <h3 style="margin:0 0 8px;font-size:15px">${t("priceChanges")} · ${esc(sel.opp)}</h3>
-      ${evList.length ? `<div class="hist">${evList.map((e) => `<div><span>${esc(dTime(e.ts))} · ${esc(e.section)}${e.zone ? ` <span class="muted">(${esc(e.zone)})</span>` : ""}</span><span class="num">${eur(e.from)} → <b>${eur(e.to)}</b> ${e.to > e.from ? "▲" : "▼"}</span></div>`).join("")}</div>` : `<div class="note">${t("noPriceChanges")}</div>`}
-    </section>
-    ${expectedVsActual(played)}
+      <div class="hist">${evList.map((e) => `<div><span>${esc(dTime(e.ts))} · ${esc(e.section)}${e.zone ? ` <span class="muted">(${esc(e.zone)})</span>` : ""}</span><span class="num">${eur(e.from)} → <b>${eur(e.to)}</b> ${e.to > e.from ? "▲" : "▼"}</span></div>`).join("")}</div>
+    </section>` : ""}
+    ${played.length ? expectedVsActual(played) : ""}
     ${attendanceBy(played)}
   </div>`;
   segButtons($("aRange"), ranges, S.range, (v) => { S.range = v; store.set("range", v); render(); }, t("daysBefore"));
   $("aGame").onchange = (ev) => { S.agame = ev.target.value; render(); };
-  $("view").querySelectorAll("path.hit").forEach((p) => p.addEventListener("click", () => { S.agame = p.dataset.g; render(); }));
-  // hover: crosshair + value of the selected game at that day
-  const wrap = $("chartWrap"), svgEl = wrap.querySelector("svg"), tip = $("aTip"), xh = svgEl.querySelector(".xhair");
-  const move = (cx) => {
-    const r = svgEl.getBoundingClientRect(), x = (cx - r.left) / r.width * W;
-    if (x < L || x > W - R){ tip.hidden = true; xh.style.display = "none"; return; }
-    const d = range + (x - L) / (W - L - R) * (0 - range), v = valueAt(me.all, d);
-    xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.style.display = "";
-    tip.innerHTML = `<b>${d >= -0.04 ? t("tipoff") : (-d).toFixed(d > -10 ? 1 : 0) + " " + t("daysShort")}</b><br>${esc(sel.opp)}: ${v == null ? "–" : nf(v) + " " + t("sold")}`;
-    tip.hidden = false;
-    const px = (x / W) * r.width;
-    tip.style.left = Math.min(px + 12, r.width - tip.offsetWidth - 4) + "px"; tip.style.top = "8px";
+  // hover: the line nearest the pointer (any game) - its game, days before tip-off, tickets sold
+  const wrap = $("chartWrap"), svgEl = wrap.querySelector("svg"), tip = $("aTip"), xh = svgEl.querySelector(".xhair"), hd = svgEl.querySelector(".hdot");
+  const drawn = vis.filter((c) => c.pts.length);
+  let hovered = null;
+  const nearest = (x, y) => {
+    const d = range + (x - L) / (W - L - R) * (0 - range);
+    let best = null;
+    for (const c of drawn){
+      if (d < c.pts[0][0] - 0.05 || d > c.pts[c.pts.length - 1][0] + 0.05) continue;     // no data for this game that day
+      const v = valueAt(c.all, d); if (v == null) continue;
+      const dist = Math.abs(Y(v) - y) - (c.g.id === sel.id ? 6 : 0);                       // slight preference for the selected game
+      if (!best || dist < best.dist) best = { c, v, d, dist };
+    }
+    return best && best.dist < 40 ? best : null;
   };
+  const hide = () => { tip.hidden = true; xh.style.display = "none"; hd.style.display = "none"; svgEl.querySelectorAll("path.hov").forEach((p) => p.classList.remove("hov")); hovered = null; };
   const over = svgEl.querySelector("rect.over");
-  over.addEventListener("pointermove", (e) => move(e.clientX));
-  over.addEventListener("pointerleave", () => { tip.hidden = true; xh.style.display = "none"; });
-}
-function last24Table(gs){
-  if (!gs.length) return "";
-  return `<section class="panel tablebox sb"><table><caption class="small muted" style="text-align:left;padding:10px 12px">${t("last24Title")}</caption>
-    <thead><tr><th scope="col">${t("gameLbl")}</th><th scope="col">${t("per24")}</th><th scope="col">${t("per24prev")}</th><th scope="col">${t("singles")}</th></tr></thead>
-    <tbody>${gs.map((g) => { const a = g.sold24 || 0, b = g.sold24prev || 0;
-      return `<tr><td>${esc(dShort(g.start))} · ${esc(g.opp)}</td><td class="num"><b>+${nf(a)}</b> ${a > b ? "▲" : a < b ? "▼" : ""}</td><td class="num">+${nf(b)}</td><td class="num">${nf(g.singles)}</td></tr>`; }).join("")}</tbody></table></section>`;
+  over.addEventListener("pointermove", (e) => {
+    const r = svgEl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+    const n = nearest(x, y);
+    if (!n){ hide(); return; }
+    hovered = n.c.g.id;
+    svgEl.querySelectorAll("path.hov").forEach((p) => p.classList.remove("hov"));
+    const path = svgEl.querySelector(`path[data-g="${CSS.escape(hovered)}"]`); if (path && hovered !== sel.id) path.classList.add("hov");
+    xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.style.display = "";
+    hd.setAttribute("cx", x); hd.setAttribute("cy", Y(n.v)); hd.style.display = ""; hd.setAttribute("class", "hdot" + (hovered === sel.id ? " me" : ""));
+    tip.innerHTML = `<b>${esc(n.c.g.opp)}</b> <span class="muted">${esc(dShort(n.c.g.start))}</span><br>${n.d >= -0.04 ? t("tipoff") : (-n.d).toFixed(n.d > -10 ? 1 : 0) + " " + t("daysBeforeShort")} · <b>${nf(n.v)}</b> ${t("sold")}`;
+    tip.hidden = false;
+    const px = (x / W) * r.width, py = (Y(n.v) / H) * r.height;
+    tip.style.left = Math.max(4, Math.min(px + 12, r.width - tip.offsetWidth - 4)) + "px";
+    tip.style.top = Math.max(0, py - tip.offsetHeight - 10) + "px";
+  });
+  over.addEventListener("pointerleave", hide);
+  over.addEventListener("click", () => { if (hovered && hovered !== sel.id){ S.agame = hovered; render(); } });
 }
 function expectedVsActual(played){
   if (!played.length) return `<section class="panel" style="padding:14px 16px"><h3 style="margin:0 0 6px;font-size:15px">${t("evaTitle")}</h3><div class="note">${t("evaEmpty")}</div></section>`;
@@ -620,7 +634,7 @@ function renderSalesMap(){
     const top = Object.values(pop).filter((p) => p.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 8);
     $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
       <div class="smgrid"><div>${mapSvg(shapes, cell)}
-        <div class="legend"><span>0%</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${hi.toFixed(0)}%</span></div></div>
+        <div class="legend"><span>0%</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${hi.toFixed(0)}% ${t("soldWord")}</span></div></div>
         <div><h3 style="margin:0 0 6px;font-size:15px">${t("topSections")}</h3>${top.map((p) => `<div class="byrow small"><span>${esc(p.title)}</span><span class="minibar wide"><i style="width:${(100 * p.pct / hi).toFixed(0)}%"></i></span><span class="num">${p.pct.toFixed(0)}%</span></div>`).join("")}</div></div>
       <p class="note" style="margin:8px 0 0">${t("popNote")}</p></section></div>`;
   } else {
@@ -628,9 +642,11 @@ function renderSalesMap(){
       <div id="smBody" class="note" style="margin-top:10px">…</div></section></div>`;
     loadSeats(sel.id).then((seats) => {
       if (S.tab !== "salesmap" || S.smode !== "replay" || S.agame !== sel.id) return;
-      const t0 = new Date(sel.dataFrom || sel.sales[0][0]).getTime(), t1 = Math.min(Date.now(), new Date(sel.start).getTime());
+      const t1 = Math.min(Date.now(), new Date(sel.start).getTime()), first = new Date(sel.dataFrom || sel.sales[0][0]).getTime();
+      const t0 = S.range === "all" ? first : Math.max(first, t1 - Number(S.range) * DAY);
       const hours = Math.max(1, Math.round((t1 - t0) / 36e5));
-      if (S.replayT == null || S.replayT > hours) S.replayT = hours;
+      if (S.replayT == null || S.replayT > hours || S.replayWin !== S.range) S.replayT = hours;
+      S.replayWin = S.range;
       const secsById = {}; (DATA.sections[sel.id] || []).forEach((x) => { secsById[x.id] = x; });
       const fanIds = new Set((sel.fanSections || []).map((f) => f.id));
       const draw = () => {
@@ -653,14 +669,17 @@ function renderSalesMap(){
       };
       $("smBody").className = "";
       $("smBody").innerHTML = `<div class="smgrid"><div><div id="smMap"></div>
-          <div class="legend"><span>${t("low")}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>100%</span>${sel.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}</div></div>
-        <div class="replay"><div class="small muted">${t("replayAt")}</div><div class="disp" style="font-size:20px;font-weight:700" id="smWhen"></div>
+          <div class="legend"><span>0%</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>100% ${t("takenWord")}</span>${sel.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}</div></div>
+        <div class="replay"><div class="seg small-seg" role="group" id="rpRange" style="margin-bottom:12px"></div>
+          <div class="small muted">${t("replayAt")}</div><div class="disp" style="font-size:20px;font-weight:700" id="smWhen"></div>
           <div class="small" id="smSold" style="margin:2px 0 10px"></div>
           <input type="range" id="smRange" min="0" max="${hours}" step="1" value="${S.replayT}" aria-label="${esc(t("replayAt"))}">
           <div style="display:flex;justify-content:space-between" class="small muted"><span>${esc(dTime(new Date(t0).toISOString()))}</span><span>${esc(dTime(new Date(t1).toISOString()))}</span></div>
           <button type="button" class="btn" id="smPlay" style="margin-top:10px">${replayTimer ? t("pause") : t("play")}</button>
           <p class="note" style="margin:10px 0 0">${t("replayNote")}</p></div></div>`;
       draw();
+      segButtons($("rpRange"), [["7", "7 " + t("daysShort")], ["14", "14 " + t("daysShort")], ["30", "30 " + t("daysShort")], ["all", t("rangeAll")]], S.range,
+        (v) => { S.range = v; store.set("range", v); if (replayTimer){ clearInterval(replayTimer); replayTimer = null; } render(); }, t("replay"));
       $("smRange").oninput = (e) => { S.replayT = Number(e.target.value); draw(); };
       $("smPlay").onclick = () => {
         if (replayTimer){ clearInterval(replayTimer); replayTimer = null; $("smPlay").textContent = t("play"); return; }
@@ -783,7 +802,7 @@ function arenaColors(g){
   const low = cssVar("--low"), mid = cssVar("--mid"), high = cssVar("--high"), closed = cssVar("--closed");
   const scale = (f) => f < 0.5 ? mix(low, mid, f * 2) : mix(mid, high, (f - 0.5) * 2);
   const labelInk = (fill) => { const rgb = fill.match(/\d+/g).map(Number); return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 > 0.55 ? "#1A1208" : "#FFFFFF"; };
-  const legend = { taken: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
+  const legend = { taken: ["0%", "100% " + t("takenWord")], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
   return { secs, byId, prices, scale, closed, labelInk, legend, shapes: DATA.shapes[g.conf] || [] };
 }
 
@@ -823,11 +842,13 @@ function renderArena(){
       <div class="sbar" id="chipsBar" aria-hidden="true"><i id="chipsThumb"></i></div></div>
     <div class="arena">
       <div class="panel mapbox">
-        <div class="controls">
-          <div><div class="disp" style="font-size:20px;font-weight:700">${esc(g.opp)}</div>
-          <div class="small muted">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${(DATA.arenaCap || {})[g.conf] ? " · " + t("arenaCap") + " " + nf(DATA.arenaCap[g.conf]) : ""}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg small-seg" role="group" id="modeSeg"></div>
-            <button type="button" class="btn" id="arenaShare" aria-label="${esc(t("share") + ": " + t("arena") + " " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
+        <div>
+          <div class="controls" style="flex-wrap:nowrap">
+            <div class="disp" style="font-size:20px;font-weight:700;min-width:0">${esc(g.opp)}</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0"><div class="seg small-seg" role="group" id="modeSeg"></div>
+              <button type="button" class="btn" id="arenaShare" aria-label="${esc(t("share") + ": " + t("arena") + " " + g.opp)}">${ICON_SHARE}<span class="hide-xs">${t("share")}</span></button></div>
+          </div>
+          <div class="small muted" style="margin-top:2px">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${(DATA.arenaCap || {})[g.conf] ? ` · <span style="white-space:nowrap">${t("arenaCap")} ${nf(DATA.arenaCap[g.conf])}</span>` : ""}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div>
         </div>
         ${shapes.length ? `<svg class="map" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
           <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
@@ -1178,26 +1199,37 @@ function drawShare(c, g, W, H){
   const tot = g.seats + (g.fans || 0), ws = bwid * (tot ? g.season / tot : 0), wf = bwid * (tot ? (g.fans || 0) / tot : 0), wsi = bwid * (tot ? g.singles / tot : 0);
   c.fillStyle = v("--season"); c.fillRect(x0, y, ws, bh); c.fillStyle = v("--fan"); c.fillRect(x0 + ws, y, wf, bh);
   c.fillStyle = v("--single"); c.fillRect(x0 + ws + wf, y, wsi, bh); c.restore();
+  // expected crowd without B Tribūna (as on the card)
+  if (g.fans){ y += bh + 44; c.fillStyle = v("--muted"); c.font = `500 28px ${BODY}`; c.fillText(t("fanPart", { n: nf(expectedOf(g) - g.fans) }), x0, y); y -= bh; }
   // legend
   y += bh + 50; let lx = x0; c.font = `500 26px ${BODY}`;
   const items = [["--season", t("legendSeason") + " " + nf(g.season)]];
-  if (g.fans) items.push(["--fan", FAN + " ~" + nf(g.fans)]);
+  if (g.fans) items.push(["--fan", FAN + " " + nf(g.fans)]);
   items.push(["--single", t("legendSingle") + " " + nf(g.singles)], ["--free", t("legendFree") + " " + nf(g.available)]);
   for (const [col, label] of items){
     if (lx + 38 + c.measureText(label).width > x1){ lx = x0; y += 44; }   // wrap to a second line
     roundRect(c, lx, y - 22, 26, 26, 6); c.fillStyle = v(col); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
     c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += 38 + c.measureText(label).width + 36;
   }
-  // metrics 2x2 (+ attendance for played games)
-  const cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
-  if (g.played && g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(expectedOf(g))]);
-  y += 40; const colW = (x1 - x0) / 2, shown = cells.slice(0, 6);
+  // metrics: upcoming games 3 columns (with the last 24 h), played games 2 columns (+ attendance)
+  const a24 = g.sold24 || 0, b24 = g.sold24prev || 0;
+  let cells, cols;
+  if (g.played){
+    cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
+    if (g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(expectedOf(g))]);
+    cols = 2;
+  } else {
+    cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("per24"), "+" + nf(a24) + (a24 > b24 ? " ▲" : a24 < b24 ? " ▼" : "")],
+             [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"], [t("seenLbl"), nf(g.seen)]];
+    cols = 3;
+  }
+  y += 40; const colW = (x1 - x0) / cols, shown = cells.slice(0, 6);
   shown.forEach(([label, val], i) => {
-    const cx = x0 + (i % 2) * colW, cy = y + Math.floor(i / 2) * 128;
+    const cx = x0 + (i % cols) * colW, cy = y + Math.floor(i / cols) * 128;
     c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`; c.fillText(label, cx, cy + 36);
     c.fillStyle = v("--ink"); c.font = `700 58px ${HEAD}`; c.fillText(val, cx, cy + 100);
   });
-  const contentEnd = y + Math.ceil(shown.length / 2) * 128;
+  const contentEnd = y + Math.ceil(shown.length / cols) * 128;
   // footer
   c.fillStyle = v("--muted"); c.font = `500 26px ${BODY}`;
   c.fillText(t("title") + " · " + t("shareFoot", { d: dTime(DATA.updated) }), x0, H - 56);
