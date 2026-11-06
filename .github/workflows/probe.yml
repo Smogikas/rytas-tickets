@@ -1,0 +1,29 @@
+name: Probe (temporary)
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import collections, time, rytas
+          A = rytas.API
+          def seats(eid, sid):
+              time.sleep(0.3)
+              return rytas.get_json(f"{A}/store/events/{eid}/sections/{sid}/seat-map?language=lt").get("seatMapTickets") or []
+          for eid, sid, label in [("PNJMMUNJYB","72930","108 listed"),("PNJMMUNJYB","87884","107 hidden"),
+                                  ("PNJMMUNJYB","72976","409 hidden"),("ZPHZTQITUH","72976","409 listed (Jonava)"),
+                                  ("PNJMMUNJYB","79993","110"),("PNJMMUNJYB","73010","upper pc0"),
+                                  ("PNJMMUNJYB","78670","78670 courtside?"),("PNJMMUNJYB","76814","76814")]:
+              t = seats(eid, sid)
+              by = collections.defaultdict(collections.Counter)
+              for x in t:
+                  by[x.get("status")][("ticketId" if x.get("ticketId") not in (None, "", 0) else "noTicket")] += 1
+              ex = {st: next((x for x in t if x.get("status") == st), None) for st in (0, 1)}
+              print("S", label, eid, sid, {k: dict(v) for k, v in by.items()})
+              for st, x in ex.items():
+                  if x: print("   ex", st, {k: x[k] for k in x if k not in ("x", "y")})
+          PY
