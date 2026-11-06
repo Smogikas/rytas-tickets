@@ -59,8 +59,8 @@ Played games are kept: tracking stops at tip-off, the data stays.
 ## Data: Google Sheet
 
 Tabs: **Rungtynės** (overview, one row per game), **one tab per game** (e.g. `2026-11-11 Nanterre 92`: every price change and seat change, „Įrašas" = kaina / vieta) and hidden technical tabs (`_events`, `_series`, `_layout`, `_shapes`).
-Rows are only appended, never changed. **Actual attendance**: type a row into the
-„Lankomumas (įrašykite)" of the Rungtynės tab (the job never overwrites that column); it shows on the page
+Game rows are only appended, never changed. **Actual attendance**: type it into the last
+column „Lankomumas (įrašykite)" of the Rungtynės tab (the job never overwrites that column); it shows on the page
 after the next hourly run.
 
 Setup (once): a Google Cloud service account with the Sheets API enabled, its JSON key in
