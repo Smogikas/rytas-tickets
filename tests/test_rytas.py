@@ -315,6 +315,20 @@ class Zones(unittest.TestCase):
         self.assertEqual([x[1] for x in rytas.price_history(pl, "S")], [79.0, 85.0])
         self.assertEqual([x[1] for x in rytas.zone_histories(pl, "S")["22-ta kaina"]], [69.0])
 
+    def test_zone_replaced_section_stays_open(self):
+        """101 Lounge: zone 'Premium lounge 5' replaced by 'Premium lounge 6' (same price).
+        The old zone going to 0 must not make the section 'withdrawn'."""
+        T1, T2 = "2026-11-06T08:00:00+00:00", "2026-11-06T09:35:00+00:00"
+        r = self.rows([(T1, "Premium lounge 5", "3838", 20.0, 22),
+                       (T2, "Premium lounge 6", "4081", 20.0, 22), (T2, "Premium lounge 5", "3838", 20.0, 0)])
+        tl = {"x": [{"ts_utc": T1, "section_id": "S", "seat_id": "x", "status": 1, "price_class": "3838"}]}
+        sec = rytas.analyse_event(tl, r, set())["sections"][0]
+        self.assertEqual(sec["status"], "open")
+        self.assertIsNone(sec["closed_at"])
+        r.append(dict(r[1], ts_utc="2026-11-06T11:00:00+00:00", available=0))   # now the whole section leaves
+        sec = rytas.analyse_event(tl, r, set())["sections"][0]
+        self.assertEqual((sec["status"], sec["closed_at"]), ("closed", "2026-11-06T11:00:00+00:00"))
+
     def test_zone_sold_out_before_ids_were_logged_is_matched_through_other_games(self):
         old = self.rows([("T1", "21-ta kaina", "", 99.0, 3), ("T1", "22-ta kaina", "", 89.0, 14),
                          ("T2", "21-ta kaina", "", 99.0, 0)])

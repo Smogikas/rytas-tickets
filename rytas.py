@@ -710,10 +710,18 @@ def analyse_event(tl, price_rows, season, names=None):
             x["revenue"] += p - (f or 0)
             x["gross"] += p
 
-    # is the section in the sale list now? (a vanished section's last price row has available=0)
+    # is the section in the sale list now? Only when none of its zones is left: a zone can
+    # sell out or be replaced (renamed, same price) while the section stays on sale.
+    # -> (on sale, since when it has been off sale)
     listed = {}
-    for r in sorted(price_rows, key=lambda r: r["ts_utc"]):
-        listed[r["section_id"]] = (r["available"] > 0, r["ts_utc"])
+    for sid, sec_p in prices.items():
+        since = None
+        for ts, zones in zip(sec_p["times"], sec_p["states"]):
+            if any(a > 0 for _p, _f, a in zones.values()):
+                since = None
+            elif since is None:
+                since = ts
+        listed[sid] = (since is None, since)
 
     sections = []
     for sid, x in sec.items():
