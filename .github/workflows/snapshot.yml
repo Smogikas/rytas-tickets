@@ -63,6 +63,7 @@ jobs:
       COLLECT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     outputs:
       built: ${{ steps.site.outputs.built }}
+      soon: ${{ steps.soon.outputs.soon }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -104,6 +105,11 @@ jobs:
         env:
           SEATS: ${{ inputs.seats && '--seats' || '' }}
         run: python rytas.py snapshot $SEATS
+
+      - name: Game starting soon?
+        id: soon
+        if: env.COLLECT == 'true' && steps.pull.outcome == 'success'
+        run: python rytas.py final --check
 
       # only after a successful load, so rows are never uploaded twice
       - name: Save data
@@ -158,3 +164,41 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Final full check 10 minutes before tip-off, in its own job so the hourly
+  # update is not delayed while it waits.
+  final:
+    needs: run
+    if: ${{ !cancelled() && needs.run.outputs.soon == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install google-auth==2.38.0 requests==2.32.3
+      - name: Final check before tip-off
+        run: |
+          python sheets.py pull
+          python rytas.py final
+          python sheets.py push
+          python rytas.py export _site
+          cp site/index.html _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+          name: github-pages-final
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-final

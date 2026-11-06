@@ -13,11 +13,13 @@ Commands:
   attendance <id> <number>             record actual attendance after the game
   report [<id>]                        season summary, or one game in detail
   season                               season-ticket seat estimate
+  final [--check]                      full check 10 min before a game starting within 75 min
 """
 import argparse
 import csv
 import http.cookiejar
 import json
+import os
 import re
 import sys
 import time
@@ -651,6 +653,51 @@ def cmd_snapshot(args):
     return 1 if failed else 0
 
 
+def games_starting_soon(ev, now, window_min):
+    """Upcoming games that start within the next `window_min` minutes, earliest first."""
+    out = []
+    for eid, meta in ev["events"].items():
+        start = parse_ts(meta["start_utc"])
+        if now < start <= now + timedelta(minutes=window_min):
+            out.append((start, eid, meta))
+    return sorted(out)
+
+
+def cmd_final(args):
+    """Final check before tip-off: wait until `lead` minutes before a game that
+    starts within `window` minutes, then read every seat plan and price of it.
+    With --check only report (for the workflow) whether such a game exists."""
+    ev = load_events()
+    soon = games_starting_soon(ev, datetime.now(timezone.utc), args.window)
+    if args.check:
+        line = f"soon={'true' if soon else 'false'}"
+        print(line + "".join(f"  {eid} {meta['start_utc']}" for _s, eid, meta in soon))
+        out = os.environ.get("GITHUB_OUTPUT")
+        if out:
+            with open(out, "a") as f:
+                f.write(line + "\n")
+        return 0
+    if not soon:
+        print("No game starts soon.")
+        return 0
+    failed = False
+    try:
+        for start, eid, meta in soon:
+            wait = (start - timedelta(minutes=args.lead) - datetime.now(timezone.utc)).total_seconds()
+            if wait > 0:
+                print(f"{eid}: waiting {wait / 60:.0f} min for the final check ({args.lead} min before {meta['start_utc']})", flush=True)
+                time.sleep(wait)
+            try:
+                print(f"{eid} final check: " + snapshot_event(eid, meta, datetime.now(timezone.utc), force_seats=True), flush=True)
+                meta["final_check_utc"] = now_utc()
+            except Exception as e:
+                failed = True
+                print(f"{eid}: final check failed: {e}", file=sys.stderr)
+    finally:
+        save_events(ev)
+    return 1 if failed else 0
+
+
 def cmd_attendance(args):
     eid = event_id_from(args.event)
     append_csv(ATTENDANCE, ATT_FIELDS, [{
@@ -833,6 +880,11 @@ def main(argv=None):
     t.set_defaults(fn=cmd_attendance)
     r = sub.add_parser("report"); r.add_argument("event", nargs="?"); r.set_defaults(fn=cmd_report)
     sub.add_parser("season").set_defaults(fn=cmd_season)
+    f = sub.add_parser("final", help="final full check shortly before tip-off")
+    f.add_argument("--window", type=int, default=75, help="look for games starting within N minutes (default 75)")
+    f.add_argument("--lead", type=int, default=10, help="check N minutes before tip-off (default 10)")
+    f.add_argument("--check", action="store_true", help="only report whether a game starts soon")
+    f.set_defaults(fn=cmd_final)
     x = sub.add_parser("export"); x.add_argument("dir"); x.set_defaults(fn=cmd_export)
     args = p.parse_args(argv)
     return args.fn(args) or 0

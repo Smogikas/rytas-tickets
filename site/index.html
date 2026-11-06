@@ -207,7 +207,8 @@ const T = {
     loadErr: "Nepavyko įkelti duomenų.",
     share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", making: "Ruošiamas paveikslėlis…",
     shareFoot: "Duomenys {d}",
-    soldOut: "Išparduota", closedSec: "Uždarytas", closedOn: "uždarytas {d}", priceFrom: "anksčiau {p} (pakeista {d})"
+    soldOut: "Išparduota", closedSec: "Uždarytas", closedOn: "uždarytas {d}", priceFrom: "anksčiau {p} (pakeista {d})",
+    priceSummary: "pradinė {a} → dabar {b} ({d})", priceBack: "kaina keitėsi, bet dabar vėl {a}"
   },
   en: {
     title: "Rytas tickets", eyebrow: "Vilniaus „Rytas“ · home games · Arena Vilnius", loading: "Loading…",
@@ -238,7 +239,8 @@ const T = {
     loadErr: "Could not load the data.",
     share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", making: "Making the picture…",
     shareFoot: "Data {d}",
-    soldOut: "Sold out", closedSec: "Closed", closedOn: "closed {d}", priceFrom: "was {p} (changed {d})"
+    soldOut: "Sold out", closedSec: "Closed", closedOn: "closed {d}", priceFrom: "was {p} (changed {d})",
+    priceSummary: "first {a} → now {b} ({d})", priceBack: "price changed but is back to {a}"
   }
 };
 
@@ -439,7 +441,7 @@ function renderArena(){
       <caption class="small muted" style="text-align:left;padding:10px 12px">${t("sectionsTable")}</caption>
       <thead><tr><th scope="col">${t("section")}</th><th scope="col">${t("price")}</th><th scope="col">${t("value")}</th><th scope="col">${t("seats")}</th><th scope="col">${t("season")}</th><th scope="col">${t("single")}</th><th scope="col">${t("free")}</th><th scope="col">${t("full")}</th><th scope="col">${t("revenue")}</th></tr></thead>
       <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button>${statusTag(x)}</td>
-        <td class="num">${priceChg(x, true)} ${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
+        <td class="num">${priceChg(x)} ${eur(x.price)}</td><td class="num">${eur(x.price != null ? x.price - (x.fee || 0) : null)}</td><td class="num">${nf(x.seats)}</td><td class="num">${nf(x.season)}</td><td class="num">${nf(x.singles)}</td><td class="num">${nf(x.available)}</td><td class="num">${pct(x.seats - x.available, x.seats).toFixed(0)}%</td><td class="num">${eur(x.revenue)}</td></tr>`).join("")}
         <tr><td><b>${t("totalRow")}</b></td><td></td><td></td><td class="num"><b>${nf(tot.seats)}</b></td><td class="num"><b>${nf(tot.season)}</b></td><td class="num"><b>${nf(tot.singles)}</b></td><td class="num"><b>${nf(tot.available)}</b></td><td class="num"><b>${pct(tot.seats - tot.available, tot.seats).toFixed(0)}%</b></td><td class="num"><b>${eur(tot.revenue)}</b></td></tr>
       </tbody></table></div>
   </div>`;
@@ -510,24 +512,33 @@ function statusTag(s){
   return "";
 }
 
-// ▲/▼ against the first logged price; short form for the table, a line for the section card
-function priceChg(s, short){
+// ▲/▼ against the first logged price, for the sections table
+function priceChg(s){
   const h = s.history || [];
   if (h.length < 2 || s.price == null || h[0][1] === s.price) return "";
   const up = s.price > h[0][1], last = h[h.length - 1][0];
-  if (short) return `<span class="pchg ${up ? "up" : "down"}" title="${esc(t("priceFrom", { p: eur(h[0][1]), d: dShort(last) }))}">${up ? "▲" : "▼"}</span>`;
-  return `<div class="pchg ${up ? "up" : "down"}">${up ? "▲" : "▼"} ${esc(t("priceFrom", { p: eur(h[0][1]), d: dShort(last) }))}</div>`;
+  return `<span class="pchg ${up ? "up" : "down"}" title="${esc(t("priceFrom", { p: eur(h[0][1]), d: dShort(last) }))}">${up ? "▲" : "▼"}</span>`;
+}
+
+// price history card: first -> now summary, then every change (newest first) with its direction
+function priceHistoryHtml(s){
+  const h = s.history || [];
+  if (!h.length) return "";
+  if (h.length === 1) return `<div class="muted">${t("unchanged", { d: dTime(h[0][0]) })}</div>`;
+  const first = h[0][1], now = h[h.length - 1][1], diff = now - first;
+  const head = diff ? `<div class="pchg ${diff > 0 ? "up" : "down"}" style="font-size:13px">${diff > 0 ? "▲" : "▼"} ${esc(t("priceSummary", { a: eur(first), b: eur(now), d: (diff > 0 ? "+" : "−") + eur(Math.abs(diff)) }))}</div>`
+                    : `<div class="muted">${esc(t("priceBack", { a: eur(first) }))}</div>`;
+  const rows = h.map((x, i) => {
+    const prev = i ? h[i - 1][1] : null, arrow = prev == null ? "" : x[1] > prev ? "▲" : x[1] < prev ? "▼" : "";
+    return `<div><span class="muted">${esc(dTime(x[0]))}</span><span class="num">${arrow ? `<span class="pchg ${x[1] > prev ? "up" : "down"}">${arrow}</span> ` : ""}${eur(x[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(x[1] - x[2])})</span></span></div>`;
+  }).reverse().join("");
+  return head + rows;
 }
 
 function sectionPanel(s, g){
-  const hist = (s.history || []).slice().reverse();
-  const histHtml = hist.length > 1
-    ? hist.map((h) => `<div><span class="muted">${esc(dTime(h[0]))}</span><span class="num">${eur(h[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(h[1] - h[2])})</span></span></div>`).join("")
-    : (hist.length ? `<div class="muted">${t("unchanged", { d: dTime(hist[0][0]) })}</div>` : "");
   return `<div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}${statusTag(s)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${eur(s.price)}</div></div>
     <div class="small muted">${t("value")} ${eur(s.price - (s.fee || 0))} · ${t("fee").toLowerCase()} ${eur(s.fee)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}${s.status === "closed" && s.closedAt ? " · " + t("closedOn", { d: dTime(s.closedAt) }) : ""}</div>
-    ${priceChg(s, false)}
     <div class="grid2">
       <div><span class="muted">${t("seats")}</span><b class="num">${nf(s.seats)}</b></div><div><span class="muted">${t("free")}</span><b class="num">${nf(s.available)}</b></div>
       <div><span class="muted">${t("season")}</span><b class="num">${nf(s.season)}</b></div><div><span class="muted">${t("singles")}</span><b class="num">${nf(s.singles)}</b></div>
@@ -535,7 +546,7 @@ function sectionPanel(s, g){
     </div>
   </div>
   <div class="panel"><div style="font-weight:600">${t("seatPlan")}</div><div id="seatBox"><div class="note">${t("loading")}</div></div></div>
-  <div class="panel"><div style="font-weight:600">${t("priceHistory")}</div><div class="hist">${histHtml}</div></div>`;
+  <div class="panel"><div style="font-weight:600">${t("priceHistory")}</div><div class="hist">${priceHistoryHtml(s)}</div></div>`;
 }
 
 function loadSeats(gid){

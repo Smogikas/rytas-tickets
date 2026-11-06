@@ -368,6 +368,37 @@ class Commands(Base):
         vip = [r for r in rytas.latest_by(rytas.load_seats(E), lambda r: r["seat_id"]).values() if r["section_id"] == "94921"]
         self.assertEqual(sum(r["status"] for r in vip), 10)
 
+    def test_final_check_before_tipoff(self):
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        self.snapshot_all(seats=True)
+        start = datetime(2026, 11, 11, 17, 30, tzinfo=timezone.utc)
+        now = start - rytas.timedelta(minutes=43)      # hourly run at 16:47
+        ev = rytas.load_events()
+        self.assertEqual([e for _s, e, _m in rytas.games_starting_soon(ev, now, 75)], ["PNJMMUNJYB"])
+        self.assertEqual(rytas.games_starting_soon(ev, start - rytas.timedelta(minutes=80), 75), [])
+        self.assertEqual(rytas.games_starting_soon(ev, start + rytas.timedelta(minutes=1), 75), [])
+
+        out = self.tmp / "gh_output"
+        with unittest.mock.patch.object(rytas, "datetime", wraps=rytas.datetime) as dt, \
+             unittest.mock.patch.dict("os.environ", {"GITHUB_OUTPUT": str(out)}):
+            dt.now.return_value = now
+            self.assertEqual(rytas.main(["final", "--check"]), 0)
+        self.assertEqual(out.read_text().strip(), "soon=true")
+
+        sleeps = []
+        n = len(self.site.requests)
+        self.site.sell("PNJMMUNJYB", "72935", 3)                  # "20+" section: only a full read sees it
+        with unittest.mock.patch.object(rytas, "datetime", wraps=rytas.datetime) as dt, \
+             unittest.mock.patch.object(rytas.time, "sleep", side_effect=sleeps.append):
+            dt.now.return_value = now
+            self.assertEqual(rytas.main(["final"]), 0)
+        self.assertEqual([round(x) for x in sleeps if x > 1], [33 * 60])   # waits until 17:20, 10 min before (ignore request pauses)
+        seat_reads = [u for u in self.site.requests[n:] if "/sections/" in u]
+        self.assertEqual(len(seat_reads), 3)                       # every open section of that game only
+        tl = rytas.timelines(rytas.load_seats("PNJMMUNJYB"))
+        self.assertEqual(sum(1 for r in tl.values() if r[0]["status"] == 1 and r[-1]["status"] == 0), 3)
+        self.assertIn("final_check_utc", rytas.load_events()["events"]["PNJMMUNJYB"])
+
     def test_add_single_event(self):
         self.assertEqual(rytas.main(["add", "ZPHZTQITUH"]), 0)
         self.assertTrue(rytas.seat_path("ZPHZTQITUH").exists())

@@ -46,7 +46,10 @@ Seat ids are the same in every game, so for each game:
 - A section leaving the sale list with an exact count (< 20) left is **sold out** (last
   seats counted as sold, striped on the map); with "20+" left it was **withdrawn**
   (nothing counted as sold, dashed outline, closing date shown).
-- Price changes show as ▲/▼ next to the price (section card, table) and in the price history.
+- Price changes: the section's price history card (first → now, and every change with ▲/▼);
+  ▲/▼ next to the price in the sections table.
+- Tracking of a game stops at tip-off, so sections closing at the start are not seen as withdrawn.
+  Seats already seen sold always stay sold, also in a withdrawn section.
 
 ## Schedule (GitHub Actions, `.github/workflows/snapshot.yml`)
 
@@ -56,6 +59,8 @@ Seat ids are the same in every game, so for each game:
   Between full scans, when the hourly price check sees a section open or close, a price
   change, or fewer tickets left in a section showing under 20, that section's seat plan is
   read right away (sections showing "20+" give no signal and wait for the full scan).
+- **10 minutes before tip-off**: a final full check (every seat and price) of that game, in
+  its own job started by the hourly run that sees the game starting within 75 minutes.
 - **Mondays 05:41 UTC**: look for new or rescheduled games of the tracked season.
 - **code push**: tests, then the page is rebuilt (no data collection).
 - **manual** (Actions → *Ticket snapshot* → *Run workflow*): track a season or a game,
