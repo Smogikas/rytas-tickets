@@ -74,7 +74,7 @@ Played games are kept: tracking stops at tip-off, the data stays.
 
 ## Data: Google Sheet
 
-Tabs: **Rungtynės** (overview, one row per game), **one tab per game** (e.g. `2026-11-11 Nanterre 92`: every price change and seat change, „Įrašas" = kaina / vieta) and hidden technical tabs (`_events`, `_series`, `_layout`, `_shapes`).
+Tabs: **Rungtynės** (overview, one row per game), **one tab per game** (e.g. `2026-11-11 Nanterre 92`: every price change and seat change, „Įrašas" = kaina / vieta) **Talpa** (seats per section and arena capacity) and hidden technical tabs (`_events`, `_series`, `_layout`, `_shapes`, `_capacity`).
 Game rows are only appended, never changed. **Actual attendance**: type it into the last
 column „Lankomumas (įrašykite)" of the Rungtynės tab (the job never overwrites that column); it shows on the page
 after the next hourly run.

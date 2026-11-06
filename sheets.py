@@ -99,7 +99,7 @@ def vpath(r, suffix=""):
 
 
 def sheet_props():
-    meta = request("GET", "", {"fields": "sheets.properties(sheetId,title,index,hidden)"})
+    meta = request("GET", "", {"fields": "sheets.properties(sheetId,title,index,hidden,gridProperties(rowCount,columnCount))"})
     return {s["properties"]["title"]: s["properties"] for s in meta.get("sheets", [])}
 
 
@@ -109,8 +109,24 @@ def add_tab(title, head, hidden=False, index=None):
              "gridProperties": {"rowCount": 2, "columnCount": len(head), "frozenRowCount": 1}}
     if index is not None:
         props["index"] = index
-    request("POST", ":batchUpdate", body={"requests": [{"addSheet": {"properties": props}}]})
+    res = request("POST", ":batchUpdate", body={"requests": [{"addSheet": {"properties": props}}]})
     request("PUT", vpath(rng(title, "A1")), {"valueInputOption": "RAW"}, {"values": [head]})
+    try:
+        return res["replies"][0]["addSheet"]["properties"]
+    except (KeyError, IndexError, TypeError):
+        return {"title": title, "gridProperties": props["gridProperties"]}
+
+
+def ensure_columns(tabs, title, cols):
+    """Writing past a tab's last column fails (Google only adds rows by itself), so
+    widen the tab first when a layout change needs more columns."""
+    props = tabs.get(title) or {}
+    have = (props.get("gridProperties") or {}).get("columnCount")
+    if have is None or have >= cols or props.get("sheetId") is None:
+        return
+    request("POST", ":batchUpdate", body={"requests": [{"appendDimension": {
+        "sheetId": props["sheetId"], "dimension": "COLUMNS", "length": cols - have}}]})
+    props.setdefault("gridProperties", {})["columnCount"] = cols
 
 
 def read_tabs(titles):
@@ -287,8 +303,7 @@ def push():
         new = rows[counts.get(name, 0):]
         if new:
             if name not in tabs:
-                add_tab(name, HIDDEN[name], hidden=True)
-                tabs[name] = {}
+                tabs[name] = add_tab(name, HIDDEN[name], hidden=True)
             append_rows(name, [[num(r[c]) if c in ("x", "y", "seats") else r[c] for c in HIDDEN[name]] for r in new])
             counts[name] = len(rows)
             pushed.append(f"{name} +{len(new)}")
@@ -304,8 +319,7 @@ def push():
         if not meta.get("tab") or meta["tab"] not in tabs:
             meta["tab"] = meta.get("tab") or game_tab_title(meta, set(tabs))
             if meta["tab"] not in tabs:
-                add_tab(meta["tab"], GAME_HEAD)
-                tabs[meta["tab"]] = {}
+                tabs[meta["tab"]] = add_tab(meta["tab"], GAME_HEAD)
         titles = {r["section_id"]: r["section"] for r in prices}
         rows = [price_to_row(r) for r in new_p] + [seat_to_row(r, titles) for r in new_s]
         rows.sort(key=lambda r: r[0])
@@ -318,16 +332,15 @@ def push():
         ("_series", SERIES_FIELDS, [[sid, title] for sid, title in ev["series"].items()]),
     ):
         if name not in tabs:
-            add_tab(name, head, hidden=True)
-            tabs[name] = {}
+            tabs[name] = add_tab(name, head, hidden=True)
         rewrite(name, head, rows)
 
     # overview: stable row order (so typed attendance stays on its game), new games appended
     order = [e for e in state.get("order", []) if e in ev["events"]]
     order += [e for e, _ in sorted(ev["events"].items(), key=lambda kv: kv[1]["start_utc"]) if e not in order]
     if OVERVIEW not in tabs:
-        add_tab(OVERVIEW, OVERVIEW_HEAD, index=0)
-        tabs[OVERVIEW] = {}
+        tabs[OVERVIEW] = add_tab(OVERVIEW, OVERVIEW_HEAD, index=0)
+    ensure_columns(tabs, OVERVIEW, len(OVERVIEW_HEAD))
     rows = overview_rows(ev, order)
     last_col = chr(ord("A") + len(OVERVIEW_HEAD) - 2)
     request("PUT", vpath(rng(OVERVIEW, f"A1:{last_col}{len(rows) + 1}")), {"valueInputOption": "RAW"},
@@ -337,8 +350,7 @@ def push():
     cap_rows, cap_tot = rytas.capacity_table(ev)
     if cap_rows:
         if CAPACITY_TAB not in tabs:
-            add_tab(CAPACITY_TAB, CAPACITY_HEAD, index=1)
-            tabs[CAPACITY_TAB] = {}
+            tabs[CAPACITY_TAB] = add_tab(CAPACITY_TAB, CAPACITY_HEAD, index=1)
         body = [[r["section_id"], r["title"], r["seats"], r["max_on_sale"] or "", r["games_on_sale"] or "",
                  "taip" if r["on_map"] else ""] for r in cap_rows]
         for conf, tot in cap_tot.items():

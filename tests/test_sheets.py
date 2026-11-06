@@ -26,7 +26,7 @@ class FakeSheets:
 
     def __init__(self):
         self.tabs = {"Sheet1": []}
-        self.props = {"Sheet1": {"sheetId": 0, "hidden": False}}
+        self.props = {"Sheet1": {"sheetId": 0, "hidden": False, "gridProperties": {"rowCount": 1000, "columnCount": 26}}}
         self.order = ["Sheet1"]
         self.calls = []
         self.next_id = 1
@@ -39,6 +39,9 @@ class FakeSheets:
         return m.group(1), (col_index(m.group(2)) if m.group(2) else 0), (int(m.group(3)) - 1 if m.group(3) else 0)
 
     def write(self, tab, col, row, values):
+        cols = self.props[tab]["gridProperties"]["columnCount"]
+        if any(col + len(v) > cols for v in values):     # Google: "exceeds grid limits" (rows grow, columns don't)
+            raise RuntimeError(f"HTTP 400: Range exceeds grid limits. Max columns: {cols} ({tab})")
         grid = self.tabs[tab]
         for i, vals in enumerate(values):
             while len(grid) <= row + i:
@@ -64,9 +67,16 @@ class FakeSheets:
                     # Google: a sheet can't hide its last visible tab
                     assert not p.get("hidden") or any(not v["hidden"] for v in self.props.values())
                     self.tabs[p["title"]] = []
-                    self.props[p["title"]] = {"sheetId": self.next_id, "hidden": p.get("hidden", False)}
+                    self.props[p["title"]] = {"sheetId": self.next_id, "hidden": p.get("hidden", False),
+                                              "gridProperties": dict(g)}
                     self.next_id += 1
                     self.order.insert(p.get("index", len(self.order)), p["title"])
+                    return {"replies": [{"addSheet": {"properties": dict(self.props[p["title"]], title=p["title"])}}]}
+                elif "appendDimension" in r:
+                    d = r["appendDimension"]
+                    t = next(t for t, v in self.props.items() if v["sheetId"] == d["sheetId"])
+                    key = "columnCount" if d["dimension"] == "COLUMNS" else "rowCount"
+                    self.props[t]["gridProperties"][key] += d["length"]
                 elif "deleteSheet" in r:
                     t = next(t for t, v in self.props.items() if v["sheetId"] == r["deleteSheet"]["sheetId"])
                     del self.tabs[t], self.props[t]
@@ -227,6 +237,21 @@ class SheetsTest(unittest.TestCase):
         # the capacity table survives a fresh start (hidden _capacity tab)
         self.wipe_local(); sheets.pull()
         self.assertEqual(rytas.load_capacity("77"), {"10": 139, "72934": 246, "99999": 8})
+
+    def test_overview_tab_is_widened_for_a_new_column(self):
+        """Regression: a Rungtynės tab made with 12 columns before the B Tribūna column
+        existed must be widened, not fail with 'exceeds grid limits'."""
+        self.write_local_data()
+        sheets.pull()
+        sheets.push()
+        f = self.fake
+        f.props["Rungtynės"]["gridProperties"]["columnCount"] = 12          # as created by the older version
+        f.tabs["Rungtynės"] = [r[:12] for r in f.tabs["Rungtynės"]]
+        self.wipe_local()
+        sheets.pull()
+        sheets.push()
+        self.assertEqual(f.props["Rungtynės"]["gridProperties"]["columnCount"], len(sheets.OVERVIEW_HEAD))
+        self.assertEqual(f.tabs["Rungtynės"][0], sheets.OVERVIEW_HEAD)
 
     def test_tab_title(self):
         m = {"name": "LKL: Vilniaus ''Rytas'' - Kėdainių ''Nevėžis-Paskolų klubas''", "start_utc": "2027-01-24T17:10:00Z"}
