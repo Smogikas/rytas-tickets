@@ -70,7 +70,7 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .modal{position:fixed;inset:0;z-index:50;background:rgba(10,10,12,.62);display:flex;align-items:center;justify-content:center;padding:16px}
 .modal[hidden]{display:none}
 .modal-box{position:relative;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:20px;overflow:hidden;
-  width:min(400px, 100%, calc((100vh - 120px) * 0.86));display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  --ar:0.86; width:min(400px, 100%, calc((100vh - 110px) * var(--ar)));display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .modal-box img{width:100%;height:auto;display:block}
 .modal-x{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .modal-x:hover{border-color:var(--accent)}
@@ -91,7 +91,25 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .mapbox{flex:3 1 520px;min-width:0;padding:16px;display:flex;flex-direction:column;gap:12px}
 .side{flex:2 1 340px;min-width:0;display:flex;flex-direction:column;gap:14px}
 .side .panel{padding:18px;display:flex;flex-direction:column;gap:12px}
-.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+/* own scroll indicator for the game bar: themed, no arrows, fades out when idle after first use */
+.sbar{position:relative;height:6px;margin-top:6px;border-radius:3px;transition:opacity .45s ease;touch-action:none}
+.sbar.idle{opacity:0}
+.sbar[hidden]{display:none}
+.sbar i{position:absolute;top:0;height:6px;border-radius:3px;background:var(--seat-line);cursor:grab}
+.sbar:hover i,.sbar.drag i{background:var(--muted)}
+.sbar.drag i{cursor:grabbing}
+/* thin scrollbars in theme colours, no arrows */
+.sb::-webkit-scrollbar{width:7px;height:7px}
+.sb::-webkit-scrollbar-button{display:none;width:0;height:0}
+.sb::-webkit-scrollbar-track{background:transparent}
+.sb::-webkit-scrollbar-thumb{background:var(--seat-line);border-radius:4px}
+.sb::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+.sb::-webkit-scrollbar-corner{background:transparent}
+@supports not selector(::-webkit-scrollbar){
+  .sb{scrollbar-width:thin;scrollbar-color:var(--seat-line) transparent}
+}
 .chip small{display:block;font-size:11px;font-weight:500;opacity:.8}
 svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
 svg.map polygon{cursor:pointer;stroke:var(--line);stroke-width:2;vector-effect:non-scaling-stroke}
@@ -339,20 +357,27 @@ function sectionValue(s){
   return (s.season + s.singles) / seats;
 }
 
-function renderArena(){
-  const gs = listGames().slice().sort((a, b) => S.when === "played" ? (a.start < b.start ? 1 : -1) : (a.start < b.start ? -1 : 1));
-  if (!gs.length){ $("view").innerHTML = `<div class="panel empty">${t("noGames")}</div>`; return; }
-  let g = gs.find((x) => x.id === S.game) || gs[0];
-  S.game = g.id;
+// colours of the arena map for one game (also used by the share picture)
+function arenaColors(g){
   const secs = DATA.sections[g.id] || [];
   const byId = {}; secs.forEach((s) => { byId[s.id] = s; });
   const prices = secs.map((s) => s.price || 0).filter((p) => p > 0);
   const lo = Math.log(Math.min(...prices, 1e9)), hi = Math.log(Math.max(...prices, 1));
   secs.forEach((s) => { s._p = s.price && hi > lo ? (Math.log(s.price) - lo) / (hi - lo) : 0; });
-  if (!S.sec || !byId[S.sec]) S.sec = (secs.find((s) => s.title === "108") || secs[0] || {}).id || null;
   const low = cssVar("--low"), mid = cssVar("--mid"), high = cssVar("--high"), closed = cssVar("--closed");
   const scale = (f) => f < 0.5 ? mix(low, mid, f * 2) : mix(mid, high, (f - 0.5) * 2);
-  const shapes = (DATA.shapes[g.conf] || []);
+  const labelInk = (fill) => { const rgb = fill.match(/\d+/g).map(Number); return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 > 0.55 ? "#1A1208" : "#FFFFFF"; };
+  const legend = { taken: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
+  return { secs, byId, prices, scale, closed, labelInk, legend, shapes: DATA.shapes[g.conf] || [] };
+}
+
+function renderArena(){
+  const gs = listGames().slice().sort((a, b) => S.when === "played" ? (a.start < b.start ? 1 : -1) : (a.start < b.start ? -1 : 1));
+  if (!gs.length){ $("view").innerHTML = `<div class="panel empty">${t("noGames")}</div>`; return; }
+  let g = gs.find((x) => x.id === S.game) || gs[0];
+  S.game = g.id;
+  const { secs, byId, prices, scale, closed, labelInk, shapes } = arenaColors(g);
+  if (!S.sec || !byId[S.sec]) S.sec = (secs.find((s) => s.title === "108") || secs[0] || {}).id || null;
   const polys = shapes.map(([id, pts]) => {
     const s = byId[id];
     const fill = s ? scale(sectionValue(s)) : closed;
@@ -362,24 +387,25 @@ function renderArena(){
   const labels = shapes.filter(([id]) => byId[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
     const cx = n.reduce((a, p) => a + p[0], 0) / n.length, cy = n.reduce((a, p) => a + p[1], 0) / n.length;
-    // label colour by the fill's brightness: dark text on gold/cream, light text on blue/brown
-    const rgb = scale(sectionValue(byId[id])).match(/\d+/g).map(Number);
-    const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
-    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${lum > 0.55 ? "#1A1208" : "#FFFFFF"}">${esc(shortTitle(byId[id].title))}</text>`;
+    // label colour by the fill's brightness
+    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${labelInk(scale(sectionValue(byId[id])))}">${esc(shortTitle(byId[id].title))}</text>`;
   }).join("");
-  const legend = { taken: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
+  const legend = arenaColors(g).legend;
   const s = byId[S.sec];
+  const prevChips = $("chips") ? $("chips").scrollLeft : null;
   const tot = secs.reduce((a, x) => { ["seats", "season", "singles", "available", "revenue"].forEach((k) => { a[k] = (a[k] || 0) + (x[k] || 0); }); return a; }, {});
   const sorted = secs.slice().sort((a, b) => a.title.localeCompare(b.title, "lt", { numeric: true }));
 
   $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-    <div class="chips" role="group" aria-label="${esc(t("games"))}">${gs.map((x) => `<button type="button" class="chip" data-game="${esc(x.id)}" aria-pressed="${x.id === g.id}"><small>${esc(dShort(x.start))} · ${esc(x.comp)}</small>${esc(x.opp)}</button>`).join("")}</div>
+    <div><div class="chips" id="chips" role="group" aria-label="${esc(t("games"))}">${gs.map((x) => `<button type="button" class="chip" data-game="${esc(x.id)}" aria-pressed="${x.id === g.id}"><small>${esc(dShort(x.start))} · ${esc(x.comp)}</small>${esc(x.opp)}</button>`).join("")}</div>
+      <div class="sbar" id="chipsBar" aria-hidden="true"><i id="chipsThumb"></i></div></div>
     <div class="arena">
       <div class="panel mapbox">
         <div class="controls">
           <div><div class="disp" style="font-size:20px;font-weight:700">${esc(g.opp)}</div>
           <div class="small muted">${esc(dFull(g.start))} · ${nf(g.taken)} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div></div>
-          <div class="seg small-seg" role="group" id="modeSeg"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg small-seg" role="group" id="modeSeg"></div>
+            <button type="button" class="btn" id="arenaShare" aria-label="${esc(t("share") + ": " + t("arena") + " " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
         </div>
         ${shapes.length ? `<svg class="map" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
           <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
@@ -393,7 +419,7 @@ function renderArena(){
         ${s ? sectionPanel(s, g) : `<div class="panel note">${t("pickSection")}</div>`}
       </div>
     </div>
-    <div class="panel tablebox"><table>
+    <div class="panel tablebox sb" id="secTable"><table>
       <caption class="small muted" style="text-align:left;padding:10px 12px">${t("sectionsTable")}</caption>
       <thead><tr><th scope="col">${t("section")}</th><th scope="col">${t("price")}</th><th scope="col">${t("value")}</th><th scope="col">${t("seats")}</th><th scope="col">${t("season")}</th><th scope="col">${t("single")}</th><th scope="col">${t("free")}</th><th scope="col">${t("full")}</th><th scope="col">${t("revenue")}</th></tr></thead>
       <tbody>${sorted.map((x) => `<tr class="${x.id === S.sec ? "sel" : ""}"><td><button type="button" class="link" data-sec="${esc(x.id)}">${esc(x.title)}</button></td>
@@ -403,6 +429,9 @@ function renderArena(){
   </div>`;
 
   segButtons($("modeSeg"), [["taken", t("modeTaken")], ["price", t("modePrice")]], S.mode, (v) => { S.mode = v; renderArena(); });
+  $("arenaShare").addEventListener("click", () => openShare(g.id, "arena"));
+  scrollIndicator($("chips"), $("chipsBar"), $("chipsThumb"), "chips");
+  centerChip(prevChips);
   const v = $("view");
   v.querySelectorAll(".chip[data-game]").forEach((b) => b.addEventListener("click", () => { S.game = b.dataset.game; S.seat = null; store.set("game", S.game); renderArena(); }));
   v.querySelectorAll("[data-sec]").forEach((el) => {
@@ -411,6 +440,52 @@ function renderArena(){
     el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
   });
   if (s) loadSeats(g.id).then(() => drawSeats(g, s));
+}
+
+// keep the game bar where it was, then slide so the selected game is in the middle
+function centerChip(prevLeft){
+  const bar = $("chips"); if (!bar) return;
+  const chip = bar.querySelector('.chip[aria-pressed="true"]'); if (!chip) return;
+  bar.style.scrollBehavior = "auto"; bar.scrollLeft = prevLeft || 0;
+  if (prevLeft != null && S._centered === S.game) return;   // same game (e.g. a section was picked): keep the bar where it is
+  S._centered = S.game;
+  const target = chip.offsetLeft - bar.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2;
+  bar._auto = Date.now();
+  requestAnimationFrame(() => { bar.style.scrollBehavior = ""; bar.scrollTo({ left: Math.max(0, target), behavior: prevLeft == null ? "auto" : "smooth" }); });
+}
+
+// game bar scroll indicator: visible until first used; afterwards it fades out when idle
+// and comes back while scrolling or when the pointer is over the bar. Draggable.
+function scrollIndicator(el, bar, thumb, key){
+  if (!el || !bar) return;
+  S.sbUsed = S.sbUsed || {};
+  let timer;
+  const geo = () => { const tw = bar.clientWidth, ratio = el.clientWidth / el.scrollWidth, w = Math.max(36, tw * ratio); return { tw, w, max: el.scrollWidth - el.clientWidth }; };
+  const update = () => {
+    const { tw, w, max } = geo();
+    bar.hidden = max <= 1;
+    thumb.style.width = w + "px";
+    thumb.style.left = (max > 0 ? (el.scrollLeft / max) * (tw - w) : 0) + "px";
+  };
+  const show = () => { bar.classList.remove("idle"); clearTimeout(timer); if (S.sbUsed[key]) timer = setTimeout(() => { if (!bar.classList.contains("drag")) bar.classList.add("idle"); }, 1200); };
+  const used = () => { S.sbUsed[key] = true; show(); };
+  if (S.sbUsed[key]) bar.classList.add("idle");
+  el.addEventListener("scroll", () => { update(); if (!(el._auto && Date.now() - el._auto < 700)) used(); }, { passive: true });
+  [el, bar].forEach((n) => n.addEventListener("pointermove", () => { if (S.sbUsed[key]) show(); }, { passive: true }));
+  // drag the thumb, or click the track to jump
+  let drag = null;
+  bar.addEventListener("pointerdown", (e) => {
+    const { tw, w, max } = geo(), r = bar.getBoundingClientRect();
+    if (e.target !== thumb) el.scrollLeft = ((e.clientX - r.left - w / 2) / (tw - w)) * max;
+    drag = { x: e.clientX, left: el.scrollLeft, k: max / Math.max(1, tw - w) };
+    bar.setPointerCapture(e.pointerId); bar.classList.add("drag"); used(); e.preventDefault();
+  });
+  bar.addEventListener("pointermove", (e) => { if (drag) el.scrollLeft = drag.left + (e.clientX - drag.x) * drag.k; });
+  const end = () => { drag = null; bar.classList.remove("drag"); show(); };
+  bar.addEventListener("pointerup", end); bar.addEventListener("pointercancel", end);
+  if (window._sbResize) window.removeEventListener("resize", window._sbResize);
+  window._sbResize = update; window.addEventListener("resize", update);
+  update();
 }
 
 function sectionPanel(s, g){
@@ -448,7 +523,7 @@ async function drawSeats(g, s){
   const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)" };
   const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
   const K = 1.1;  // px per seat-map unit: the same seat size in every section
-  box.innerHTML = `<div class="seatwrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
+  box.innerHTML = `<div class="seatwrap sb" id="seatWrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
     <div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("legendSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span></div>`;
   const svg = box.querySelector("svg");
@@ -475,14 +550,93 @@ function wrapLines(c, text, maxW){
   if (line) out.push(line); return out;
 }
 
-async function makeShareImage(g){
+async function makeShareImage(g, kind){
   try { await Promise.all(["700 120px \"Space Grotesk\"", "500 30px Inter", "700 30px Inter"].map((f) => document.fonts.load(f))); } catch (e) {}
+  const draw = kind === "arena" ? drawArenaShare : drawShare;
   // first pass measures how tall the content is, second pass draws at that height
-  const probe = document.createElement("canvas"); probe.width = 1080; probe.height = 2000;
-  const contentEnd = drawShare(probe.getContext("2d"), g, 1080, 2000);
+  const probe = document.createElement("canvas"); probe.width = 1080; probe.height = 2400;
+  const contentEnd = draw(probe.getContext("2d"), g, 1080, 2400);
   const cv = document.createElement("canvas"); cv.width = 1080; cv.height = Math.ceil(contentEnd + 130);
-  drawShare(cv.getContext("2d"), g, cv.width, cv.height);
-  return new Promise((res) => cv.toBlob(res, "image/png"));
+  draw(cv.getContext("2d"), g, cv.width, cv.height);
+  return new Promise((res) => cv.toBlob((b) => res({ blob: b, ratio: cv.width / cv.height }), "image/png"));
+}
+
+// header shared by both pictures; returns the y below it
+function drawShareHeader(c, g, W, v, HEAD, BODY){
+  const x0 = 72, x1 = W - 72; let y = 96;
+  c.textBaseline = "alphabetic";
+  c.fillStyle = v("--muted"); c.font = `500 26px ${BODY}`; c.fillText(t("eyebrow").toUpperCase(), x0, y);
+  y += 58;
+  c.font = `700 26px ${BODY}`; const bw = c.measureText(g.comp).width + 28;
+  roundRect(c, x0, y - 32, bw, 44, 8); c.lineWidth = 2.5; c.strokeStyle = g.comp === "BCL" ? v("--bcl") : v("--accent"); c.stroke();
+  c.fillStyle = c.strokeStyle; c.fillText(g.comp, x0 + 14, y);
+  c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`; const dt = dFull(g.start); c.fillText(dt, x1 - c.measureText(dt).width, y);
+  y += 78;
+  c.fillStyle = v("--muted"); c.font = `500 34px ${BODY}`; c.fillText(t("vs"), x0, y);
+  c.fillStyle = v("--ink"); c.font = `700 76px ${HEAD}`;
+  for (const line of wrapLines(c, g.opp, x1 - x0).slice(0, 2)){ y += 86; c.fillText(line, x0, y); }
+  return y;
+}
+
+function drawShareFooter(c, W, H, v, BODY){
+  c.fillStyle = v("--muted"); c.font = `500 26px ${BODY}`;
+  c.fillText(t("title") + " · " + t("shareFoot", { d: dTime(DATA.updated) }), 72, H - 56);
+  const site = location.host + location.pathname.replace(/index\.html$/, "");
+  c.fillText(site, W - 72 - c.measureText(site).width, H - 56);
+}
+
+function drawArenaShare(c, g, W, H){
+  const v = (n) => cssVar(n), HEAD = '"Space Grotesk", Inter, sans-serif', BODY = 'Inter, system-ui, sans-serif';
+  const A = arenaColors(g), x0 = 72, x1 = W - 72;
+  c.fillStyle = v("--panel"); c.fillRect(0, 0, W, H);
+  let y = drawShareHeader(c, g, W, v, HEAD, BODY);
+  y += 52; c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`;
+  c.fillText(`${nf(g.taken)} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()} · ${S.mode === "price" ? t("modePrice") : t("modeTaken")}`, x0, y);
+  // the map: section outlines in a 1000x1000 space, cropped to what is drawn
+  y += 24;
+  const pts = A.shapes.map(([id, p]) => [id, p.split(" ").map((q) => q.split(",").map(Number))]);
+  const all = pts.flatMap(([, p]) => p);
+  const minX = Math.min(...all.map((p) => p[0]), 380), maxX = Math.max(...all.map((p) => p[0]), 620);
+  const minY = Math.min(...all.map((p) => p[1]), 160), maxY = Math.max(...all.map((p) => p[1]), 610);
+  const k = (x1 - x0) / (maxX - minX), X = (x) => x0 + (x - minX) * k, Y = (yy) => y + (yy - minY) * k;
+  c.lineJoin = "round";
+  c.strokeStyle = v("--court"); c.lineWidth = 3;
+  roundRect(c, X(390), Y(170), 225 * k, 430 * k, 10 * k); c.stroke();
+  c.beginPath(); c.moveTo(X(390), Y(385)); c.lineTo(X(615), Y(385)); c.stroke();
+  c.beginPath(); c.arc(X(502), Y(385), 38 * k, 0, Math.PI * 2); c.stroke();
+  for (const [id, p] of pts){
+    const s = A.byId[id];
+    c.beginPath(); p.forEach(([px, py], i) => (i ? c.lineTo(X(px), Y(py)) : c.moveTo(X(px), Y(py)))); c.closePath();
+    if (s){ c.setLineDash([]); c.fillStyle = A.scale(sectionValue(s)); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke(); }
+    else { c.setLineDash([7, 6]); c.strokeStyle = v("--seat-line"); c.lineWidth = 1.5; c.stroke(); }
+  }
+  c.setLineDash([]); c.textAlign = "center"; c.textBaseline = "middle"; c.font = `700 22px ${HEAD}`;
+  for (const [id, p] of pts){
+    const s = A.byId[id]; if (!s) continue;
+    const cx = p.reduce((a, q) => a + q[0], 0) / p.length, cy = p.reduce((a, q) => a + q[1], 0) / p.length;
+    c.fillStyle = A.labelInk(A.scale(sectionValue(s))); c.fillText(shortTitle(s.title), X(cx), Y(cy));
+  }
+  c.textAlign = "left"; c.textBaseline = "alphabetic";
+  y = Y(maxY) + 54;
+  // legend
+  c.font = `500 26px ${BODY}`; c.fillStyle = v("--muted"); c.fillText(A.legend[0], x0, y);
+  let lx = x0 + c.measureText(A.legend[0]).width + 16;
+  const grad = c.createLinearGradient(lx, 0, lx + 220, 0);
+  grad.addColorStop(0, v("--low")); grad.addColorStop(0.5, v("--mid")); grad.addColorStop(1, v("--high"));
+  roundRect(c, lx, y - 20, 220, 22, 11); c.fillStyle = grad; c.fill();
+  lx += 236; c.fillStyle = v("--muted"); c.fillText(A.legend[1], lx, y);
+  lx += c.measureText(A.legend[1]).width + 40;
+  c.setLineDash([6, 5]); c.strokeStyle = v("--seat-line"); c.lineWidth = 2; roundRect(c, lx, y - 22, 26, 26, 6); c.stroke(); c.setLineDash([]);
+  c.fillText(t("notOnSale"), lx + 38, y);
+  // key numbers
+  y += 40; const cells = [[t("season"), nf(g.season)], [t("singles"), nf(g.singles)], [t("revenue"), eur(g.revenue)]], colW = (x1 - x0) / 3;
+  cells.forEach(([label, val], i) => {
+    c.fillStyle = v("--muted"); c.font = `500 28px ${BODY}`; c.fillText(label, x0 + i * colW, y + 36);
+    c.fillStyle = v("--ink"); c.font = `700 52px ${HEAD}`; c.fillText(val, x0 + i * colW, y + 96);
+  });
+  const contentEnd = y + 116;
+  drawShareFooter(c, W, H, v, BODY);
+  return contentEnd;
 }
 
 function drawShare(c, g, W, H){
@@ -536,7 +690,7 @@ function drawShare(c, g, W, H){
   return contentEnd;
 }
 
-async function openShare(gid){
+async function openShare(gid, kind){
   const g = DATA.games.find((x) => x.id === gid); if (!g) return;
   const m = $("shareModal");
   m.setAttribute("aria-label", t("shareTitle"));
@@ -544,14 +698,16 @@ async function openShare(gid){
   $("shareGo").innerHTML = ICON_SHARE + `<span>${esc(t("share"))}</span>`;
   $("shareDl").innerHTML = ICON_DL + `<span>${esc(t("download"))}</span>`;
   $("shareX").setAttribute("aria-label", t("close"));
+  m.querySelector(".modal-box").style.setProperty("--ar", kind === "arena" ? "0.66" : "0.86");
   m.hidden = false; share.open = true; share.game = g;
   if (!(history.state && history.state.share)) history.pushState({ share: 1 }, "");   // phone/browser Back closes it
   $("shareX").focus();
-  const blob = await makeShareImage(g);
+  const { blob, ratio } = await makeShareImage(g, kind);
   if (!share.open || share.game !== g) return;
+  m.querySelector(".modal-box").style.setProperty("--ar", String(Math.min(0.95, ratio + 0.03)));
   if (share.url) URL.revokeObjectURL(share.url);
   share.url = URL.createObjectURL(blob);
-  const name = `ryto-bilietai-${g.start.slice(0, 10)}-${g.opp.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase()}.png`;
+  const name = `ryto-bilietai-${g.start.slice(0, 10)}-${g.opp.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").toLowerCase()}${kind === "arena" ? "-arena" : ""}.png`;
   share.file = new File([blob], name, { type: "image/png" });
   $("shareBody").innerHTML = `<img src="${share.url}" alt="${esc(g.opp + " · " + nf(g.taken) + " " + t("expected"))}">`;
   $("shareDl").href = share.url; $("shareDl").setAttribute("download", name);
