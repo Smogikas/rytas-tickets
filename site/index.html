@@ -14,7 +14,7 @@
 :root{
   --bg:#F6EFE2; --panel:#FFFAF0; --ink:#2A1C11; --muted:#6B5644; --line:#E2D3BA;
   --accent:#7B4A23; --accent-ink:#FFF8EC; --season:#6F6052; --single:#C47A2C; --free:#F6EFE2; --seat-line:#B8A386;
-  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46; --warn:#B4532A;
+  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46; --warn:#B4532A; --c1:#008C80; --c2:#C7701A;
   color-scheme: light;
 }
 /* dark: charcoal with amber; teal for the data (as in light) */
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
     --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E;
+    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
   --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E;
+  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -137,6 +137,36 @@ th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;whit
 th{font-size:12px;color:var(--muted);font-weight:600}
 th:first-child,td:first-child{text-align:left}
 tr.sel td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.chartwrap{position:relative;margin-top:10px}
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+svg.chart .grid{stroke:var(--line);stroke-width:1}
+svg.chart .zero{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+svg.chart .ax{fill:var(--muted);font:12px Inter,sans-serif}
+svg.chart .other{fill:none;stroke:var(--muted);stroke-width:1.5;opacity:.35}
+svg.chart .hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
+svg.chart .hit:hover+.other,svg.chart .other:hover{opacity:.8}
+svg.chart .me{fill:none;stroke:var(--c2);stroke-width:2.5;stroke-linejoin:round}
+svg.chart .medot{fill:var(--c2);stroke:var(--panel);stroke-width:2}
+svg.chart .lbl{fill:var(--ink);font:700 13px Inter,sans-serif}
+svg.chart .ev{fill:var(--ink);stroke:var(--panel);stroke-width:1.5}
+svg.chart .xhair{stroke:var(--muted);stroke-width:1}
+svg.chart .over{fill:transparent}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}
+.clegend{display:flex;flex-wrap:wrap;gap:14px;margin-top:6px;color:var(--muted)}
+.clegend span{display:inline-flex;align-items:center;gap:6px}
+.clegend .ln{width:18px;height:0;border-top:2.5px solid var(--c2)}.clegend .ln.other{border-top:1.5px solid var(--muted);opacity:.6}
+.clegend .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid var(--ink)}
+.clegend .sq{width:12px;height:12px;border-radius:3px}.sq.c1,.bar.c1{background:var(--c1)}.sq.c2,.bar.c2{background:var(--c2)}
+.sel{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 6px;max-width:220px}
+.evrow{padding:6px 0;border-top:1px solid var(--line)}.evrow:first-of-type{border-top:0}
+.evbars{display:grid;grid-template-columns:1fr auto;gap:3px 8px;align-items:center;margin-top:4px}
+.evbars .bar{display:block;height:10px;border-radius:0 4px 4px 0;min-width:2px}
+.bygrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.byrow{display:grid;grid-template-columns:1fr 80px 52px;gap:8px;align-items:center;padding:2px 0}
+.minibar.wide{width:80px}
+.smgrid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px;margin-top:10px;align-items:start}
+@media (max-width:760px){.smgrid{grid-template-columns:1fr}}
+.replay input[type=range]{width:100%;accent-color:var(--accent)}
 .zone{display:inline-flex;align-items:center;gap:6px}.zone i{width:12px;height:12px;border-radius:3px;border:1px solid var(--line)}
 .minibar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle;overflow:hidden}.minibar i{display:block;height:100%;background:var(--season)}
 td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration:underline;font-weight:600}
@@ -200,13 +230,26 @@ const T = {
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
     clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto kaina", avgValueSub: "su mokesčiais · klubui vid. {p}",
     vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
-    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}",
+    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", per24: "Per 24 val.", per24prev: "prieš tai",
     attendance: "Lankomumas", attVs: "laukta {e}", noAtt: "lankomumas dar neįrašytas",
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
     noGames: "Šiame sąraše rungtynių nėra.", noData: "vietų duomenys dar renkami",
     modeTaken: "% užimta", modePrice: "Kaina", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
+    salesMapTab: "Pardavimų žemėlapis", replay: "Pardavimų eiga", popular: "Populiarumas",
+    replayAt: "Būsena", replayNote: "Slinkite laiką: sektoriai nuspalvinti pagal tuo metu užimtų vietų dalį. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių.",
+    popNote: "Visų stebimų rungtynių vidurkis: kokia dalis parduodamų vietų (be abonementų) parduota pavieniais bilietais. Rodo, kurie sektoriai populiariausi.",
+    soldByThen: "Iki tol parduota pavienių: {n}", topSections: "Populiariausi sektoriai", play: "Groti", pause: "Stabdyti",
+    last24Title: "Pardavimai per paskutines 24 val.", trendLbl: "pokytis",
+    analysisTab: "Analizė", curveTitle: "Pavienių bilietų pardavimai iki rungtynių",
+    curveSub: "Parduota pavienių bilietų (iš viso) pagal dienas iki rungtynių pradžios. Linija prasideda nuo stebėjimo pradžios; pirmas taškas – bilietai, parduoti iki tol.",
+    rangeAll: "Visas", daysShort: "d.", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
+    priceChange: "kainos pokytis", priceChanges: "Kainų pokyčiai", noPriceChanges: "Šių rungtynių kainos nesikeitė.",
+    gameLbl: "Rungtynės", tipoff: "pradžia", evaTitle: "Laukta ir atėjo", evaSub: "Laukiama žiūrovų (prieš rungtynes) ir įrašytas lankomumas sužaistose rungtynėse.",
+    evaEmpty: "Bus rodoma, kai įrašysite lankomumą (Google Sheet, skirtukas „Rungtynės“, paskutinis stulpelis).",
+    expectedLbl: "laukta", actualLbl: "atėjo", gapLbl: "neatėjo", byTitle: "Lankomumas pagal", byOpp: "varžovą", byDay: "savaitės dieną",
+    byTime: "pradžios laiką", byComp: "turnyrą", avgAtt: "vid. lankomumas", nGames: "rungt.",
     seasonTab: "Abonementai", msSeats: "Abonementai", msSeatsSub: "vietos, užimtos abonementų visose rungtynėse",
     msRevenue: "Abonementų pajamos (įvert.)", msRevenueSub: "pagal klubo skelbtas narysčių kainas",
     msAvg: "Vid. narystės kaina", msAvgSub: "mažiausia – didžiausia", msPresale: "Uždaroje prekyboje",
@@ -250,13 +293,26 @@ const T = {
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
     clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket price", avgValueSub: "incl. fees · club gets avg {p}",
     vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
-    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}",
+    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", per24: "Last 24 h", per24prev: "24 h before",
     attendance: "Attendance", attVs: "expected {e}", noAtt: "attendance not recorded yet",
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
     noGames: "No games in this list.", noData: "seat data still being collected",
     modeTaken: "% taken", modePrice: "Price", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
+    salesMapTab: "Sales map", replay: "Sales replay", popular: "Popularity",
+    replayAt: "As of", replayNote: "Move the time: sections are coloured by the share of seats taken at that moment. Tickets sold before tracking began show as taken from the start.",
+    popNote: "Average over all tracked games: share of seats on sale (excl. season tickets) sold as single tickets. Shows which sections are most popular.",
+    soldByThen: "Single tickets sold by then: {n}", topSections: "Most popular sections", play: "Play", pause: "Pause",
+    last24Title: "Sales in the last 24 hours", trendLbl: "change",
+    analysisTab: "Insights", curveTitle: "Single-ticket sales before the game",
+    curveSub: "Single tickets sold (total) by days before tip-off. A line starts when tracking began; its first point is the tickets sold before then.",
+    rangeAll: "All", daysShort: "d", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
+    priceChange: "price change", priceChanges: "Price changes", noPriceChanges: "No price changes for this game.",
+    gameLbl: "Game", tipoff: "tip-off", evaTitle: "Expected vs attended", evaSub: "Expected crowd (before the game) and recorded attendance of played games.",
+    evaEmpty: "Shown once attendance is entered (Google Sheet, tab „Rungtynės“, last column).",
+    expectedLbl: "expected", actualLbl: "attended", gapLbl: "no-shows", byTitle: "Attendance by", byOpp: "opponent", byDay: "weekday",
+    byTime: "tip-off time", byComp: "competition", avgAtt: "avg attendance", nGames: "games",
     seasonTab: "Season tickets", msSeats: "Season tickets", msSeatsSub: "seats taken by memberships in every game",
     msRevenue: "Season-ticket revenue (est.)", msRevenueSub: "from the club's published membership prices",
     msAvg: "Avg membership price", msAvgSub: "lowest – highest", msPresale: "Closed presale",
@@ -299,7 +355,7 @@ const store = {
 };
 const S = {
   lang: store.get("lang", "lt"), theme: store.get("theme", "auto"), tab: store.get("tab", "games"),
-  when: "upcoming", comp: "all", sort: "date", game: store.get("game", null), sec: null, mode: "taken", seat: null
+  when: "upcoming", comp: "all", sort: "date", range: store.get("range", "14"), agame: null, smode: "replay", replayT: null, game: store.get("game", null), sec: null, mode: "taken", seat: null
 };
 let DATA = null;
 const seatCache = {};
@@ -362,16 +418,17 @@ function render(){
   document.querySelectorAll("[data-t]").forEach((n) => { n.textContent = t(n.dataset.t); });
   segButtons($("langSeg"), [["lt", "LT"], ["en", "EN"]], S.lang, (v) => { S.lang = v; store.set("lang", v); render(); }, "Language / Kalba");
   segButtons($("themeSeg"), [["auto", t("auto")], ["light", t("light")], ["dark", t("dark")]], S.theme, (v) => { S.theme = v; store.set("theme", v); setTheme(); render(); }, t("theme"));
-  segButtons($("tabSeg"), [["games", t("games")], ["arena", t("arena")], ["season", t("seasonTab")]], S.tab, (v) => { S.tab = v; store.set("tab", v); render(); }, t("games") + " / " + t("arena") + " / " + t("seasonTab"));
-  $("whenSeg").style.display = S.tab === "season" ? "none" : "";
-  $("kpis").style.display = S.tab === "season" ? "none" : "";
+  segButtons($("tabSeg"), [["games", t("games")], ["arena", t("arena")], ["season", t("seasonTab")], ["analysis", t("analysisTab")], ["salesmap", t("salesMapTab")]], S.tab, (v) => { S.tab = v; store.set("tab", v); render(); }, t("games") + " / " + t("arena") + " / " + t("seasonTab") + " / " + t("analysisTab") + " / " + t("salesMapTab"));
+  const own = S.tab === "season" || S.tab === "analysis" || S.tab === "salesmap";     // tabs with their own figures
+  $("whenSeg").style.display = own ? "none" : "";
+  $("kpis").style.display = own ? "none" : "";
   segButtons($("whenSeg"), [["upcoming", t("upcoming")], ["played", t("played")]], S.when, (v) => { S.when = v; S.game = null; render(); }, t("upcoming") + " / " + t("played"));
   $("foot").textContent = t("foot");
   if (!DATA) return;
   $("updated").textContent = t("updated", { d: dTime(DATA.updated) });
   renderHealth();
   renderKpis();
-  if (S.tab === "games") renderGames(); else if (S.tab === "season") renderSeason(); else renderArena();
+  if (S.tab === "games") renderGames(); else if (S.tab === "season") renderSeason(); else if (S.tab === "analysis") renderAnalysis(); else if (S.tab === "salesmap") renderSalesMap(); else renderArena();
 }
 
 function listGames(){
@@ -394,6 +451,232 @@ function renderHealth(){
   $("updated").appendChild(btn);
   const text = (w) => t("warn_" + w.code, { game: w.game || "", detail: w.detail || "–", d: w.since ? dTime(w.since) : "", h: w.hours });
   box.innerHTML = `<ul>${items.map((w) => `<li>${esc(text(w))}</li>`).join("")}</ul><a href="https://github.com/Smogikas/rytas-tickets/actions" target="_blank" rel="noopener">${esc(t("warnMore"))}</a>`;
+}
+
+// "Per 24 val. +12 ▲": single tickets seen sold in the last 24 h, arrow vs the 24 h before
+function trend24(g){
+  const a = g.sold24 || 0, b = g.sold24prev || 0;
+  const arrow = a > b ? ' <span aria-hidden="true">▲</span>' : a < b ? ' <span aria-hidden="true">▼</span>' : "";
+  return `${t("per24")} <b class="num">+${nf(a)}</b>${arrow}`;
+}
+
+// ---------------------------------------------------------------- insights tab
+const DAY = 864e5;
+function curveOf(g){                      // [[days before tip-off (<= 0), cumulative singles]]
+  const start = new Date(g.start).getTime(), pts = (g.sales || []).map(([h, n]) => [(new Date(h).getTime() - start) / DAY, n]);
+  if (!pts.length) return pts;
+  const end = Math.min(0, (Date.now() - start) / DAY);
+  if (end > pts[pts.length - 1][0]) pts.push([end, pts[pts.length - 1][1]]);   // flat to now / tip-off
+  return pts.filter((p) => p[0] <= 0.01);
+}
+function valueAt(pts, d){ let v = null; for (const [x, y] of pts){ if (x <= d) v = y; else break; } return v; }
+function renderAnalysis(){
+  const games = DATA.games.filter((g) => (g.sales || []).length).sort((a, b) => a.start.localeCompare(b.start));
+  if (!games.length){ $("view").innerHTML = `<div class="empty">${t("noData")}</div>`; return; }
+  const upcoming = games.filter((g) => !g.played);
+  const sel = games.find((g) => g.id === S.agame) || upcoming[0] || games[games.length - 1];
+  S.agame = sel.id;
+  const curves = games.map((g) => ({ g, pts: curveOf(g) }));
+  const minAll = Math.min(...curves.map((c) => c.pts.length ? c.pts[0][0] : 0));
+  const range = S.range === "all" ? Math.min(-1, Math.floor(minAll)) : -Number(S.range);
+  const vis = curves.map((c) => ({ g: c.g, pts: c.pts.filter((p) => p[0] >= range) , all: c.pts }));
+  // value at the left edge so a line entering the window starts at the right height
+  vis.forEach((c) => { const v = valueAt(c.all, range); if (v != null && (!c.pts.length || c.pts[0][0] > range)) c.pts.unshift([range, v]); });
+  const ymax = Math.max(10, ...vis.map((c) => Math.max(0, ...c.pts.map((p) => p[1]))));
+  // drawn at the real width (text stays at its normal size), shorter on phones
+  const W = Math.max(300, ($("view").clientWidth || 900) - 34), H = W < 600 ? 230 : 290, L = 48, R = 18, Tp = 14, B = 34;
+  const X = (d) => L + (d - range) / (0 - range) * (W - L - R), Y = (v) => Tp + (1 - v / ymax) * (H - Tp - B);
+  const step = (pts) => pts.map(([x, y], i) => (i ? `H${X(x).toFixed(1)}V${Y(y).toFixed(1)}` : `M${X(x).toFixed(1)},${Y(y).toFixed(1)}`)).join("");
+  const nice = (m) => { const e = Math.pow(10, Math.floor(Math.log10(m))), f = m / e; return (f <= 2 ? 0.5 : f <= 5 ? 1 : 2) * e; };
+  const yt = nice(ymax), yTicks = []; for (let v = 0; v <= ymax; v += yt) yTicks.push(v);
+  const maxTicks = W < 600 ? 4 : 8, xs = [1, 2, 5, 7, 14, 30, 60, 90].find((st) => -range / st <= maxTicks) || 180, xTicks = []; for (let d = 0; d >= range; d -= xs) xTicks.push(d);
+  const others = vis.filter((c) => c.g.id !== sel.id && c.pts.length > 1);
+  const me = vis.find((c) => c.g.id === sel.id);
+  const startMs = new Date(sel.start).getTime();
+  const evs = (sel.priceEvents || []).map((e) => ({ e, d: (new Date(e.ts).getTime() - startMs) / DAY })).filter((x) => x.d >= range && x.d <= 0);
+  const last = me.pts[me.pts.length - 1];
+  const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t("curveTitle") + ": " + sel.opp)}">
+    ${yTicks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${L - 8}" y="${Y(v)}" class="ax" text-anchor="end" dominant-baseline="central">${nf(v)}</text>`).join("")}
+    ${xTicks.map((d) => `<text x="${X(d)}" y="${H - B + 18}" class="ax" text-anchor="middle">${d === 0 ? t("tipoff") : d + " " + t("daysShort")}</text>`).join("")}
+    <line x1="${X(0)}" x2="${X(0)}" y1="${Tp}" y2="${H - B}" class="zero"/>
+    ${others.map((c) => `<path d="${step(c.pts)}" class="other" data-g="${esc(c.g.id)}"><title>${esc(c.g.opp + " · " + dShort(c.g.start) + " · " + nf(c.pts[c.pts.length - 1][1]) + " " + t("sold"))}</title></path>`).join("")}
+    ${others.map((c) => `<path d="${step(c.pts)}" class="hit" data-g="${esc(c.g.id)}"><title>${esc(c.g.opp + " · " + dShort(c.g.start))}</title></path>`).join("")}
+    <path d="${step(me.pts)}" class="me"/>
+    ${evs.map(({ e, d }) => { const v = valueAt(me.all, d) || 0, up = e.to > e.from;
+      return `<path d="M${X(d) - 6},${Y(v) - 16} h12 l-6,${up ? -9 : 9} z" transform="${up ? `translate(0,9)` : ""}" class="ev"><title>${esc(dTime(e.ts) + " · " + e.section + (e.zone ? " (" + e.zone + ")" : "") + ": " + eur(e.from) + " → " + eur(e.to))}</title></path>`; }).join("")}
+    ${last ? `<circle cx="${X(last[0])}" cy="${Y(last[1])}" r="4.5" class="medot"/><text x="${X(last[0]) - 8}" y="${Math.min(Y(last[1]) + 20, H - B - 4)}" class="lbl" text-anchor="end">${nf(last[1])}</text>` : ""}
+    <line class="xhair" y1="${Tp}" y2="${H - B}" style="display:none"/>
+    <rect x="${L}" y="${Tp}" width="${W - L - R}" height="${H - Tp - B}" class="over"/>
+  </svg>`;
+  const opts = games.map((g) => `<option value="${esc(g.id)}"${g.id === sel.id ? " selected" : ""}>${esc(dShort(g.start) + " · " + g.opp)}</option>`).join("");
+  const ranges = [["7", "7 " + t("daysShort")], ["14", "14 " + t("daysShort")], ["30", "30 " + t("daysShort")], ["all", t("rangeAll")]];
+  const evList = (sel.priceEvents || []).slice().reverse();
+  // played games with attendance
+  const played = DATA.games.filter((g) => g.played && g.attendance != null).sort((a, b) => a.start.localeCompare(b.start));
+  $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
+    <section class="panel" style="padding:14px 16px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+        <h2 style="margin:0;font-size:18px">${t("curveTitle")}</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label class="small muted">${t("gameLbl")} <select id="aGame" class="sel">${opts}</select></label>
+          <div class="seg" role="group" id="aRange"></div>
+        </div>
+      </div>
+      <div class="chartwrap" id="chartWrap">${svg}<div class="tip" id="aTip" hidden></div></div>
+      <div class="clegend small"><span><i class="ln me"></i>${esc(sel.opp)}</span><span><i class="ln other"></i>${t("otherGames")}</span>${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
+      <p class="note" style="margin:6px 0 0">${t("curveSub")}</p>
+    </section>
+    ${last24Table(upcoming)}
+    <section class="panel" style="padding:14px 16px">
+      <h3 style="margin:0 0 8px;font-size:15px">${t("priceChanges")} · ${esc(sel.opp)}</h3>
+      ${evList.length ? `<div class="hist">${evList.map((e) => `<div><span>${esc(dTime(e.ts))} · ${esc(e.section)}${e.zone ? ` <span class="muted">(${esc(e.zone)})</span>` : ""}</span><span class="num">${eur(e.from)} → <b>${eur(e.to)}</b> ${e.to > e.from ? "▲" : "▼"}</span></div>`).join("")}</div>` : `<div class="note">${t("noPriceChanges")}</div>`}
+    </section>
+    ${expectedVsActual(played)}
+    ${attendanceBy(played)}
+  </div>`;
+  segButtons($("aRange"), ranges, S.range, (v) => { S.range = v; store.set("range", v); render(); }, t("daysBefore"));
+  $("aGame").onchange = (ev) => { S.agame = ev.target.value; render(); };
+  $("view").querySelectorAll("path.hit").forEach((p) => p.addEventListener("click", () => { S.agame = p.dataset.g; render(); }));
+  // hover: crosshair + value of the selected game at that day
+  const wrap = $("chartWrap"), svgEl = wrap.querySelector("svg"), tip = $("aTip"), xh = svgEl.querySelector(".xhair");
+  const move = (cx) => {
+    const r = svgEl.getBoundingClientRect(), x = (cx - r.left) / r.width * W;
+    if (x < L || x > W - R){ tip.hidden = true; xh.style.display = "none"; return; }
+    const d = range + (x - L) / (W - L - R) * (0 - range), v = valueAt(me.all, d);
+    xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.style.display = "";
+    tip.innerHTML = `<b>${d >= -0.04 ? t("tipoff") : (-d).toFixed(d > -10 ? 1 : 0) + " " + t("daysShort")}</b><br>${esc(sel.opp)}: ${v == null ? "–" : nf(v) + " " + t("sold")}`;
+    tip.hidden = false;
+    const px = (x / W) * r.width;
+    tip.style.left = Math.min(px + 12, r.width - tip.offsetWidth - 4) + "px"; tip.style.top = "8px";
+  };
+  const over = svgEl.querySelector("rect.over");
+  over.addEventListener("pointermove", (e) => move(e.clientX));
+  over.addEventListener("pointerleave", () => { tip.hidden = true; xh.style.display = "none"; });
+}
+function last24Table(gs){
+  if (!gs.length) return "";
+  return `<section class="panel tablebox sb"><table><caption class="small muted" style="text-align:left;padding:10px 12px">${t("last24Title")}</caption>
+    <thead><tr><th scope="col">${t("gameLbl")}</th><th scope="col">${t("per24")}</th><th scope="col">${t("per24prev")}</th><th scope="col">${t("singles")}</th></tr></thead>
+    <tbody>${gs.map((g) => { const a = g.sold24 || 0, b = g.sold24prev || 0;
+      return `<tr><td>${esc(dShort(g.start))} · ${esc(g.opp)}</td><td class="num"><b>+${nf(a)}</b> ${a > b ? "▲" : a < b ? "▼" : ""}</td><td class="num">+${nf(b)}</td><td class="num">${nf(g.singles)}</td></tr>`; }).join("")}</tbody></table></section>`;
+}
+function expectedVsActual(played){
+  if (!played.length) return `<section class="panel" style="padding:14px 16px"><h3 style="margin:0 0 6px;font-size:15px">${t("evaTitle")}</h3><div class="note">${t("evaEmpty")}</div></section>`;
+  const max = Math.max(...played.map((g) => Math.max(expectedOf(g), g.attendance)));
+  const rows = played.map((g) => { const e = expectedOf(g), a = g.attendance;
+    return `<div class="evrow"><div class="small"><b>${esc(g.opp)}</b> <span class="muted">${esc(dShort(g.start))} · ${esc(g.comp)}</span></div>
+      <div class="evbars" title="${esc(t("expectedLbl") + " " + nf(e) + " · " + t("actualLbl") + " " + nf(a))}">
+        <span class="bar c1" style="width:${(100 * e / max).toFixed(1)}%"></span><span class="num small">${nf(e)}</span>
+        <span class="bar c2" style="width:${(100 * a / max).toFixed(1)}%"></span><span class="num small">${nf(a)}${e > a ? ` <span class="muted">(${t("gapLbl")} ${nf(e - a)}, ${pct(e - a, e).toFixed(0)}%)</span>` : ""}</span>
+      </div></div>`; }).join("");
+  return `<section class="panel" style="padding:14px 16px"><h3 style="margin:0 0 4px;font-size:15px">${t("evaTitle")}</h3>
+    <div class="clegend small" style="margin:0 0 8px"><span><i class="sq c1"></i>${t("expectedLbl")}</span><span><i class="sq c2"></i>${t("actualLbl")}</span></div>
+    ${rows}<p class="note" style="margin:8px 0 0">${t("evaSub")}</p></section>`;
+}
+function attendanceBy(played){
+  if (!played.length) return "";
+  const wd = (g) => fmt(g.start, { weekday: "long" }), hr = (g) => fmt(g.start, { hour: "2-digit", minute: "2-digit" });
+  const group = (key) => { const m = {}; played.forEach((g) => { const k = key(g); (m[k] = m[k] || []).push(g.attendance); });
+    return Object.entries(m).map(([k, v]) => [k, v.reduce((a, b) => a + b, 0) / v.length, v.length]).sort((a, b) => b[1] - a[1]); };
+  const max = Math.max(...played.map((g) => g.attendance));
+  const block = (title, rows) => `<div><div class="small muted" style="margin-bottom:4px">${t("byTitle")} ${title}</div>${rows.map(([k, v, n]) =>
+    `<div class="byrow small"><span>${esc(k)} <span class="muted">(${n} ${t("nGames")})</span></span><span class="minibar wide"><i style="width:${(100 * v / max).toFixed(0)}%"></i></span><span class="num">${nf(v)}</span></div>`).join("")}</div>`;
+  return `<section class="panel" style="padding:14px 16px"><div class="bygrid">
+    ${block(t("byOpp"), group((g) => g.opp))}${block(t("byDay"), group(wd))}${block(t("byTime"), group(hr))}${block(t("byComp"), group((g) => g.comp))}
+  </div><p class="note" style="margin:8px 0 0">${t("avgAtt")}</p></section>`;
+}
+
+// ---------------------------------------------------------------- sales map tab
+let replayTimer = null;
+function mapSvg(shapes, cell){        // cell(id) -> {fill, label, title, cls} or null (not drawn as data)
+  const polys = shapes.map(([id, pts]) => { const c = cell(id);
+    return `<polygon points="${esc(pts)}" fill="${c ? c.fill : cssVar("--closed")}" class="${c ? c.cls || "" : "closed"}">${c && c.title ? `<title>${esc(c.title)}</title>` : ""}</polygon>`; }).join("");
+  const labels = shapes.map(([id, pts]) => { const c = cell(id); if (!c || !c.label) return "";
+    const [cx, cy] = polyCenter(pts.split(" ").map((p) => p.split(",").map(Number)));
+    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${c.ink}">${esc(c.label)}</text>`; }).join("");
+  return `<svg class="map" viewBox="0 0 1000 1000" role="img">
+    <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
+    <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
+    <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>${polys}${labels}</svg>`;
+}
+function renderSalesMap(){
+  if (replayTimer && S.smode !== "replay"){ clearInterval(replayTimer); replayTimer = null; }
+  const gs = DATA.games.filter((g) => (g.sales || []).length).sort((a, b) => a.start.localeCompare(b.start));
+  if (!gs.length){ $("view").innerHTML = `<div class="empty">${t("noData")}</div>`; return; }
+  const sel = gs.find((g) => g.id === S.agame) || gs.find((g) => !g.played) || gs[gs.length - 1];
+  S.agame = sel.id;
+  const { scale, labelInk } = arenaColors(sel);
+  const shapes = DATA.shapes[sel.conf] || [];
+  const opts = gs.map((g) => `<option value="${esc(g.id)}"${g.id === sel.id ? " selected" : ""}>${esc(dShort(g.start) + " · " + g.opp)}</option>`).join("");
+  const head = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+      <div class="seg" role="group" id="smSeg"></div>
+      ${S.smode === "replay" ? `<label class="small muted">${t("gameLbl")} <select id="smGame" class="sel">${opts}</select></label>` : ""}</div>`;
+  if (S.smode === "popular"){
+    const pop = DATA.popularity || {};
+    const vals = Object.values(pop).map((p) => p.pct).filter((v) => v != null);
+    const hi = Math.max(1, ...vals);
+    const cell = (id) => { const p = pop[id]; if (!p || p.pct == null) return null; const fill = scale(p.pct / hi);
+      return { fill, label: shortTitle(p.title), ink: labelInk(fill), title: `${p.title}: ${p.pct.toFixed(0)}% (${gamesN(p.games)})` }; };
+    const top = Object.values(pop).filter((p) => p.pct != null).sort((a, b) => b.pct - a.pct).slice(0, 8);
+    $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
+      <div class="smgrid"><div>${mapSvg(shapes, cell)}
+        <div class="legend"><span>0%</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${hi.toFixed(0)}%</span></div></div>
+        <div><h3 style="margin:0 0 6px;font-size:15px">${t("topSections")}</h3>${top.map((p) => `<div class="byrow small"><span>${esc(p.title)}</span><span class="minibar wide"><i style="width:${(100 * p.pct / hi).toFixed(0)}%"></i></span><span class="num">${p.pct.toFixed(0)}%</span></div>`).join("")}</div></div>
+      <p class="note" style="margin:8px 0 0">${t("popNote")}</p></section></div>`;
+  } else {
+    $("view").innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><section class="panel" style="padding:14px 16px">${head}
+      <div id="smBody" class="note" style="margin-top:10px">…</div></section></div>`;
+    loadSeats(sel.id).then((seats) => {
+      if (S.tab !== "salesmap" || S.smode !== "replay" || S.agame !== sel.id) return;
+      const t0 = new Date(sel.dataFrom || sel.sales[0][0]).getTime(), t1 = Math.min(Date.now(), new Date(sel.start).getTime());
+      const hours = Math.max(1, Math.round((t1 - t0) / 36e5));
+      if (S.replayT == null || S.replayT > hours) S.replayT = hours;
+      const secsById = {}; (DATA.sections[sel.id] || []).forEach((x) => { secsById[x.id] = x; });
+      const fanIds = new Set((sel.fanSections || []).map((f) => f.id));
+      const draw = () => {
+        const T = t0 + S.replayT * 36e5;
+        let soldThen = 0;
+        const share = {};
+        for (const [sid, list] of Object.entries(seats)){
+          let n = 0, k = 0;
+          for (const q of list){ const cat = q[4]; if (cat === "X") continue; n++;
+            const taken = cat === "S" || cat === "F" || cat === "B" || (cat === "O" && q[7] && new Date(q[7]).getTime() <= T);
+            if (taken) k++; if (cat === "B" || (cat === "O" && taken)) soldThen++; }
+          if (n) share[sid] = k / n;
+        }
+        const cell = (id) => { if (fanIds.has(id)) return { fill: cssVar("--fan"), label: "", cls: "fan" };
+          if (share[id] == null) return null; const fill = scale(share[id]);
+          const x = secsById[id]; return { fill, label: x ? shortTitle(x.title) : "", ink: labelInk(fill), title: `${x ? x.title : id}: ${(100 * share[id]).toFixed(0)}%` }; };
+        $("smMap").innerHTML = mapSvg(shapes, cell);
+        $("smWhen").textContent = dTime(new Date(T).toISOString());
+        $("smSold").textContent = t("soldByThen", { n: nf(soldThen) });
+      };
+      $("smBody").className = "";
+      $("smBody").innerHTML = `<div class="smgrid"><div><div id="smMap"></div>
+          <div class="legend"><span>${t("low")}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>100%</span>${sel.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}</div></div>
+        <div class="replay"><div class="small muted">${t("replayAt")}</div><div class="disp" style="font-size:20px;font-weight:700" id="smWhen"></div>
+          <div class="small" id="smSold" style="margin:2px 0 10px"></div>
+          <input type="range" id="smRange" min="0" max="${hours}" step="1" value="${S.replayT}" aria-label="${esc(t("replayAt"))}">
+          <div style="display:flex;justify-content:space-between" class="small muted"><span>${esc(dTime(new Date(t0).toISOString()))}</span><span>${esc(dTime(new Date(t1).toISOString()))}</span></div>
+          <button type="button" class="btn" id="smPlay" style="margin-top:10px">${replayTimer ? t("pause") : t("play")}</button>
+          <p class="note" style="margin:10px 0 0">${t("replayNote")}</p></div></div>`;
+      draw();
+      $("smRange").oninput = (e) => { S.replayT = Number(e.target.value); draw(); };
+      $("smPlay").onclick = () => {
+        if (replayTimer){ clearInterval(replayTimer); replayTimer = null; $("smPlay").textContent = t("play"); return; }
+        if (S.replayT >= hours) S.replayT = 0;
+        const stepH = Math.max(1, Math.round(hours / 60));
+        replayTimer = setInterval(() => {
+          if (S.tab !== "salesmap" || !$("smRange")){ clearInterval(replayTimer); replayTimer = null; return; }
+          S.replayT = Math.min(hours, S.replayT + stepH); $("smRange").value = S.replayT; draw();
+          if (S.replayT >= hours){ clearInterval(replayTimer); replayTimer = null; $("smPlay").textContent = t("play"); }
+        }, 120);
+        $("smPlay").textContent = t("pause");
+      };
+    });
+  }
+  segButtons($("smSeg"), [["replay", t("replay")], ["popular", t("popular")]], S.smode, (v) => { S.smode = v; render(); }, t("salesMapTab"));
+  const gsel = $("smGame"); if (gsel) gsel.onchange = (e) => { S.agame = e.target.value; S.replayT = null; render(); };
 }
 
 // ---------------------------------------------------------------- season tickets tab
@@ -466,7 +749,7 @@ function renderGames(){
       ` : `<div class="small muted">${t("noData")}</div>`}
       ${att}
     </button>
-    <div class="card-foot"><span class="small muted">${has ? t("seen", { n: nf(g.seen) }) : ""}</span>
+    <div class="card-foot"><span class="small muted">${has ? (g.played ? t("seen", { n: nf(g.seen) }) : trend24(g) + " · " + t("seenShort", { n: nf(g.seen) })) : ""}</span>
       <button type="button" class="btn" data-share="${esc(g.id)}" aria-label="${esc(t("share") + ": " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
     </article>`;
   }).join("");
@@ -630,6 +913,10 @@ function scrollIndicator(el, bar, thumb, key){
   bar.addEventListener("pointerup", end); bar.addEventListener("pointercancel", end);
   if (window._sbResize) window.removeEventListener("resize", window._sbResize);
   window._sbResize = update; window.addEventListener("resize", update);
+  if (!window._chartResize){         // the insights chart is drawn at the real width: redraw on resize
+    let tm; window._chartResize = true;
+    window.addEventListener("resize", () => { clearTimeout(tm); tm = setTimeout(() => { if (S.tab === "analysis") render(); }, 200); });
+  }
   update();
 }
 

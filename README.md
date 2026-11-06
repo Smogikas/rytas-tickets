@@ -14,6 +14,13 @@ seat by seat, with a live web page:
 - **Season tickets** (Abonementai): season seats per section with the club's 2026/27 membership
   prices and a revenue range (low = holders renewed at the renewal price where there was one,
   high = all paid the open-sale price).
+- **Insights** (Analizė): single-ticket sales curves by days before tip-off (7 / 14 / 30 days / all;
+  the selected game against the others), price changes marked on the curve and listed, sales in
+  the last 24 h for every game, and for played games expected vs attended and attendance by
+  opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).
+- **Sales map** (Pardavimų žemėlapis): replay how a game's sections filled up over time (slider /
+  play), and section popularity across all games.
+- Game cards show tickets sold in the last 24 h (▲/▼ against the 24 h before).
 - Lithuanian / English, light / dark (follows the system by default).
 
 Everything runs on GitHub Actions; the collected data is stored in a Google Sheet, not in

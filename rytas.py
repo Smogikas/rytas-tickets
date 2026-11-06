@@ -740,9 +740,12 @@ def analyse_event(tl, price_rows, season, names=None):
     keys = ["seats", "available", "taken", "season", "sold_seen", "pre_taken"]
     sec = defaultdict(lambda: dict({k: 0 for k in keys}, revenue=0.0, gross=0.0))
     count_key = {SEASON: "season", SOLD_SEEN: "sold_seen", SOLD_BEFORE: "pre_taken", AVAILABLE: "available"}
+    sale_times = []                   # when each single ticket sold while tracked was seen
     for seat, (sid, cat, p, f, _ts) in classify_seats(tl, prices, season).items():
         if cat == BLOCKED:
             continue
+        if cat == SOLD_SEEN:
+            sale_times.append(_ts)
         x = sec[sid]
         x["seats"] += 1
         x[count_key[cat]] += 1
@@ -796,8 +799,19 @@ def analyse_event(tl, price_rows, season, names=None):
     tot["avg_paid"] = tot["gross"] / tot["singles"] if tot["singles"] else None
     tot["sections"] = len(sections)
     tot["first_ts"] = first_ts
+    # price changes (per zone; a zone selling out is not a change)
+    events = []
+    for x in sections:
+        multi = len(x["zones"]) > 1
+        for z in x["zones"]:
+            h = z["history"]
+            for (t0, p0, _f0), (t1, p1, _f1) in zip(h, h[1:]):
+                if p1 != p0:
+                    events.append({"ts": t1, "section": x["section"], "zone": z["name"] if multi else None,
+                                   "from": p0, "to": p1})
     tot["last_ts"] = max((rows[-1]["ts_utc"] for rows in tl.values()), default=None)
-    return {"sections": sections, "totals": tot}
+    return {"sections": sections, "totals": tot, "sale_times": sorted(sale_times),
+            "price_events": sorted(events, key=lambda e: e["ts"])}
 
 
 def analyse_all(ev, with_seats=False):
@@ -1186,6 +1200,40 @@ def r2(x):
     return None if x is None else round(x, 2)
 
 
+def sales_curve(first_ts, before, sale_times):
+    """Single tickets sold over time: [[hour (UTC, ISO), cumulative]], starting with
+    the ones sold before tracking at the first observation; one point per hour with sales."""
+    if not first_ts:
+        return []
+    hour = lambda ts: parse_ts(ts).strftime("%Y-%m-%dT%H:00:00Z")
+    out, n = [[hour(first_ts), before]], before
+    for ts in sale_times:
+        n += 1
+        h = hour(ts)
+        if out[-1][0] == h:
+            out[-1][1] = n
+        else:
+            out.append([h, n])
+    return out
+
+
+def popularity(res, ev):
+    """Per section across all games: share of seats on sale (not season tickets) that were
+    sold as single tickets -> {section_id: {"title", "pct", "games"}}."""
+    acc = defaultdict(lambda: [0, 0, 0, ""])
+    for eid in ev["events"]:
+        for x in res[eid]["sections"]:
+            if x.get("whole"):
+                continue
+            a = acc[x["section_id"]]
+            a[0] += x["singles"]
+            a[1] += max(0, x["seats"] - x["season"])
+            a[2] += 1
+            a[3] = x["section"]
+    return {sid: {"title": a[3], "pct": round(100 * a[0] / a[1], 1) if a[1] else None, "games": a[2]}
+            for sid, a in acc.items()}
+
+
 def membership_table(ev, res):
     """Season seats per section with membership prices and a revenue range: low = every
     holder paid the renewal price (where there was one), high = all paid the open price."""
@@ -1280,6 +1328,11 @@ def cmd_export(args):
             "revenue": r2(t["revenue"]), "gross": r2(t["gross"]),
             "avg": r2(t["avg_price"]), "avgPaid": r2(t["avg_paid"]),
             "attendance": attendance.get(eid), "dataFrom": t["first_ts"], "dataTo": t["last_ts"],
+            "sales": sales_curve(t["first_ts"], t["pre_taken"], r.get("sale_times", [])),
+            "sold24": sum(1 for x in r.get("sale_times", []) if parse_ts(x) > now - timedelta(hours=24)),
+            "sold24prev": sum(1 for x in r.get("sale_times", [])
+                              if now - timedelta(hours=48) < parse_ts(x) <= now - timedelta(hours=24)),
+            "priceEvents": r.get("price_events", []),
         })
         sections[eid] = [{
             "id": x["section_id"], "title": x["section"], "price": x["price"], "fee": x["fee"],
@@ -1316,7 +1369,7 @@ def cmd_export(args):
         arena_cap[conf] = sum(cap.get(sid, 0) for sid, _pts in shp)
     data = {"updated": now_utc(), "seasonSeats": any_res.get("season_total", 0),
             "games": games, "sections": sections, "shapes": shapes, "arenaCap": arena_cap,
-            "membership": membership_table(ev, res),
+            "membership": membership_table(ev, res), "popularity": popularity(res, ev),
             "warnings": health_warnings(ev, res, now)}
     (out / "data.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"Exported {len(games)} games to {out}")

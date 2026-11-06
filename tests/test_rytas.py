@@ -341,6 +341,21 @@ class Zones(unittest.TestCase):
         self.assertEqual(rytas.price_at(pl, "S", "T1", "1370"), (99.0, 7.0))  # this game's 21-ta kaina
         self.assertEqual(rytas.price_at(rytas.price_lookup(old), "S", "T1", "1370"), (89.0, 7.0))  # without: cheapest
 
+    def test_sales_curve_and_price_events(self):
+        curve = rytas.sales_curve("2026-11-05T22:23:12+00:00", 10,
+                                  ["2026-11-06T08:05:00+00:00", "2026-11-06T08:40:00+00:00", "2026-11-06T11:00:00+00:00"])
+        self.assertEqual(curve, [["2026-11-05T22:00:00Z", 10], ["2026-11-06T08:00:00Z", 12], ["2026-11-06T11:00:00Z", 13]])
+        self.assertEqual(rytas.sales_curve(None, 0, []), [])
+        r = self.rows([("2026-11-06T08:00:00+00:00", "21-ta kaina", "1370", 79.0, 14), ("2026-11-06T08:00:00+00:00", "22-ta kaina", "1371", 69.0, 14),
+                       ("2026-11-06T10:00:00+00:00", "22-ta kaina", "1371", 69.0, 9),      # sales only
+                       ("2026-11-06T12:00:00+00:00", "22-ta kaina", "1371", 59.0, 9)])     # price cut
+        tl = {"x": [{"ts_utc": "2026-11-06T08:00:00+00:00", "section_id": "S", "seat_id": "x", "status": 1, "price_class": "1371"},
+                    {"ts_utc": "2026-11-06T13:00:00+00:00", "section_id": "S", "seat_id": "x", "status": 0, "price_class": "1371"}]}
+        res = rytas.analyse_event(tl, r, set())
+        self.assertEqual(res["price_events"], [{"ts": "2026-11-06T12:00:00+00:00", "section": "Sec", "zone": "22-ta kaina",
+                                                "from": 69.0, "to": 59.0}])
+        self.assertEqual(res["sale_times"], ["2026-11-06T13:00:00+00:00"])
+
     def test_recent_sales(self):
         log = [{"ts_utc": "2026-11-06T10:00:00+00:00", "section_id": "S", "seat_id": str(i), "status": 1} for i in range(5)]
         log += [{"ts_utc": "2026-11-06T20:00:00+00:00", "section_id": "S", "seat_id": str(i), "status": 0} for i in range(3)]
@@ -712,6 +727,11 @@ class Commands(Base):
         self.assertEqual(m["presale"], rytas.MEMBERSHIPS_PRESALE)
         self.assertEqual(m["total"], sum(r["season"] for r in m["rows"]))
         self.assertLessEqual(m["low"], m["high"])
+        g = next(x for x in d["games"] if x["id"] == "PNJMMUNJYB")
+        self.assertTrue(g["sales"] and g["sales"][0][1] == g["before"])   # curve starts with pre-tracking sales
+        self.assertIn("sold24", g)
+        self.assertIn("priceEvents", g)
+        self.assertTrue(d["popularity"])
         # bilietai.lt answers nothing: one warning, not one per game
         with unittest.mock.patch.object(rytas, "get_json", side_effect=OSError("HTTP 403")):
             self.snapshot_all()
