@@ -2,45 +2,48 @@
 """Google Sheet storage for rytas.py, so collected data is not kept in the repo.
 
   python sheets.py pull   Sheet -> local working files (data/, events.json)
-  python sheets.py push   new local rows -> Sheet (append); events/series rewritten
+  python sheets.py push   new local rows -> Sheet
 
-Tabs: events, series, prices, layout, shapes, attendance, seats_<game id>.
-Rows are only ever appended (except events/series, which are small and
-rewritten). You can type actual attendance straight into the "attendance" tab.
+Tabs
+  Rungtynės               overview, one row per game (rewritten each run). The last
+                          column "Lankomumas (įrašykite)" is yours: type actual
+                          attendance there; the job never overwrites it.
+  <date> <opponent>       one tab per game, e.g. "2026-11-11 Nanterre 92": every price
+                          change ("kaina" rows) and seat change ("vieta" rows), append-only
+  _events _series _layout _shapes   hidden technical tabs
 
-Needs env SHEET_ID and GOOGLE_SA_KEY (a service account's JSON key; the
-sheet must be shared with that account as Editor) and `pip install google-auth requests`.
+Needs env SHEET_ID and GOOGLE_SA_KEY (a service account's JSON key; the sheet
+shared with that account as Editor) and `pip install google-auth requests`.
 """
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
 import rytas
 
 API = "https://sheets.googleapis.com/v4/spreadsheets"
-STATE = rytas.DATA / ".sheet_state.json"   # rows per tab at pull time
-CHUNK = 10000                              # rows per append request
+STATE = rytas.DATA / ".sheet_state.json"
+CHUNK = 10000                     # rows per append request
 
-EVENT_FIELDS = ["id", "name", "start_utc", "series_id", "status", "conf_id", "last_seats_utc"]
+OVERVIEW = "Rungtynės"
+OVERVIEW_HEAD = ["ID", "Data (Vilnius)", "Turnyras", "Varžovas", "Būsena", "Laukiama žiūrovų",
+                 "Abonementai", "Pavieniai bilietai", "Laisvi bilietai", "Klubo pajamos €",
+                 "Vid. bilieto vertė €", "Lankomumas (įrašykite)"]
+ATT_COL = "L"                     # attendance column, typed by the user
+GAME_HEAD = ["Laikas (UTC)", "Įrašas", "Sektoriaus ID", "Sektorius", "Zona / kainų klasė",
+             "Bilieto tipas", "Kaina €", "Mokesčiai €", "Laisva sektoriuje (iki 22)",
+             "Vietos ID", "Eilė", "Vieta", "Būsena (1 laisva, 0 užimta)"]
+PRICE, SEAT = "kaina", "vieta"
+EVENT_FIELDS = ["id", "name", "start_utc", "series_id", "status", "conf_id", "last_seats_utc", "tab"]
 SERIES_FIELDS = ["id", "title"]
-
-
-def tables(events=()):
-    """tab name -> (local file, columns) for append-only tables."""
-    t = {
-        "prices": (rytas.SNAPSHOTS, rytas.SNAP_FIELDS),
-        "layout": (rytas.LAYOUT, rytas.LAYOUT_FIELDS),
-        "shapes": (rytas.SHAPES, rytas.SHAPE_FIELDS),
-        "attendance": (rytas.ATTENDANCE, rytas.ATT_FIELDS),
-    }
-    for eid in events:
-        t[f"seats_{eid}"] = (rytas.seat_path(eid), rytas.SEAT_FIELDS)
-    return t
+HIDDEN = {"_events": EVENT_FIELDS, "_series": SERIES_FIELDS,
+          "_layout": rytas.LAYOUT_FIELDS, "_shapes": rytas.SHAPE_FIELDS}
+DEFAULT_TABS = ("Sheet1", "Lapas1")
 
 
 # ------------------------------------------------------------------ HTTP
@@ -81,52 +84,109 @@ def request(method, path, params=None, body=None):
             raise
 
 
-def tab_names():
-    meta = request("GET", "", {"fields": "sheets.properties.title"})
-    return [s["properties"]["title"] for s in meta.get("sheets", [])]
+def rng(tab, cells=""):
+    """A1 range for a tab, quoted (titles have spaces)."""
+    return f"'{tab}'" + (f"!{cells}" if cells else "")
 
 
-def add_tab(name, columns):
-    request("POST", ":batchUpdate", body={"requests": [{"addSheet": {"properties": {
-        "title": name, "gridProperties": {"rowCount": 1, "columnCount": len(columns), "frozenRowCount": 1}}}}]})
-    request("PUT", f"/values/{urllib.parse.quote(name)}!A1", {"valueInputOption": "RAW"},
-            {"values": [columns]})
+def vpath(r, suffix=""):
+    return "/values/" + urllib.parse.quote(r, safe="") + suffix
 
 
-def read_tabs(names):
-    """name -> list of rows (lists of strings), header included."""
-    if not names:
+def sheet_props():
+    meta = request("GET", "", {"fields": "sheets.properties(sheetId,title,index,hidden)"})
+    return {s["properties"]["title"]: s["properties"] for s in meta.get("sheets", [])}
+
+
+def add_tab(title, head, hidden=False, index=None):
+    props = {"title": title, "hidden": hidden,
+             "gridProperties": {"rowCount": 1, "columnCount": len(head), "frozenRowCount": 1}}
+    if index is not None:
+        props["index"] = index
+    request("POST", ":batchUpdate", body={"requests": [{"addSheet": {"properties": props}}]})
+    request("PUT", vpath(rng(title, "A1")), {"valueInputOption": "RAW"}, {"values": [head]})
+
+
+def read_tabs(titles):
+    """title -> list of rows (lists of strings), header included."""
+    if not titles:
         return {}
-    res = request("GET", "/values:batchGet", {"ranges": [f"'{n}'" for n in names],
+    res = request("GET", "/values:batchGet", {"ranges": [rng(t) for t in titles],
                                               "valueRenderOption": "UNFORMATTED_VALUE"})
-    out = {}
-    for n, vr in zip(names, res.get("valueRanges", [])):
-        out[n] = [["" if v is None else str(v) for v in row] for row in vr.get("values", [])]
-    return out
+    return {t: [["" if v is None else str(v) for v in row] for row in vr.get("values", [])]
+            for t, vr in zip(titles, res.get("valueRanges", []))}
 
 
-def append_rows(name, rows):
+def append_rows(title, rows):
     for i in range(0, len(rows), CHUNK):
-        request("POST", f"/values/{urllib.parse.quote(name)}!A1:append",
-                {"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"},
-                {"values": rows[i:i + CHUNK]})
+        request("POST", vpath(rng(title, "A1"), ":append"),
+                {"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"}, {"values": rows[i:i + CHUNK]})
 
 
-def rewrite(name, columns, rows):
-    request("POST", f"/values/{urllib.parse.quote(name)}:clear", body={})
-    request("PUT", f"/values/{urllib.parse.quote(name)}!A1", {"valueInputOption": "RAW"},
-            {"values": [columns] + rows})
+def rewrite(title, head, rows):
+    request("POST", vpath(rng(title), ":clear"), body={})
+    request("PUT", vpath(rng(title, "A1")), {"valueInputOption": "RAW"}, {"values": [head] + rows})
 
 
-# --------------------------------------------------------------- pull/push
+# --------------------------------------------------------------- helpers
 
 def to_dicts(rows, columns):
-    """Sheet rows -> dicts by the sheet's own header (columns missing there stay empty)."""
+    """Rows of a hidden tab -> dicts by that tab's own header."""
     if not rows:
         return []
     head = rows[0]
     return [{c: (r[head.index(c)] if c in head and head.index(c) < len(r) else "") for c in columns}
             for r in rows[1:] if any(r)]
+
+
+def cell(row, i):
+    return row[i] if i < len(row) else ""
+
+
+def num(v):
+    """Numbers as numbers in the Sheet (nicer to read and sum)."""
+    try:
+        f = float(v)
+        return int(f) if f.is_integer() else f
+    except (TypeError, ValueError):
+        return v
+
+
+def game_tab_title(meta, taken):
+    """'2026-11-11 Nanterre 92' from the start date and the opponent's team name."""
+    _comp, opp = rytas.split_name(meta["name"])
+    m = re.search(r"„(.+?)“", opp)
+    short = re.sub(r"[\[\]'*?:/\\\"„“]", "", m.group(1) if m else opp).strip()
+    title = f"{meta['start_utc'][:10]} {short}"[:90]
+    n, base = 2, title
+    while title in taken:
+        title, n = f"{base} ({n})", n + 1
+    return title
+
+
+def price_to_row(r):
+    return [r["ts_utc"], PRICE, r["section_id"], r["section"], r["zone"], r["ticket_type_id"],
+            num(r["price"]), num(r["fee"]), num(r["available"]), "", "", "", ""]
+
+
+def seat_to_row(r, titles):
+    return [r["ts_utc"], SEAT, r["section_id"], titles.get(r["section_id"], ""), r["price_class"], "",
+            "", "", "", r["seat_id"], r["row"], r["place"], num(r["status"])]
+
+
+def split_game_rows(eid, rows):
+    """Game tab rows -> (price dicts, seat dicts), by column position."""
+    prices, seats = [], []
+    for r in rows[1:]:
+        kind = cell(r, 1)
+        if kind == PRICE:
+            prices.append({"ts_utc": cell(r, 0), "event_id": eid, "section_id": cell(r, 2), "section": cell(r, 3),
+                           "zone": cell(r, 4), "ticket_type_id": cell(r, 5), "price": cell(r, 6),
+                           "fee": cell(r, 7), "available": cell(r, 8)})
+        elif kind == SEAT:
+            seats.append({"ts_utc": cell(r, 0), "section_id": cell(r, 2), "seat_id": cell(r, 9), "row": cell(r, 10),
+                          "place": cell(r, 11), "price_class": cell(r, 4), "status": cell(r, 12)})
+    return prices, seats
 
 
 def write_local(path, columns, dicts):
@@ -136,54 +196,153 @@ def write_local(path, columns, dicts):
     rytas.append_csv(path, columns, dicts)
 
 
+# --------------------------------------------------------------- pull/push
+
 def pull():
-    names = tab_names()
-    ours = [n for n in names if n in ("events", "series") or n in tables() or n.startswith("seats_")]
-    data = read_tabs(ours)
-    state = {}
-    if "events" in data:
-        ev = {"series": {s["id"]: s["title"] for s in to_dicts(data.get("series", []), SERIES_FIELDS)},
-              "events": {}}
-        for e in to_dicts(data["events"], EVENT_FIELDS):
-            ev["events"][e["id"]] = {k: e[k] for k in EVENT_FIELDS[1:] if e[k] != ""}
-        rytas.save_json(rytas.EVENTS, ev)
-    seat_tabs = [n[len("seats_"):] for n in data if n.startswith("seats_")]
-    for name, (path, columns) in tables(seat_tabs).items():
-        if name in data:
-            dicts = to_dicts(data[name], columns)
-            write_local(path, columns, dicts)
-            state[name] = len(dicts)
-        else:
-            state[name] = 0          # first run: local rows (if any) get uploaded by push
-    rytas.DATA.mkdir(parents=True, exist_ok=True)
+    tabs = sheet_props()
+    state = {"order": [], "att": {}, "counts": {}}
+    if "_events" not in tabs:
+        # empty Sheet (first run): keep any local files; push uploads them all
+        rytas.DATA.mkdir(parents=True, exist_ok=True)
+        rytas.save_json(STATE, state)
+        print("Sheet has no data yet")
+        return
+    head = read_tabs([t for t in ("_events", "_series", "_layout", "_shapes", OVERVIEW) if t in tabs])
+    events = to_dicts(head["_events"], EVENT_FIELDS)
+    ev = {"series": {s["id"]: s["title"] for s in to_dicts(head.get("_series", []), SERIES_FIELDS)},
+          "events": {e["id"]: {k: e[k] for k in EVENT_FIELDS[1:] if e[k] != ""} for e in events}}
+    rytas.save_json(rytas.EVENTS, ev)
+    for name, path in (("_layout", rytas.LAYOUT), ("_shapes", rytas.SHAPES)):
+        dicts = to_dicts(head.get(name, []), HIDDEN[name])
+        write_local(path, HIDDEN[name], dicts)
+        state["counts"][name] = len(dicts)
+
+    game_tabs = {eid: m["tab"] for eid, m in ev["events"].items() if m.get("tab") in tabs}
+    data = read_tabs(list(game_tabs.values()))
+    all_prices = []
+    for eid, title in game_tabs.items():
+        prices, seats = split_game_rows(eid, data.get(title, []))
+        all_prices += prices
+        write_local(rytas.seat_path(eid), rytas.SEAT_FIELDS, seats)
+        state["counts"][f"prices:{eid}"] = len(prices)
+        state["counts"][f"seats:{eid}"] = len(seats)
+    write_local(rytas.SNAPSHOTS, rytas.SNAP_FIELDS, all_prices)
+
+    att_rows = []
+    for r in head.get(OVERVIEW, [])[1:]:
+        eid = cell(r, 0).strip()
+        if not eid:
+            continue
+        state["order"].append(eid)
+        a = cell(r, len(OVERVIEW_HEAD) - 1).strip()
+        if a:
+            state["att"][eid] = a
+            att_rows.append({"event_id": eid, "attendance": a, "recorded_utc": "", "note": "Sheet"})
+    write_local(rytas.ATTENDANCE, rytas.ATT_FIELDS, att_rows)
     rytas.save_json(STATE, state)
-    print(f"Pulled {len(data)} tabs: " + ", ".join(f"{n} {len(v) - 1 if v else 0}" for n, v in data.items()))
+    print(f"Pulled {len(ev['events'])} games, {len(all_prices)} price rows, "
+          f"{sum(state['counts'].get(f'seats:{e}', 0) for e in game_tabs)} seat rows")
+
+
+def overview_rows(ev, order):
+    res = rytas.analyse_all(ev)
+    now = rytas.datetime.now(rytas.timezone.utc)
+    rows = []
+    for eid in order:
+        m = ev["events"][eid]
+        t = res[eid]["totals"]
+        comp, opp = rytas.split_name(m["name"])
+        start = rytas.parse_ts(m["start_utc"])
+        rows.append([eid, vilnius(start), comp, opp, "Sužaista" if start <= now else "Būsima",
+                     t["taken"], t["season"], t["singles"], t["available"],
+                     round(t["revenue"], 2), round(t["avg_price"], 2) if t["avg_price"] else ""])
+    return rows
+
+
+def vilnius(dt):
+    """UTC -> Europe/Vilnius wall time (EET/EEST), without needing tz data."""
+    y = dt.year
+    def last_sunday(month):
+        d = rytas.datetime(y, month + 1, 1, tzinfo=rytas.timezone.utc) - rytas.timedelta(days=1)
+        return d - rytas.timedelta(days=(d.weekday() + 1) % 7)
+    summer = last_sunday(3).replace(hour=1) <= dt < last_sunday(10).replace(hour=1)
+    return (dt + rytas.timedelta(hours=3 if summer else 2)).strftime("%Y-%m-%d %H:%M")
 
 
 def push():
-    state = rytas.load_json(STATE, {})
-    names = set(tab_names())
+    state = rytas.load_json(STATE, {"order": [], "att": {}, "counts": {}})
+    counts = state.setdefault("counts", {})
+    tabs = sheet_props()
     ev = rytas.load_events()
     pushed = []
-    for name, (path, columns) in tables(ev["events"]).items():
+
+    for name, path in (("_layout", rytas.LAYOUT), ("_shapes", rytas.SHAPES)):
         rows = rytas.read_csv(path)
-        new = rows[state.get(name, 0):]
-        if not new:
+        new = rows[counts.get(name, 0):]
+        if new:
+            if name not in tabs:
+                add_tab(name, HIDDEN[name], hidden=True)
+                tabs[name] = {}
+            append_rows(name, [[num(r[c]) if c in ("x", "y") else r[c] for c in HIDDEN[name]] for r in new])
+            counts[name] = len(rows)
+            pushed.append(f"{name} +{len(new)}")
+
+    all_prices = rytas.read_csv(rytas.SNAPSHOTS)
+    for eid, meta in sorted(ev["events"].items(), key=lambda kv: kv[1]["start_utc"]):
+        prices = [r for r in all_prices if r["event_id"] == eid]
+        seats = rytas.read_csv(rytas.seat_path(eid))
+        new_p = prices[counts.get(f"prices:{eid}", 0):]
+        new_s = seats[counts.get(f"seats:{eid}", 0):]
+        if not (new_p or new_s):
             continue
-        if name not in names:
-            add_tab(name, columns)
-        append_rows(name, [[r.get(c, "") for c in columns] for r in new])
-        state[name] = len(rows)
-        pushed.append(f"{name} +{len(new)}")
-    for name, columns, rows in (
-        ("events", EVENT_FIELDS, [[eid] + [str(m.get(c, "")) for c in EVENT_FIELDS[1:]] for eid, m in ev["events"].items()]),
-        ("series", SERIES_FIELDS, [[sid, title] for sid, title in ev["series"].items()]),
+        if not meta.get("tab") or meta["tab"] not in tabs:
+            meta["tab"] = meta.get("tab") or game_tab_title(meta, set(tabs))
+            if meta["tab"] not in tabs:
+                add_tab(meta["tab"], GAME_HEAD)
+                tabs[meta["tab"]] = {}
+        titles = {r["section_id"]: r["section"] for r in prices}
+        rows = [price_to_row(r) for r in new_p] + [seat_to_row(r, titles) for r in new_s]
+        rows.sort(key=lambda r: r[0])
+        append_rows(meta["tab"], rows)
+        counts[f"prices:{eid}"], counts[f"seats:{eid}"] = len(prices), len(seats)
+        pushed.append(f"{meta['tab']} +{len(new_p)} kainos +{len(new_s)} vietos")
+
+    for name, head, rows in (
+        ("_events", EVENT_FIELDS, [[eid] + [str(m.get(c, "")) for c in EVENT_FIELDS[1:]] for eid, m in ev["events"].items()]),
+        ("_series", SERIES_FIELDS, [[sid, title] for sid, title in ev["series"].items()]),
     ):
-        if name not in names:
-            add_tab(name, columns)
-        rewrite(name, columns, rows)
+        if name not in tabs:
+            add_tab(name, head, hidden=True)
+            tabs[name] = {}
+        rewrite(name, head, rows)
+
+    # overview: stable row order (so typed attendance stays on its game), new games appended
+    order = [e for e in state.get("order", []) if e in ev["events"]]
+    order += [e for e, _ in sorted(ev["events"].items(), key=lambda kv: kv[1]["start_utc"]) if e not in order]
+    if OVERVIEW not in tabs:
+        add_tab(OVERVIEW, OVERVIEW_HEAD, index=0)
+        tabs[OVERVIEW] = {}
+    rows = overview_rows(ev, order)
+    last_col = chr(ord("A") + len(OVERVIEW_HEAD) - 2)
+    request("PUT", vpath(rng(OVERVIEW, f"A1:{last_col}{len(rows) + 1}")), {"valueInputOption": "RAW"},
+            {"values": [OVERVIEW_HEAD[:-1]] + rows})
+    request("PUT", vpath(rng(OVERVIEW, f"{ATT_COL}1")), {"valueInputOption": "RAW"}, {"values": [[OVERVIEW_HEAD[-1]]]})
+    # attendance recorded locally (rytas.py attendance) and not yet in the Sheet
+    for i, eid in enumerate(order):
+        local = rytas.latest_attendance(eid)
+        if local is not None and str(state.get("att", {}).get(eid, "")).split(".")[0] != str(local):
+            request("PUT", vpath(rng(OVERVIEW, f"{ATT_COL}{i + 2}")), {"valueInputOption": "RAW"}, {"values": [[local]]})
+            state.setdefault("att", {})[eid] = str(local)
+    state["order"] = order
+
+    for t in DEFAULT_TABS:   # the empty first tab of a new spreadsheet
+        if t in tabs and tabs[t].get("sheetId") is not None and len(tabs) > 1:
+            if not any(any(r) for r in read_tabs([t]).get(t, [])):
+                request("POST", ":batchUpdate", body={"requests": [{"deleteSheet": {"sheetId": tabs[t]["sheetId"]}}]})
+
+    rytas.save_json(rytas.EVENTS, ev)
     rytas.save_json(STATE, state)
-    print("Pushed: " + (", ".join(pushed) or "no new rows") + f"; events {len(ev['events'])}")
+    print("Pushed: " + ("; ".join(pushed) or "no new rows") + f"; overview {len(order)} games")
 
 
 if __name__ == "__main__":

@@ -10,24 +10,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
+/* light: cream and brown */
 :root{
-  --bg:#F4F2EC; --panel:#FFFFFF; --ink:#16181D; --muted:#5A606C; --line:#E0DBCF;
-  --accent:#1D4ED8; --accent-ink:#FFFFFF; --season:#8590A6; --single:#D2620A; --free:#F4F2EC; --seat-line:#ADA696;
-  --closed:#ECE8DE; --low:#DCE6FB; --high:#1D4ED8; --court:#D9D3C4; --focus:#1D4ED8;
+  --bg:#F6EFE2; --panel:#FFFAF0; --ink:#2A1C11; --muted:#6B5644; --line:#E2D3BA;
+  --accent:#7B4A23; --accent-ink:#FFF8EC; --season:#6F6052; --single:#C47A2C; --free:#F6EFE2; --seat-line:#B8A386;
+  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A;
   color-scheme: light;
 }
+/* dark: classic blue and gold */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#0B1220; --panel:#121B2E; --ink:#E8EDF7; --muted:#9AA8C2; --line:#26344F;
-    --accent:#4C8DFF; --accent-ink:#0B1220; --season:#6C7EA3; --single:#FF9F43; --free:#1A2540; --seat-line:#4A5A7C;
-    --closed:#162036; --low:#1D2B4A; --high:#4C8DFF; --court:#2B3A5A; --focus:#82AEFF;
+    --bg:#0A1730; --panel:#0F2244; --ink:#F2F5FA; --muted:#A9B8D2; --line:#22406F;
+    --accent:#E2B544; --accent-ink:#0A1730; --season:#5677B3; --single:#E2B544; --free:#132A52; --seat-line:#4D6A9C;
+    --closed:#0F2244; --low:#17325F; --mid:#3F6FC6; --high:#E2B544; --court:#2C4A7A; --focus:#F0CB6A; --bcl:#8FB3F0;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0B1220; --panel:#121B2E; --ink:#E8EDF7; --muted:#9AA8C2; --line:#26344F;
-  --accent:#4C8DFF; --accent-ink:#0B1220; --season:#6C7EA3; --single:#FF9F43; --free:#1A2540; --seat-line:#4A5A7C;
-  --closed:#162036; --low:#1D2B4A; --high:#4C8DFF; --court:#2B3A5A; --focus:#82AEFF;
+  --bg:#0A1730; --panel:#0F2244; --ink:#F2F5FA; --muted:#A9B8D2; --line:#22406F;
+  --accent:#E2B544; --accent-ink:#0A1730; --season:#5677B3; --single:#E2B544; --free:#132A52; --seat-line:#4D6A9C;
+  --closed:#0F2244; --low:#17325F; --mid:#3F6FC6; --high:#E2B544; --court:#2C4A7A; --focus:#F0CB6A; --bcl:#8FB3F0;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -60,7 +62,7 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .card{cursor:pointer;text-align:left;padding:20px;display:flex;flex-direction:column;gap:14px;border-radius:18px;width:100%}
 .card:hover{border-color:var(--accent)}
 .badge{font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px;border:1px solid currentColor}
-.badge.LKL{color:var(--accent)} .badge.BCL{color:var(--single)}
+.badge.LKL{color:var(--accent)} .badge.BCL{color:var(--bcl)}
 .opp{font-family:"Space Grotesk",Inter,sans-serif;font-size:22px;font-weight:700;line-height:1.15}
 .big{font-family:"Space Grotesk",Inter,sans-serif;font-size:40px;font-weight:700;line-height:1}
 .bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--free);border:1px solid var(--line)}
@@ -312,19 +314,22 @@ function renderArena(){
   const lo = Math.log(Math.min(...prices, 1e9)), hi = Math.log(Math.max(...prices, 1));
   secs.forEach((s) => { s._p = s.price && hi > lo ? (Math.log(s.price) - lo) / (hi - lo) : 0; });
   if (!S.sec || !byId[S.sec]) S.sec = (secs.find((s) => s.title === "108") || secs[0] || {}).id || null;
-  const low = cssVar("--low"), high = cssVar("--high"), closed = cssVar("--closed");
+  const low = cssVar("--low"), mid = cssVar("--mid"), high = cssVar("--high"), closed = cssVar("--closed");
+  const scale = (f) => f < 0.5 ? mix(low, mid, f * 2) : mix(mid, high, (f - 0.5) * 2);
   const shapes = (DATA.shapes[g.conf] || []);
   const polys = shapes.map(([id, pts]) => {
     const s = byId[id];
-    const fill = s ? mix(low, high, sectionValue(s)) : closed;
+    const fill = s ? scale(sectionValue(s)) : closed;
     const lbl = s ? (s.title) : "";
     return `<polygon points="${esc(pts)}" fill="${fill}" class="${s ? "" : "closed"} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
   }).join("");
   const labels = shapes.filter(([id]) => byId[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
     const cx = n.reduce((a, p) => a + p[0], 0) / n.length, cy = n.reduce((a, p) => a + p[1], 0) / n.length;
-    const v = sectionValue(byId[id]);
-    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${v > 0.55 ? "#FFFFFF" : "var(--ink)"}">${esc(shortTitle(byId[id].title))}</text>`;
+    // label colour by the fill's brightness: dark text on gold/cream, light text on blue/brown
+    const rgb = scale(sectionValue(byId[id])).match(/\d+/g).map(Number);
+    const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="${lum > 0.55 ? "#1A1208" : "#FFFFFF"}">${esc(shortTitle(byId[id].title))}</text>`;
   }).join("");
   const legend = { taken: [t("low"), "100%"], singles: [t("low"), "100%"], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
   const s = byId[S.sec];
@@ -345,7 +350,7 @@ function renderArena(){
           <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
           <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
           ${polys}${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
-        <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--high))"></span><span>${esc(legend[1])}</span>
+        <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
           <span><i class="sw" style="border:1.5px dashed var(--seat-line)"></i>${t("notOnSale")}</span></div>
       </div>
       <div class="side">
