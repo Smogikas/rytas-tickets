@@ -188,12 +188,12 @@ const T = {
     title: "Ryto bilietai", eyebrow: "Vilniaus „Rytas“ · namų rungtynės · Arena Vilnius", loading: "Kraunama…",
     updated: "Duomenys atnaujinti {d} · atnaujinama kas valandą", games: "Rungtynės", arena: "Arenos planas",
     upcoming: "Būsimos", played: "Sužaistos", all: "Visos", sort: "Rikiuoti", byDate: "Data", byExpected: "Žiūrovai",
-    bySingles: "Pavieniai", byRevenue: "Pajamos", byAvg: "Vid. vertė", theme: "Tema", auto: "Auto", light: "Šviesi", dark: "Tamsi",
+    bySingles: "Pavieniai", byRevenue: "Pajamos", byAvg: "Vid. kaina", theme: "Tema", auto: "Auto", light: "Šviesi", dark: "Tamsi",
     nextGame: "Kitos rungtynės", seasonSeats: "Abonementų vietos", seasonSub: "niekada nebuvo laisvos ({n} rungt.)",
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
-    clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto vertė", avgValueSub: "pirkėjai mokėjo vid. {p}",
+    clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto kaina", avgValueSub: "su mokesčiais · klubui vid. {p}",
     vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
-    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. vertė", seen: "Stebint parduota: {n}",
+    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}",
     attendance: "Lankomumas", attVs: "laukta {e}", noAtt: "lankomumas dar neįrašytas",
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
@@ -223,12 +223,12 @@ const T = {
     title: "Rytas tickets", eyebrow: "Vilniaus „Rytas“ · home games · Arena Vilnius", loading: "Loading…",
     updated: "Data updated {d} · refreshed hourly", games: "Games", arena: "Arena plan",
     upcoming: "Upcoming", played: "Played", all: "All", sort: "Sort", byDate: "Date", byExpected: "Crowd",
-    bySingles: "Singles", byRevenue: "Revenue", byAvg: "Avg value", theme: "Theme", auto: "Auto", light: "Light", dark: "Dark",
+    bySingles: "Singles", byRevenue: "Revenue", byAvg: "Avg price", theme: "Theme", auto: "Auto", light: "Light", dark: "Dark",
     nextGame: "Next game", seasonSeats: "Season-ticket seats", seasonSub: "never available ({n} games)",
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
-    clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket value", avgValueSub: "buyers paid avg {p}",
+    clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket price", avgValueSub: "incl. fees · club gets avg {p}",
     vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
-    available: "Available", revenue: "Club revenue", avg: "Avg value", seen: "Sold while tracked: {n}",
+    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}",
     attendance: "Attendance", attVs: "expected {e}", noAtt: "attendance not recorded yet",
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
@@ -333,14 +333,14 @@ function renderKpis(){
     [t("seasonSeats"), nf(DATA.seasonSeats), t("seasonSub", { n: DATA.games.length })],
     [t("singlesSold"), nf(singles), (S.when === "played" ? t("played") : t("upcoming")) + " · " + t("gamesN", { n: gs.length })],
     [t("clubRevenue"), eur(rev), t("clubRevenueSub")],
-    [t("avgValue"), singles ? eur(rev / singles, 2) : "–", singles ? t("avgValueSub", { p: eur(gross / singles, 2) }) : ""]
+    [t("avgValue"), singles ? eur(gross / singles, 2) : "–", singles ? t("avgValueSub", { p: eur(rev / singles, 2) }) : ""]
   ];
   $("kpis").innerHTML = k.map(([l, v, s]) => `<div class="panel kpi"><span class="small muted">${esc(l)}</span><span class="v">${esc(v)}</span><span class="small muted">${esc(s)}</span></div>`).join("");
 }
 
 function renderGames(){
   let gs = listGames().filter((g) => S.comp === "all" || g.comp === S.comp);
-  const key = { date: (g) => g.start, singles: (g) => -g.singles, revenue: (g) => -(g.revenue || 0), avg: (g) => -(g.avg || 0) }[S.sort];
+  const key = { date: (g) => g.start, singles: (g) => -g.singles, revenue: (g) => -(g.revenue || 0), avg: (g) => -(g.avgPaid || 0) }[S.sort];
   gs.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
   if (S.when === "played" && S.sort === "date") gs.reverse();
   const comps = ["all"].concat([...new Set(DATA.games.map((g) => g.comp))].sort());
@@ -356,7 +356,7 @@ function renderGames(){
       <div class="bar" aria-hidden="true"><i style="width:${pct(g.season, g.seats + (g.fans || 0))}%;background:var(--season)"></i><i style="width:${pct(g.fans || 0, g.seats + (g.fans || 0))}%;background:var(--fan)"></i><i style="width:${pct(g.singles, g.seats + (g.fans || 0))}%;background:var(--single)"></i></div>
       ${g.fans ? `<div class="small muted" style="margin-top:-6px">${esc(t("fanPart", { n: nf(g.fans) }))}</div>` : ""}
       <div class="grid2"><div><span class="muted">${t("singles")}</span><b class="num">${nf(g.singles)}</b></div><div><span class="muted">${t("available")}</span><b class="num">${nf(g.available)}</b></div>
-      <div><span class="muted">${t("revenue")}</span><b class="num">${eur(g.revenue)}</b></div><div><span class="muted">${t("avg")}</span><b class="num">${g.singles ? eur(g.avg, 2) : "–"}</b></div></div>
+      <div><span class="muted">${t("revenue")}</span><b class="num">${eur(g.revenue)}</b></div><div><span class="muted">${t("avg")}</span><b class="num">${g.singles ? eur(g.avgPaid, 2) : "–"}</b></div></div>
       ` : `<div class="small muted">${t("noData")}</div>`}
       ${att}
     </button>
@@ -769,7 +769,7 @@ function drawShare(c, g, W, H){
     c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += 38 + c.measureText(label).width + 36;
   }
   // metrics 2x2 (+ attendance for played games)
-  const cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avg, 2) : "–"]];
+  const cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
   if (g.played && g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(g.taken)]);
   y += 40; const colW = (x1 - x0) / 2, shown = cells.slice(0, 6);
   shown.forEach(([label, val], i) => {

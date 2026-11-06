@@ -34,7 +34,7 @@ OVERVIEW = "Rungtynės"
 OVERVIEW_HEAD = ["ID", "Data (Vilnius)", "Turnyras", "Varžovas", "Būsena", "Laukiama žiūrovų",
                  "iš jų B Tribūna (110–111, įvert.)",
                  "Abonementai", "Pavieniai bilietai", "Laisvi bilietai", "Klubo pajamos €",
-                 "Vid. bilieto vertė €", "Lankomumas (įrašykite)"]
+                 "Vid. bilieto kaina € (su mokesčiais)", "Lankomumas (įrašykite)"]
 ATT_COL = chr(ord("A") + len(OVERVIEW_HEAD) - 1)   # attendance column (last), typed by the user
 CAPACITY_TAB = "Talpa"
 CAPACITY_HEAD = ["Sektoriaus ID", "Sektorius", "Vietų (pilnas planas)", "Daugiausia vietų pardavime",
@@ -261,7 +261,7 @@ def overview_rows(ev, order):
         start = rytas.parse_ts(m["start_utc"])
         rows.append([eid, vilnius(start), comp, opp, "Sužaista" if start <= now else "Būsima",
                      t["expected"], t["fans_est"], t["season"], t["singles"], t["available"],
-                     round(t["revenue"], 2), round(t["avg_price"], 2) if t["avg_price"] else ""])
+                     round(t["revenue"], 2), round(t["avg_paid"], 2) if t["avg_paid"] else ""])
     return rows
 
 
