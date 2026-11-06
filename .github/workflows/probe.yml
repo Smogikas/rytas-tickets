@@ -1,0 +1,35 @@
+name: Probe (temporary)
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          import collections, json, rytas, urllib.error
+          A = rytas.API
+          for eid in ("PNJMMUNJYB", "ZPHZTQITUH", "ZMS7IPCJGD"):
+              for sid in ("87884", "72929", "87885", "73010", "72998"):
+                  url = f"{A}/store/events/{eid}/sections/{sid}/seat-map?language=lt"
+                  try:
+                      j = rytas.get_json(url)
+                      t = j.get("seatMapTickets") or []
+                      print(eid, sid, "OK", len(t), "seats; status counts", dict(collections.Counter(x.get("status") for x in t)),
+                            "priceClass", dict(collections.Counter(x.get("priceClass") for x in t)))
+                  except urllib.error.HTTPError as e:
+                      body = e.read()[:200]
+                      print(eid, sid, "HTTP", e.code, body)
+          vm = rytas.get_json(f"{A}/store/seat-map/1769507581")
+          print("venue map keys", list(vm))
+          s = [x for x in vm.get("seats", []) if str(x.get("section")) in ("87884", "72929")]
+          print("venue seats 87884/72929:", collections.Counter(str(x["section"]) for x in s))
+          if s: print("sample seat keys", sorted(s[0]))
+          secs = vm.get("sections") or vm.get("sectors")
+          if secs:
+              for x in secs:
+                  if str(x.get("id")) in ("87884", "72929", "87885", "72930"):
+                      print("section", json.dumps(x, ensure_ascii=False)[:300])
+          PY
