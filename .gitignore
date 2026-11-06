@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+# collected data lives in the Google Sheet; these are local working copies
+data/
+events.json
+_site/
