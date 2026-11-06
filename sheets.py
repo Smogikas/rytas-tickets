@@ -242,7 +242,9 @@ def pull():
     game_tabs = {eid: m["tab"] for eid, m in ev["events"].items() if m.get("tab") in tabs}
     data = read_tabs(list(game_tabs.values()))
     all_prices = []
+    state["heads"] = {}
     for eid, title in game_tabs.items():
+        state["heads"][title] = len((data.get(title) or [[]])[0])
         prices, seats = split_game_rows(eid, data.get(title, []))
         all_prices += prices
         write_local(rytas.seat_path(eid), rytas.SEAT_FIELDS, seats)
@@ -308,6 +310,14 @@ def push():
             counts[name] = len(rows)
             pushed.append(f"{name} +{len(new)}")
 
+    # game tabs made before a column was added: widen them and complete the header
+    for meta in ev["events"].values():
+        t = meta.get("tab")
+        if t in tabs and state.get("heads", {}).get(t, len(GAME_HEAD)) < len(GAME_HEAD):
+            ensure_columns(tabs, t, len(GAME_HEAD))
+            request("PUT", vpath(rng(t, "A1")), {"valueInputOption": "RAW"}, {"values": [GAME_HEAD]})
+            state["heads"][t] = len(GAME_HEAD)
+
     all_prices = rytas.read_csv(rytas.SNAPSHOTS)
     for eid, meta in sorted(ev["events"].items(), key=lambda kv: kv[1]["start_utc"]):
         prices = [r for r in all_prices if r["event_id"] == eid]
@@ -322,8 +332,6 @@ def push():
                 tabs[meta["tab"]] = add_tab(meta["tab"], GAME_HEAD)
         titles = {r["section_id"]: r["section"] for r in prices}
         ensure_columns(tabs, meta["tab"], len(GAME_HEAD))
-        if (tabs.get(meta["tab"]) or {}).get("sheetId") is not None and meta.get("_head") != len(GAME_HEAD):
-            pass
         rows = [price_to_row(r) for r in new_p] + [seat_to_row(r, titles) for r in new_s]
         rows.sort(key=lambda r: r[0])
         append_rows(meta["tab"], rows)

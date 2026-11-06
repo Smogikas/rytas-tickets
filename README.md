@@ -32,24 +32,32 @@ bilietai.lt's own JSON (`https://www.bilietai.lt/api/v1`, anonymous session from
 Seat ids are the same in every game, so for each game:
 
 - **Taken** = seats − available = **expected crowd** if every season holder comes
-- **Season tickets** (estimate): seats seen in 2+ games and **never available in any**.
+- **Season tickets** (estimate): seats seen in 3+ games (2 while fewer games have seat data) and
+  **never available in any** (games of the same competition; all games if it has fewer than 3).
+  Far-away games, with few single tickets sold yet, keep seats sold to single buyers out.
   They cluster in the central sideline sections (108, 116–120, lounges 102–104), mostly in
   the middle rows, in blocks of 2–10 seats.
 - **Single tickets** = taken − season
   - **sold while tracked**: seen going available → taken, priced at the price in force then
+    in the seat's own price zone (a seat's price class = the zone id; a section can have
+    several zones, e.g. 21-ta kaina 79 €, 22-ta kaina 69 €)
   - **sold before tracking began** (5 Nov 2026): priced at the first logged price (estimate)
 - **Club revenue** = **ticket value = price − fee**. The bilietai.lt price includes fees
   (booking, Arena Vilnius, venue administration, lounge), which do not go to the club:
   e.g. a 45 € lounge ticket = 30 € ticket value + 15 € fees.
 - Prices are logged hourly whenever they change, so price changes before a game are kept.
+  Only changed rows are written, so each zone's last price is carried forward to rebuild the
+  full price list at any moment; a zone selling out is not a price change.
 - Only sections sold online are counted; sections that open later are picked up.
 - **B Tribūna** (110–111, the ultras' sections) is not sold on bilietai.lt: its full capacity (from
   the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
 - The full venue plan gives the seat count of every section and the arena capacity (Sheet tab
   **Talpa**; `rytas.py capacity`) and seat positions of sections never on sale.
-- A section leaving the sale list with an exact count (< 20) left is **sold out** (last
-  seats counted as sold, striped on the map); with "20+" left it was **withdrawn**
-  (nothing counted as sold, dashed outline, closing date shown).
+- A section leaving the sale list is **sold out** (last seats counted as sold, striped on the
+  map) if it had an exact count (< 22) left, or the game is one whose sections sell out
+  (Žalgiris), or it sold at least as many seats in the last 24 h as it had left. Otherwise it
+  was **withdrawn** (nothing counted as sold, dashed outline, closing date shown); free seats in
+  withdrawn sections are not counted as available tickets.
 - Price changes: the section's price history card (first → now, and every change with ▲/▼);
   ▲/▼ next to the price in the sections table.
 - Tracking of a game stops at tip-off, so sections closing at the start are not seen as withdrawn.
@@ -59,10 +67,11 @@ Seat ids are the same in every game, so for each game:
 
 - **hourly (:17 UTC)**: tests → load data from the Sheet → prices for every upcoming game;
   full seat plans hourly in the last 48 h before a game, every 6 h within 14 days, daily
-  otherwise → save new rows to the Sheet → rebuild and publish the page.
+  otherwise; **hot games** (Žalgiris, BCL, or any game selling 50+ seats in 24 h) hourly
+  however far away → save new rows to the Sheet → rebuild and publish the page.
   Between full scans, when the hourly price check sees a section open or close, a price
-  change, or fewer tickets left in a section showing under 20, that section's seat plan is
-  read right away (sections showing "20+" give no signal and wait for the full scan).
+  change, or fewer tickets left in a section showing under 22, that section's seat plan is
+  read right away (sections showing "22+" give no signal and wait for the full scan).
 - **10 minutes before tip-off**: a final full check (every seat and price) of that game, in
   its own job started by the hourly run that sees the game starting within 75 minutes.
 - **Mondays 05:41 UTC**: look for new or rescheduled games of the tracked season.

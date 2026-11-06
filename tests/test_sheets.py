@@ -253,6 +253,23 @@ class SheetsTest(unittest.TestCase):
         self.assertEqual(f.props["Rungtynės"]["gridProperties"]["columnCount"], len(sheets.OVERVIEW_HEAD))
         self.assertEqual(f.tabs["Rungtynės"][0], sheets.OVERVIEW_HEAD)
 
+    def test_game_tab_from_before_the_zone_column_gets_the_new_header(self):
+        self.write_local_data()
+        sheets.pull()
+        sheets.push()
+        f, tab = self.fake, "2026-11-11 Nanterre 92"
+        n = len(sheets.GAME_HEAD) - 1                                 # as made by the older version
+        f.props[tab]["gridProperties"]["columnCount"] = n
+        f.tabs[tab] = [r[:n] for r in f.tabs[tab]]
+        self.wipe_local()
+        sheets.pull()
+        sheets.push()
+        self.assertEqual(f.props[tab]["gridProperties"]["columnCount"], len(sheets.GAME_HEAD))
+        self.assertEqual(f.tabs[tab][0], sheets.GAME_HEAD)
+        self.wipe_local()
+        sheets.pull()                                                 # rows still read back
+        self.assertTrue(rytas.read_csv(rytas.SNAPSHOTS))
+
     def test_tab_title(self):
         m = {"name": "LKL: Vilniaus ''Rytas'' - Kėdainių ''Nevėžis-Paskolų klubas''", "start_utc": "2027-01-24T17:10:00Z"}
         self.assertEqual(sheets.game_tab_title(m, set()), "2027-01-24 Nevėžis-Paskolų klubas")

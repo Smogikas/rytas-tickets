@@ -44,7 +44,7 @@ EVENTS = ROOT / "events.json"
 # Local working copies. The GitHub job loads them from / saves them to the
 # Google Sheet (sheets.py), so no data is stored in the repository.
 
-# The prices API never reports more than 22 available per section ("20+").
+# The prices API never reports more than 22 available per section ("22+").
 # Exact numbers come from the seat plans instead.
 CAP = 22
 PAUSE = 0.4  # seconds between seat-plan requests, be polite to the site
@@ -525,11 +525,19 @@ def season_seats(group, tls):
     return {s for s, n in seen.items() if n >= need and s not in ever_free}
 
 
-def price_lookup(price_rows):
+def zone_names(price_rows):
+    """zone id -> zone name ('1370' -> '21-ta kaina') from every row that has the id.
+    Zone ids are the event's price levels and the same in every game, so a zone that
+    sold out before ids were logged is still matched through the other games."""
+    return {norm_id(r["zone_id"]): r.get("zone", "") for r in price_rows if r.get("zone_id")}
+
+
+def price_lookup(price_rows, names=None):
     """section_id -> {"times": [ts], "states": [{zone: (price, fee, available)}], "ids": {zone_id: zone}}.
 
     Rows are logged only when they change, so the full price list in force at a
-    moment is rebuilt by carrying every zone's last row forward."""
+    moment is rebuilt by carrying every zone's last row forward. `names` (zone id ->
+    name, from all games) fills in ids this game's rows don't have."""
     per = defaultdict(list)
     for r in sorted(price_rows, key=lambda r: r["ts_utc"]):
         per[r["section_id"]].append(r)
@@ -550,6 +558,10 @@ def price_lookup(price_rows):
             else:
                 times.append(r["ts_utc"])
                 states.append(zones)
+        seen = {r.get("zone", "") for r in rows}
+        for zid, zname in (names or {}).items():
+            if zid not in ids and zname in seen:
+                ids[zid] = zname
         out[sid] = {"times": times, "states": states, "ids": ids}
     return out
 
@@ -637,7 +649,7 @@ def classify_seats(tl, prices, season):
     return out
 
 
-def analyse_event(tl, price_rows, season):
+def analyse_event(tl, price_rows, season, names=None):
     """Seat-level figures for one game.
 
     seats       seats in sections that have been on sale (from seat plans)
@@ -651,7 +663,7 @@ def analyse_event(tl, price_rows, season):
                 at the price in force when seen, earlier ones at the first logged price
     gross       what buyers paid incl. fees
     """
-    prices = price_lookup(price_rows)
+    prices = price_lookup(price_rows, names)
     titles = {r["section_id"]: r["section"] for r in sorted(price_rows, key=lambda r: r["ts_utc"])}
     first_ts = min((rows[0]["ts_utc"] for rows in tl.values()), default=None)
     first_seen = {}
@@ -718,16 +730,17 @@ def analyse_all(ev, with_seats=False):
     tls = {eid: timelines(load_seats(eid)) for eid in names}
     groups = season_groups(names)
     cache, out = {}, {}
+    zn = zone_names(read_csv(SNAPSHOTS))
     for eid in names:
         g = groups[eid]
         if g not in cache:
             cache[g] = season_seats(g, tls)
         price_rows = load_snapshots(eid)
-        out[eid] = analyse_event(tls[eid], price_rows, cache[g])
+        out[eid] = analyse_event(tls[eid], price_rows, cache[g], zn)
         out[eid]["season_group_size"] = len(g)
         out[eid]["season_total"] = len(cache[g])
         if with_seats:
-            out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows), cache[g])
+            out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows, zn), cache[g])
         # fan sectors not on sale for this game: assume full (their whole capacity)
         cap = load_capacity(ev["events"][eid].get("conf_id", ""))
         on_sale = {rows[-1]["section_id"] for rows in tls[eid].values()}

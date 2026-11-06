@@ -203,6 +203,30 @@ class Seats(Base):
         res = rytas.analyse_event(rytas.timelines(rytas.load_seats(self.E)), rytas.load_snapshots(self.E), set())
         self.assertEqual({x["section_id"]: x["status"] for x in res["sections"]}["72935"], "open")
 
+    def test_withdrawn_seats_are_not_available_and_sellout_games(self):
+        prices = rytas.fetch_prices(self.E)
+        rytas.take_snapshot(self.E, prices)
+        rytas.take_seat_snapshot(self.E, prices)
+        self.site.close_section(self.E, "72935")                  # 34 left ("22+"): withdrawn
+        prices = rytas.fetch_prices(self.E)
+        rytas.take_snapshot(self.E, prices)
+        rytas.take_seat_snapshot(self.E, prices)
+        t = rytas.analyse_event(rytas.timelines(rytas.load_seats(self.E)), rytas.load_snapshots(self.E), set())["totals"]
+        self.assertEqual(t["withdrawn_free"], 34)
+        self.assertEqual(t["available"], (28 - 6) + (16 - 6))     # only seats that can be bought
+        # a game whose sections sell out (Žalgiris): the same section leaving counts as sold out
+        J = "ZPHZTQITUH"
+        prices = rytas.fetch_prices(J)
+        rytas.take_snapshot(J, prices)
+        rytas.take_seat_snapshot(J, prices)
+        self.site.close_section(J, "72935")
+        prices = rytas.fetch_prices(J)
+        rytas.take_snapshot(J, prices)
+        _, w, _ = rytas.take_seat_snapshot(J, prices, sellout=True)
+        self.assertEqual(len([r for r in w if r["section_id"] == "72935" and r["status"] == 0]), 34)
+        res = rytas.analyse_event(rytas.timelines(rytas.load_seats(J)), rytas.load_snapshots(J), set())
+        self.assertEqual({x["section_id"]: x["status"] for x in res["sections"]}["72935"], "soldout")
+
     def test_section_opening_later_is_picked_up(self):
         self.site.close_section(self.E, "72935")
         cur, _, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
@@ -223,6 +247,78 @@ class Seats(Base):
         self.assertTrue(due(24 * 5, 6))
         self.assertFalse(due(24 * 60, 12))
         self.assertTrue(due(24 * 60, 23))
+
+
+class Zones(unittest.TestCase):
+    """Sections with several price zones; rows are logged only when they change."""
+
+    def rows(self, spec, event="E"):
+        return [{"ts_utc": ts, "event_id": event, "section_id": "S", "section": "Sec", "zone": z,
+                 "ticket_type_id": "6175", "price": p, "fee": 7.0, "available": a, "zone_id": zid}
+                for ts, z, zid, p, a in spec]
+
+    def test_one_zone_changing_does_not_move_the_other(self):
+        # T2: only the 79 zone is logged (tickets left changed). The 69 zone is unchanged.
+        r = self.rows([("T1", "21-ta kaina", "1370", 79.0, 14), ("T1", "22-ta kaina", "1371", 69.0, 14),
+                       ("T2", "21-ta kaina", "1370", 79.0, 10)])
+        pl = rytas.price_lookup(r)
+        h = rytas.zone_histories(pl, "S")
+        self.assertEqual([x[1] for x in h["21-ta kaina"]], [79.0])
+        self.assertEqual([x[1] for x in h["22-ta kaina"]], [69.0])
+        self.assertEqual(rytas.price_history(pl, "S"), [("T1", 69.0, 7.0)])   # no false change
+        self.assertEqual(rytas.price_at(pl, "S", "T2", "1370"), (79.0, 7.0))  # seat priced by its zone
+        self.assertEqual(rytas.price_at(pl, "S", "T2", "1371.0"), (69.0, 7.0))
+        self.assertEqual(rytas.price_at(pl, "S", "T2"), (69.0, 7.0))          # zone unknown: cheapest on sale
+        self.assertEqual(rytas.current_zones(pl, "S")[0][:2], ("22-ta kaina", 69.0))
+
+    def test_zone_sold_out_and_real_price_change(self):
+        r = self.rows([("T1", "21-ta kaina", "1370", 79.0, 14), ("T1", "22-ta kaina", "1371", 69.0, 3),
+                       ("T2", "22-ta kaina", "1371", 69.0, 0),                 # cheap zone sold out
+                       ("T3", "21-ta kaina", "1370", 85.0, 9)])                # real price rise
+        pl = rytas.price_lookup(r)
+        self.assertEqual(rytas.price_at(pl, "S", "T2"), (79.0, 7.0))          # cheapest still on sale
+        self.assertEqual(rytas.price_at(pl, "S", "T1", "1371"), (69.0, 7.0))  # seat sold at T1 in the 69 zone
+        self.assertEqual([x[1] for x in rytas.price_history(pl, "S")], [79.0, 85.0])
+        self.assertEqual([x[1] for x in rytas.zone_histories(pl, "S")["22-ta kaina"]], [69.0])
+
+    def test_zone_sold_out_before_ids_were_logged_is_matched_through_other_games(self):
+        old = self.rows([("T1", "21-ta kaina", "", 99.0, 3), ("T1", "22-ta kaina", "", 89.0, 14),
+                         ("T2", "21-ta kaina", "", 99.0, 0)])
+        other = self.rows([("T1", "21-ta kaina", "1370", 79.0, 14)], event="J")
+        pl = rytas.price_lookup(old, rytas.zone_names(old + other))
+        self.assertEqual(rytas.price_at(pl, "S", "T1", "1370"), (99.0, 7.0))  # this game's 21-ta kaina
+        self.assertEqual(rytas.price_at(rytas.price_lookup(old), "S", "T1", "1370"), (89.0, 7.0))  # without: cheapest
+
+    def test_recent_sales(self):
+        log = [{"ts_utc": "2026-11-06T10:00:00+00:00", "section_id": "S", "seat_id": str(i), "status": 1} for i in range(5)]
+        log += [{"ts_utc": "2026-11-06T20:00:00+00:00", "section_id": "S", "seat_id": str(i), "status": 0} for i in range(3)]
+        self.assertEqual(rytas.recent_sales(log, "2026-11-06T12:00:00+00:00"), 3)
+        self.assertEqual(rytas.recent_sales(log, "2026-11-06T21:00:00+00:00"), 0)
+        self.assertEqual(rytas.recent_sales(log, "2026-11-06T00:00:00+00:00", "T"), 0)
+
+    def test_hot_games(self):
+        now = NOW
+        lkl = {"name": "LKL: Vilniaus ''Rytas'' - Jonavos ''Jonava Hipocredit''"}
+        self.assertTrue(rytas.is_hot({"name": "LKL: Vilniaus ''Rytas'' - Kauno ''Žalgiris''"}, [], now))
+        self.assertTrue(rytas.is_hot({"name": "BCL: Vilniaus ''Rytas'' - Nantero ''Nanterre 92''"}, [], now))
+        self.assertFalse(rytas.is_hot(lkl, [], now))
+        t0, t1 = (now - rytas.timedelta(hours=30)).isoformat(), (now - rytas.timedelta(hours=2)).isoformat()
+        log = [{"ts_utc": t0, "section_id": "S", "seat_id": str(i), "status": 1} for i in range(60)]
+        self.assertFalse(rytas.is_hot(lkl, log + [dict(r, ts_utc=t1, status=0) for r in log[:49]], now))
+        self.assertTrue(rytas.is_hot(lkl, log + [dict(r, ts_utc=t1, status=0) for r in log[:50]], now))
+        far = {"start_utc": (now + rytas.timedelta(days=60)).isoformat(),
+               "last_seats_utc": (now - rytas.timedelta(hours=1)).isoformat()}
+        self.assertFalse(rytas.seats_due(far, now))
+        self.assertTrue(rytas.seats_due(far, now, hot=True))                 # hot: hourly, even far away
+
+    def test_season_needs_three_games_once_three_have_data(self):
+        def tl(*seats):
+            return {s: [{"ts_utc": "T1", "section_id": "S", "seat_id": s, "status": st}] for s, st in seats}
+        tls = {"a": tl(("x", 0), ("y", 0)), "b": tl(("x", 0), ("y", 0)), "c": tl(("x", 0))}
+        self.assertEqual(rytas.season_seats(("a", "b", "c"), tls), {"x"})     # y seen in 2 of 3 only
+        self.assertEqual(rytas.season_seats(("a", "b"), tls), {"x", "y"})     # 2 games with data: 2 suffice
+        tls["c"] = tl(("x", 1))
+        self.assertEqual(rytas.season_seats(("a", "b", "c"), tls), set())     # free in one game: not season
 
 
 class Analysis(Base):

@@ -543,7 +543,14 @@ function priceChg(s){
 
 // price history card: first -> now summary, then every change (newest first) with its direction
 function priceHistoryHtml(s){
-  const h = s.history || [];
+  const zs = (s.zones || []).filter((z) => z.history && z.history.length);
+  if (zs.length > 1)   // several price zones: one history per zone, open zones first
+    return zs.slice().sort((a, b) => (b.open - a.open) || (a.price - b.price))
+      .map((z) => `<div style="font-weight:600;margin-top:8px">${esc(z.name)}${z.open ? "" : ` <span class="tag soldout">${t("soldOut")}</span>`}</div>${historyRows(z.history)}`).join("");
+  return historyRows(s.history || []);
+}
+
+function historyRows(h){
   if (!h.length) return "";
   if (h.length === 1) return `<div class="muted">${t("unchanged", { d: dTime(h[0][0]) })}</div>`;
   const first = h[0][1], now = h[h.length - 1][1], diff = now - first;
@@ -567,8 +574,9 @@ function fanPanel(f){
 
 function sectionPanel(s, g){
   return `<div class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}${statusTag(s)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${eur(s.price)}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="margin:0;font-size:22px">${esc(s.title)}${statusTag(s)}</h2><div class="disp num" style="font-size:18px;font-weight:700">${s.priceMax != null && s.priceMax !== s.price ? eur(s.price) + "–" + eur(s.priceMax) : eur(s.price)}</div></div>
     <div class="small muted">${t("value")} ${eur(s.price - (s.fee || 0))} · ${t("fee").toLowerCase()} ${eur(s.fee)}${s.openedLater ? " · " + t("openedLater", { d: dTime(s.openedLater) }) : ""}${s.status === "closed" && s.closedAt ? " · " + t("closedOn", { d: dTime(s.closedAt) }) : ""}</div>
+    ${(s.zones || []).length > 1 ? `<div class="small" style="margin-top:4px">${s.zones.map((z) => `<span style="white-space:nowrap${z.open ? "" : ";opacity:.6"}">${esc(z.name)} <b class="num">${eur(z.price)}</b>${z.open ? "" : " (" + t("soldOut").toLowerCase() + ")"}</span>`).join(" · ")}</div>` : ""}
     <div class="grid2">
       <div><span class="muted">${t("seats")}</span><b class="num">${nf(s.seats)}</b></div><div><span class="muted">${t("free")}</span><b class="num">${nf(s.available)}</b></div>
       <div><span class="muted">${t("season")}</span><b class="num">${nf(s.season)}</b></div><div><span class="muted">${t("singles")}</span><b class="num">${nf(s.singles)}</b></div>
