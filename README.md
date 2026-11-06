@@ -51,8 +51,9 @@ Seat ids are the same in every game, so for each game:
   Only changed rows are written, so each zone's last price is carried forward to rebuild the
   full price list at any moment; a zone selling out is not a price change.
 - Only sections sold online are counted; sections that open later are picked up.
-- Seats with price class 0 are blocked (camera, press, ... places), never sold: left out of every
-  count, grey in the seat plan.
+- Seats with price class 0 have no price in any game, so they can't be bought: left out of every
+  count, grey in the seat plan. Today: a block at the back of 119–120 (rows 16–19, seats 1–5) and
+  9 placeholder seats in 403–404 (row 9, place "NĖRA"). What they are used for is not known.
 - A section off the sale list still returns a seat plan, but with every seat "taken" (= can't be
   bought), so it is not read; e.g. 409 is off sale for Nanterre and Žalgiris while almost empty
   in other games. The sold-out / withdrawn rule decides instead.

@@ -519,7 +519,7 @@ def season_seats(group, tls):
     """Seats observed in at least SEASON_MIN_GAMES games of the group (fewer if fewer
     games have seat data, but at least 2) and taken the first time they were seen in
     every one of them. These were taken before single-game sales could reach them:
-    season tickets (and seats held for guests, press, cameras, ...). Far-away games,
+    season tickets (and any seats held in advance for every game). Far-away games,
     with few single tickets sold yet, keep seats sold to single buyers out.
 
     A season seat that becomes free later (the holder gives it back) stays a season
@@ -638,8 +638,8 @@ SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE, BLOCKED = "S", "O", "B", "A", "X"
 
 
 def blocked(row):
-    """A seat with price class 0 is not a ticket (camera, press, ... places): never
-    sold, so left out of every count."""
+    """A seat with price class 0 has no price in any game, so it can't be bought: left
+    out of every count (what it is used for is not known)."""
     return norm_id(row.get("price_class", "")) == "0"
 
 
