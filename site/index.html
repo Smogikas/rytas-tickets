@@ -254,7 +254,7 @@ const T = {
     curveSub: "Parduota pavienių bilietų (iš viso) pagal dienas iki rungtynių pradžios. Linija prasideda nuo stebėjimo pradžios; pirmas taškas – bilietai, parduoti iki tol.",
     rangeAll: "Visas", gameDay: "Rungtynių diena", gameDayShort: "Diena", soldThatHour: "parduota per valandą",
     dayEmpty: "Rungtynių dienos pardavimai bus rodomi nuo {d} 00:00 – tą dieną pradedama stebėti kas valandą, paskutinis patikrinimas 10 min. iki pradžios.",
-    daySub: "Kiek pavienių bilietų parduota kiekvieną rungtynių dienos valandą, nuo 00:00 iki pradžios (stulpeliai – pasirinktos rungtynės, pilkos linijos – kitos). Patikrinimas kas valandą (:17), paskutinis – 10 min. iki pradžios.", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
+    daySub: "Kiek pavienių bilietų parduota kiekvieną rungtynių dienos valandą, nuo 00:00 iki pradžios Patikrinimas kas valandą (:17), paskutinis – 10 min. iki pradžios.", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
     priceChange: "kainos pokytis", priceChanges: "Kainų pokyčiai", noPriceChanges: "Šių rungtynių kainos nesikeitė.",
     gameLbl: "Rungtynės", tipoff: "pradžia", evaTitle: "Laukta ir atėjo", evaSub: "Laukiama žiūrovų (prieš rungtynes) ir įrašytas lankomumas sužaistose rungtynėse.",
     evaEmpty: "Bus rodoma, kai įrašysite lankomumą (Google Sheet, skirtukas „Rungtynės“, paskutinis stulpelis).",
@@ -323,7 +323,7 @@ const T = {
     curveSub: "Single tickets sold (total) by days before tip-off. A line starts when tracking began; its first point is the tickets sold before then.",
     rangeAll: "All", gameDay: "Game day", gameDayShort: "Day", soldThatHour: "sold in that hour",
     dayEmpty: "Game-day sales are shown from {d} 00:00 – checked every hour that day, the last check 10 min before tip-off.",
-    daySub: "Single tickets sold in each hour of the game day, from 00:00 to tip-off (bars: selected game, grey lines: other games). Checked every hour (:17), the last check 10 min before tip-off.", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
+    daySub: "Single tickets sold in each hour of the game day, from 00:00 to tip-off Checked every hour (:17), the last check 10 min before tip-off.", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
     priceChange: "price change", priceChanges: "Price changes", noPriceChanges: "No price changes for this game.",
     gameLbl: "Game", tipoff: "tip-off", evaTitle: "Expected vs attended", evaSub: "Expected crowd (before the game) and recorded attendance of played games.",
     evaEmpty: "Shown once attendance is entered (Google Sheet, tab „Rungtynės“, last column).",
@@ -371,7 +371,7 @@ const store = {
 };
 const S = {
   lang: store.get("lang", "lt"), theme: store.get("theme", "auto"), tab: store.get("tab", "games"),
-  when: "upcoming", comp: "all", sort: "date", range: store.get("range", "14"), agame: null, smode: "replay", replayT: null, pmode: "fill", game: store.get("game", null), sec: null, mode: "taken", seat: null
+  when: "upcoming", comp: "all", sort: "date", range: store.get("range", "14"), rrange: store.get("rrange", "14"), agame: null, smode: "replay", replayT: null, pmode: "fill", game: store.get("game", null), sec: null, mode: "taken", seat: null
 };
 let DATA = null;
 const seatCache = {};
@@ -537,8 +537,8 @@ function renderAnalysis(){
   const isDay = S.range === "day";
   let vis, x0, x1;
   if (isDay){                             // game day: 00:00 -> tip-off, tickets sold in each hour
-    vis = games.map((g) => { const c = hourlyOf(g); return { g, pts: c.pts, all: c.pts, tip: c.tip, vals: c.vals }; });
-    x0 = 0; x1 = Math.max(12, Math.ceil(Math.max(...vis.map((c) => c.tip))));
+    vis = games.filter((g) => g.id === sel.id).map((g) => { const c = hourlyOf(g); return { g, pts: c.pts, all: c.pts, tip: c.tip, vals: c.vals }; });
+    x0 = 0; x1 = Math.ceil(vis[0].tip);
   } else {
     const curves = games.map((g) => ({ g, pts: curveOf(g) }));
     const minAll = Math.min(...curves.map((c) => c.pts.length ? c.pts[0][0] : 0));
@@ -558,13 +558,13 @@ function renderAnalysis(){
   const maxTicks = W < 600 ? 4 : 8, xTicks = [];
   if (isDay){ const st = [1, 2, 3, 4, 6].find((h) => (x1 - x0) / h <= maxTicks) || 6; for (let h = 0; h <= x1; h += st) xTicks.push(h); }
   else { const xs = [1, 2, 5, 7, 14, 30, 60, 90].find((st) => -x0 / st <= maxTicks) || 180; for (let d = 0; d >= x0; d -= xs) xTicks.push(d); }
-  const others = vis.filter((c) => c.g.id !== sel.id && c.pts.length > 1);
+  const others = isDay ? [] : vis.filter((c) => c.g.id !== sel.id && c.pts.length > 1);   // game day: this game only
   const me = vis.find((c) => c.g.id === sel.id);
   const startMs = new Date(sel.start).getTime(), midMs = localMidnight(sel.start);
   const evs = (sel.priceEvents || []).map((e) => ({ e, d: isDay ? (new Date(e.ts).getTime() - midMs) / 36e5 : (new Date(e.ts).getTime() - startMs) / DAY }))
     .filter((x) => isDay ? x.d >= 0 && x.d <= me.tip : x.d >= x0 && x.d <= 0);
   const zeroX = isDay ? me.tip : 0;
-  const noDay = isDay && !vis.some((c) => c.pts.length > 1);
+  const noDay = isDay && !(me && me.pts.length > 1);
   const last = me.pts[me.pts.length - 1];
   const svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t("curveTitle") + ": " + sel.opp)}">
     ${yTicks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${L - 8}" y="${Y(v)}" class="ax" text-anchor="end" dominant-baseline="central">${nf(v)}</text>`).join("")}
@@ -596,8 +596,8 @@ function renderAnalysis(){
           <div class="seg" role="group" id="aRange"></div>
         </div>
       </div>
-      <div class="chartwrap" id="chartWrap">${noDay ? `<div class="note" style="padding:28px 0">${t("dayEmpty", { d: dShort((upcoming[0] || sel).start) + " (" + (upcoming[0] || sel).opp + ")" })}</div>` : svg}<div class="tip" id="aTip" hidden></div></div>
-      <div class="clegend small"><span>${isDay ? '<i class="sq c2"></i>' : '<i class="ln me"></i>'}${esc(sel.opp)}</span><span><i class="ln other"></i>${t("otherGames")}</span>${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
+      <div class="chartwrap" id="chartWrap">${noDay ? `<div class="note" style="padding:28px 0">${t("dayEmpty", { d: dShort(sel.start) + " (" + sel.opp + ")" })}</div>` : svg}<div class="tip" id="aTip" hidden></div></div>
+      <div class="clegend small"><span>${isDay ? '<i class="sq c2"></i>' : '<i class="ln me"></i>'}${esc(sel.opp)}</span>${isDay ? "" : `<span><i class="ln other"></i>${t("otherGames")}</span>`}${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
       <p class="note" style="margin:6px 0 0">${t(isDay ? "daySub" : "curveSub")}</p>
     </section>
     ${evList.length ? `<section class="panel" style="padding:14px 16px">
@@ -621,7 +621,7 @@ function renderAnalysis(){
     for (const c of drawn){
       if (d < c.pts[0][0] - 0.05 || d > c.pts[c.pts.length - 1][0] + 0.05) continue;     // no data for this game that day
       const v = valueAt(c.all, d); if (v == null) continue;
-      const dist = Math.abs(Y(v) - y) - (c.g.id === sel.id ? 6 : 0);                       // slight preference for the selected game
+      const dist = isDay ? 0 : Math.abs(Y(v) - y) - (c.g.id === sel.id ? 6 : 0);           // slight preference for the selected game
       if (!best || dist < best.dist) best = { c, v, d, dist };
     }
     return best && best.dist < 40 ? best : null;
@@ -727,10 +727,11 @@ function renderSalesMap(){
     loadSeats(sel.id).then((seats) => {
       if (S.tab !== "salesmap" || S.smode !== "replay" || S.agame !== sel.id) return;
       const t1 = Math.min(Date.now(), new Date(sel.start).getTime()), first = new Date(sel.dataFrom || sel.sales[0][0]).getTime();
-      const t0 = S.range === "all" ? first : Math.max(first, t1 - Number(S.range) * DAY);
+      const rr = ["7", "14", "30", "all"].includes(S.rrange) ? S.rrange : "14";
+      const t0 = rr === "all" ? first : Math.max(first, t1 - Number(rr) * DAY);
       const hours = Math.max(1, Math.round((t1 - t0) / 36e5));
-      if (S.replayT == null || S.replayT > hours || S.replayWin !== S.range) S.replayT = hours;
-      S.replayWin = S.range;
+      if (S.replayT == null || S.replayT > hours || S.replayWin !== rr) S.replayT = hours;
+      S.replayWin = rr;
       const secsById = {}; (DATA.sections[sel.id] || []).forEach((x) => { secsById[x.id] = x; });
       const fanIds = new Set((sel.fanSections || []).map((f) => f.id));
       const draw = () => {
@@ -762,8 +763,8 @@ function renderSalesMap(){
           <button type="button" class="btn" id="smPlay" style="margin-top:10px">${replayTimer ? t("pause") : t("play")}</button>
           <p class="note" style="margin:10px 0 0">${t("replayNote")}</p></div></div>`;
       draw();
-      segButtons($("rpRange"), [["7", "7 " + t("daysShort")], ["14", "14 " + t("daysShort")], ["30", "30 " + t("daysShort")], ["all", t("rangeAll")]], S.range,
-        (v) => { S.range = v; store.set("range", v); if (replayTimer){ clearInterval(replayTimer); replayTimer = null; } render(); }, t("replay"));
+      segButtons($("rpRange"), [["7", "7 " + t("daysShort")], ["14", "14 " + t("daysShort")], ["30", "30 " + t("daysShort")], ["all", t("rangeAll")]], rr,
+        (v) => { S.rrange = v; store.set("rrange", v); if (replayTimer){ clearInterval(replayTimer); replayTimer = null; } render(); }, t("replay"));
       $("smRange").oninput = (e) => { S.replayT = Number(e.target.value); draw(); };
       $("smPlay").onclick = () => {
         if (replayTimer){ clearInterval(replayTimer); replayTimer = null; $("smPlay").textContent = t("play"); return; }
