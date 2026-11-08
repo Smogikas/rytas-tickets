@@ -15,14 +15,14 @@ seat by seat, with a live web page:
   prices and a revenue range (low = holders renewed at the renewal price where there was one,
   high = all paid the open-sale price).
 - **Insights** (Analizė): single-ticket sales curves by days before tip-off (7 / 14 / 30 days / all;
-  „Rungtynių diena": the game day from 00:00 to tip-off, sold since midnight;
+  „Rungtynių diena": tickets sold in each hour of the game day, 00:00 to tip-off;
   hover any line for its game, days before tip-off and tickets sold), price changes marked on the
   curve and listed, and for played games expected vs attended and attendance by
   opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).
 - **Sales map** (Pardavimų žemėlapis): replay how a game's sections filled up over the last 7 / 14 / 30 days or
   all of tracking (slider / play), and section popularity over played games (average fill rate incl. season
   tickets, and average seats taken; far-away games are left out so they don't pull the averages down).
-- Game cards show tickets sold in the last 24 h (▲/▼ against the 24 h before).
+- Game cards show tickets sold today (from 00:00) and yesterday; ▲ / ▼ when today is above / below yesterday.
 - Lithuanian / English, light / dark (follows the system by default).
 
 Everything runs on GitHub Actions; the collected data is stored in a Google Sheet, not in

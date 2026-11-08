@@ -151,7 +151,7 @@ svg.chart .me{fill:none;stroke:var(--c2);stroke-width:2.5;stroke-linejoin:round}
 svg.chart .medot{fill:var(--c2);stroke:var(--panel);stroke-width:2}
 svg.chart .lbl{fill:var(--ink);font:700 13px Inter,sans-serif}
 svg.chart .ev{fill:var(--ink);stroke:var(--panel);stroke-width:1.5}
-svg.chart .otherend{fill:var(--muted);opacity:.6}
+svg.chart .mebar{fill:var(--c2)}
 svg.chart .xhair{stroke:var(--muted);stroke-width:1}
 svg.chart .over{fill:transparent}
 .tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}
@@ -234,7 +234,7 @@ const T = {
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
     clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto kaina", avgValueSub: "su mokesčiais · klubui vid. {p}",
     vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
-    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", seenLbl: "Stebint parduota", per24: "Per 24 val.", per24prev: "ankstesnės 24 val.",
+    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", seenLbl: "Stebint parduota", soldToday: "Šiandien", yesterday: "vakar", per24: "Per 24 val.", per24prev: "ankstesnės 24 val.",
     attendance: "Lankomumas", attVs: "laukta {e}", noAtt: "lankomumas dar neįrašytas",
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
@@ -252,9 +252,9 @@ const T = {
     last24Title: "Pardavimai per paskutines 24 val.", trendLbl: "pokytis",
     analysisTab: "Analizė", curveTitle: "Pavienių bilietų pardavimai iki rungtynių",
     curveSub: "Parduota pavienių bilietų (iš viso) pagal dienas iki rungtynių pradžios. Linija prasideda nuo stebėjimo pradžios; pirmas taškas – bilietai, parduoti iki tol.",
-    rangeAll: "Visas", gameDay: "Rungtynių diena", gameDayShort: "Diena", soldSinceMidnight: "parduota nuo 00:00",
+    rangeAll: "Visas", gameDay: "Rungtynių diena", gameDayShort: "Diena", soldThatHour: "parduota per valandą",
     dayEmpty: "Rungtynių dienos pardavimai bus rodomi nuo {d} 00:00 – tą dieną pradedama stebėti kas valandą, paskutinis patikrinimas 10 min. iki pradžios.",
-    daySub: "Kiek pavienių bilietų parduota rungtynių dieną nuo 00:00 iki pradžios. Kiekviena linija baigiasi savo rungtynių pradžia (taškas); pasirinktų rungtynių pradžia pažymėta brūkšnine linija. Duomenys kas valandą.", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
+    daySub: "Kiek pavienių bilietų parduota kiekvieną rungtynių dienos valandą, nuo 00:00 iki pradžios (stulpeliai – pasirinktos rungtynės, pilkos linijos – kitos). Patikrinimas kas valandą (:17), paskutinis – 10 min. iki pradžios.", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
     priceChange: "kainos pokytis", priceChanges: "Kainų pokyčiai", noPriceChanges: "Šių rungtynių kainos nesikeitė.",
     gameLbl: "Rungtynės", tipoff: "pradžia", evaTitle: "Laukta ir atėjo", evaSub: "Laukiama žiūrovų (prieš rungtynes) ir įrašytas lankomumas sužaistose rungtynėse.",
     evaEmpty: "Bus rodoma, kai įrašysite lankomumą (Google Sheet, skirtukas „Rungtynės“, paskutinis stulpelis).",
@@ -303,7 +303,7 @@ const T = {
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
     clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket price", avgValueSub: "incl. fees · club gets avg {p}",
     vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
-    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", seenLbl: "Sold while tracked", per24: "Last 24 h", per24prev: "24 h before",
+    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", seenLbl: "Sold while tracked", soldToday: "Today", yesterday: "yesterday", per24: "Last 24 h", per24prev: "24 h before",
     attendance: "Attendance", attVs: "expected {e}", noAtt: "attendance not recorded yet",
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
@@ -321,9 +321,9 @@ const T = {
     last24Title: "Sales in the last 24 hours", trendLbl: "change",
     analysisTab: "Insights", curveTitle: "Single-ticket sales before the game",
     curveSub: "Single tickets sold (total) by days before tip-off. A line starts when tracking began; its first point is the tickets sold before then.",
-    rangeAll: "All", gameDay: "Game day", gameDayShort: "Day", soldSinceMidnight: "sold since 00:00",
+    rangeAll: "All", gameDay: "Game day", gameDayShort: "Day", soldThatHour: "sold in that hour",
     dayEmpty: "Game-day sales are shown from {d} 00:00 – checked every hour that day, the last check 10 min before tip-off.",
-    daySub: "Single tickets sold on the game day from 00:00 to tip-off. Each line ends at its own tip-off (dot); the selected game's tip-off is the dashed line. Hourly data.", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
+    daySub: "Single tickets sold in each hour of the game day, from 00:00 to tip-off (bars: selected game, grey lines: other games). Checked every hour (:17), the last check 10 min before tip-off.", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
     priceChange: "price change", priceChanges: "Price changes", noPriceChanges: "No price changes for this game.",
     gameLbl: "Game", tipoff: "tip-off", evaTitle: "Expected vs attended", evaSub: "Expected crowd (before the game) and recorded attendance of played games.",
     evaEmpty: "Shown once attendance is entered (Google Sheet, tab „Rungtynės“, last column).",
@@ -470,9 +470,11 @@ function renderHealth(){
 }
 
 // "Per 24 val. +12 ▲": single tickets seen sold in the last 24 h, arrow vs the 24 h before
-// "Per 24 val. +98": single tickets seen sold in the last 24 h (the 24 h before in the tooltip)
+// "Šiandien +12 ▲ · vakar +40": sold today (from 00:00) vs the whole of yesterday
+function arrowTY(a, b){ return a > b ? " ▲" : a < b ? " ▼" : ""; }
 function trend24(g){
-  return `<span title="${esc(t("per24prev") + " +" + nf(g.sold24prev || 0))}">${t("per24")} <b class="num">+${nf(g.sold24 || 0)}</b></span>`;
+  const { today, yesterday } = todayYesterday(g);
+  return `<span title="${esc(t("seenLbl") + ": " + nf(g.seen))}">${t("soldToday")} <b class="num">+${nf(today)}</b>${arrowTY(today, yesterday)} · ${t("yesterday")} +${nf(yesterday)}</span>`;
 }
 
 // ---------------------------------------------------------------- insights tab
@@ -489,6 +491,27 @@ function localMidnight(iso){
   const d = new Date(iso), p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Vilnius", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
     .formatToParts(d).filter((x) => x.type !== "literal").map((x) => [x.type, Number(x.value)]));
   return d.getTime() - (p.hour * 60 + p.minute) * 6e4 - d.getSeconds() * 1e3 - d.getMilliseconds();
+}
+function soldBetween(g, a, b){            // single tickets sold in slots starting in [a, b) (ms)
+  const pts = (g.sales || []).map(([h, n]) => [new Date(h).getTime() - 36e5, n]);
+  if (!pts.length) return 0;
+  let before = null, end = null;
+  for (const [x, y] of pts){ if (x < a) before = y; if (x < b) end = y; }
+  if (end == null) return 0;
+  return Math.max(0, end - (before == null ? pts[0][1] : before));   // first point = sold before tracking
+}
+function hourlyOf(g){                     // game day: [[hour, sold that hour] ...] as a step series, tip-off hour
+  const mid = localMidnight(g.start), tip = (new Date(g.start).getTime() - mid) / 36e5;
+  const nowH = (Date.now() - mid) / 36e5;
+  if (nowH < 0 || !(g.sales || []).length) return { pts: [], vals: [], tip };
+  const n = Math.min(Math.ceil(tip), Math.ceil(nowH)), vals = [];
+  for (let k = 0; k < n; k++) vals.push(soldBetween(g, mid + k * 36e5, mid + (k + 1) * 36e5));
+  const pts = vals.map((v, k) => [k, v]); if (vals.length) pts.push([vals.length, vals[vals.length - 1]]);
+  return { pts, vals, tip };
+}
+function todayYesterday(g){
+  const mid = localMidnight(new Date().toISOString());
+  return { today: soldBetween(g, mid, Infinity), yesterday: soldBetween(g, mid - DAY, mid) };
 }
 function dayCurveOf(g){                   // [[hours since 00:00, sold since 00:00]], tip-off hour
   const mid = localMidnight(g.start), tip = (new Date(g.start).getTime() - mid) / 36e5;
@@ -513,8 +536,8 @@ function renderAnalysis(){
   S.agame = sel.id;
   const isDay = S.range === "day";
   let vis, x0, x1;
-  if (isDay){                             // game day: 00:00 -> tip-off, sold since midnight
-    vis = games.map((g) => { const c = dayCurveOf(g); return { g, pts: c.pts, all: c.pts, tip: c.tip }; });
+  if (isDay){                             // game day: 00:00 -> tip-off, tickets sold in each hour
+    vis = games.map((g) => { const c = hourlyOf(g); return { g, pts: c.pts, all: c.pts, tip: c.tip, vals: c.vals }; });
     x0 = 0; x1 = Math.max(12, Math.ceil(Math.max(...vis.map((c) => c.tip))));
   } else {
     const curves = games.map((g) => ({ g, pts: curveOf(g) }));
@@ -549,13 +572,13 @@ function renderAnalysis(){
     <line x1="${X(zeroX)}" x2="${X(zeroX)}" y1="${Tp}" y2="${H - B}" class="zero"/>
     ${isDay ? `<text x="${X(zeroX) - 5}" y="${H - B - 6}" class="ax" text-anchor="end">${t("tipoff")} ${hhmm(me.tip)}</text>` : ""}
     ${others.map((c) => `<path d="${step(c.pts)}" class="other" data-g="${esc(c.g.id)}"/>`).join("")}
-    ${isDay ? others.filter((c) => c.pts.length && c.pts[c.pts.length - 1][0] >= c.tip - 0.01).map((c) => { const q = c.pts[c.pts.length - 1];
-      return `<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="3" class="otherend"/>`; }).join("") : ""}
-    <path d="${step(me.pts)}" class="me" data-g="${esc(sel.id)}"/>
+
+    ${isDay ? (me.vals || []).map((v, k) => v ? `<rect x="${(X(k) + (X(k + 1) - X(k)) * 0.15).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${((X(k + 1) - X(k)) * 0.7).toFixed(1)}" height="${(Y(0) - Y(v)).toFixed(1)}" rx="3" class="mebar"/>` : "").join("")
+      : `<path d="${step(me.pts)}" class="me" data-g="${esc(sel.id)}"/>`}
     <circle class="hdot" r="4.5" style="display:none"/>
     ${evs.map(({ e, d }) => { const v = valueAt(me.all, d) || 0, up = e.to > e.from;
       return `<path d="M${X(d) - 6},${Y(v) - 16} h12 l-6,${up ? -9 : 9} z" transform="${up ? `translate(0,9)` : ""}" class="ev"><title>${esc(dTime(e.ts) + " · " + e.section + (e.zone ? " (" + e.zone + ")" : "") + ": " + eur(e.from) + " → " + eur(e.to))}</title></path>`; }).join("")}
-    ${last ? `<circle cx="${X(last[0])}" cy="${Y(last[1])}" r="4.5" class="medot"/><text x="${X(last[0]) - 8}" y="${Math.min(Y(last[1]) + 20, H - B - 4)}" class="lbl" text-anchor="end">${nf(last[1])}</text>` : ""}
+    ${last && !isDay ? `<circle cx="${X(last[0])}" cy="${Y(last[1])}" r="4.5" class="medot"/><text x="${X(last[0]) - 8}" y="${Math.min(Y(last[1]) + 20, H - B - 4)}" class="lbl" text-anchor="end">${nf(last[1])}</text>` : ""}
     <line class="xhair" y1="${Tp}" y2="${H - B}" style="display:none"/>
     <rect x="${L}" y="${Tp}" width="${W - L - R}" height="${H - Tp - B}" class="over"/>
   </svg>`;
@@ -574,7 +597,7 @@ function renderAnalysis(){
         </div>
       </div>
       <div class="chartwrap" id="chartWrap">${noDay ? `<div class="note" style="padding:28px 0">${t("dayEmpty", { d: dShort((upcoming[0] || sel).start) + " (" + (upcoming[0] || sel).opp + ")" })}</div>` : svg}<div class="tip" id="aTip" hidden></div></div>
-      <div class="clegend small"><span><i class="ln me"></i>${esc(sel.opp)}</span><span><i class="ln other"></i>${t("otherGames")}</span>${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
+      <div class="clegend small"><span>${isDay ? '<i class="sq c2"></i>' : '<i class="ln me"></i>'}${esc(sel.opp)}</span><span><i class="ln other"></i>${t("otherGames")}</span>${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
       <p class="note" style="margin:6px 0 0">${t(isDay ? "daySub" : "curveSub")}</p>
     </section>
     ${evList.length ? `<section class="panel" style="padding:14px 16px">
@@ -614,7 +637,8 @@ function renderAnalysis(){
     const path = svgEl.querySelector(`path[data-g="${CSS.escape(hovered)}"]`); if (path && hovered !== sel.id) path.classList.add("hov");
     xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.style.display = "";
     hd.setAttribute("cx", x); hd.setAttribute("cy", Y(n.v)); hd.style.display = ""; hd.setAttribute("class", "hdot" + (hovered === sel.id ? " me" : ""));
-    const when = isDay ? `${hhmm(n.d)} · <b>+${nf(n.v)}</b> ${t("soldSinceMidnight")}`
+    const k = Math.floor(n.d);
+    const when = isDay ? `${hhmm(k)}–${hhmm(k + 1)} · <b>+${nf(n.v)}</b> ${t("soldThatHour")}`
       : `${n.d >= -0.04 ? t("tipoff") : (-n.d).toFixed(n.d > -10 ? 1 : 0) + " " + t("daysBeforeShort")} · <b>${nf(n.v)}</b> ${t("sold")}`;
     tip.innerHTML = `<b>${esc(n.c.g.opp)}</b> <span class="muted">${esc(dShort(n.c.g.start))}</span><br>${when}`;
     tip.hidden = false;
@@ -828,7 +852,7 @@ function renderGames(){
       ` : `<div class="small muted">${t("noData")}</div>`}
       ${att}
     </button>
-    <div class="card-foot"><span class="small muted">${has ? (g.played ? t("seen", { n: nf(g.seen) }) : trend24(g) + " · " + t("seenShort", { n: nf(g.seen) })) : ""}</span>
+    <div class="card-foot"><span class="small muted">${has ? (g.played ? t("seen", { n: nf(g.seen) }) : trend24(g)) : ""}</span>
       <button type="button" class="btn" data-share="${esc(g.id)}" aria-label="${esc(t("share") + ": " + g.opp)}">${ICON_SHARE}<span>${t("share")}</span></button></div>
     </article>`;
   }).join("");
@@ -1272,14 +1296,14 @@ function drawShare(c, g, W, H){
     c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += 38 + c.measureText(label).width + 36;
   }
   // metrics: upcoming games 3 columns (with the last 24 h), played games 2 columns (+ attendance)
-  const a24 = g.sold24 || 0, b24 = g.sold24prev || 0;
+  const ty = todayYesterday(g);
   let cells, cols;
   if (g.played){
     cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
     if (g.attendance != null) cells.splice(2, 0, [t("attendance"), nf(g.attendance)], [t("attVs", { e: "" }).trim(), nf(expectedOf(g))]);
     cols = 2;
   } else {
-    cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("per24"), "+" + nf(a24)],
+    cells = [[t("singles"), nf(g.singles)], [t("available"), nf(g.available)], [t("soldToday") + " · " + t("yesterday") + " +" + nf(ty.yesterday), "+" + nf(ty.today) + arrowTY(ty.today, ty.yesterday)],
              [t("revenue"), eur(g.revenue)], [t("avg"), g.singles ? eur(g.avgPaid, 2) : "–"]];
     cols = 3;
   }
