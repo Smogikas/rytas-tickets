@@ -234,7 +234,7 @@ const T = {
     singlesSold: "Parduota pavienių bilietų", gamesN: "{n} rungtynės", clubRevenue: "Klubo pajamos",
     clubRevenueSub: "bilieto vertė be mokesčių", avgValue: "Vid. bilieto kaina", avgValueSub: "su mokesčiais · klubui vid. {p}",
     vs: "Rytas –", expected: "laukiama žiūrovų", expectedLong: "Laukiama žiūrovų", singles: "Pavieniai bilietai",
-    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", seenLbl: "Stebint parduota", soldToday: "Šiandien", yesterday: "vakar", per24: "Per 24 val.", per24prev: "ankstesnės 24 val.",
+    available: "Laisvi bilietai", revenue: "Klubo pajamos", avg: "Vid. kaina", seen: "Stebint parduota: {n}", seenShort: "stebint {n}", seenLbl: "Stebint parduota", soldToday: "Šiandien", yesterday: "Vakar", per24: "Per 24 val.", per24prev: "ankstesnės 24 val.",
     attendance: "Lankomumas", attVs: "laukta {e}", noAtt: "lankomumas dar neįrašytas",
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
@@ -303,7 +303,7 @@ const T = {
     singlesSold: "Single tickets sold", gamesN: "{n} games", clubRevenue: "Club revenue",
     clubRevenueSub: "ticket value excl. fees", avgValue: "Avg ticket price", avgValueSub: "incl. fees · club gets avg {p}",
     vs: "Rytas vs", expected: "expected crowd", expectedLong: "Expected crowd", singles: "Single tickets",
-    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", seenLbl: "Sold while tracked", soldToday: "Today", yesterday: "yesterday", per24: "Last 24 h", per24prev: "24 h before",
+    available: "Available", revenue: "Club revenue", avg: "Avg price", seen: "Sold while tracked: {n}", seenShort: "tracked {n}", seenLbl: "Sold while tracked", soldToday: "Today", yesterday: "Yesterday", per24: "Last 24 h", per24prev: "24 h before",
     attendance: "Attendance", attVs: "expected {e}", noAtt: "attendance not recorded yet",
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
@@ -470,7 +470,7 @@ function renderHealth(){
 }
 
 // "Per 24 val. +12 ▲": single tickets seen sold in the last 24 h, arrow vs the 24 h before
-// "Šiandien +12 ▲ · vakar +40": sold today (from 00:00) vs the whole of yesterday
+// "Šiandien +12 ▲ · Vakar +40": sold today (from 00:00) vs the whole of yesterday
 function arrowTY(a, b){ return a > b ? " ▲" : a < b ? " ▼" : ""; }
 function trend24(g){
   const { today, yesterday } = todayYesterday(g);
