@@ -15,6 +15,7 @@ seat by seat, with a live web page:
   prices and a revenue range (low = holders renewed at the renewal price where there was one,
   high = all paid the open-sale price).
 - **Insights** (Analizė): single-ticket sales curves by days before tip-off (7 / 14 / 30 days / all;
+  „Rungtynių diena": the game day from 00:00 to tip-off, sold since midnight;
   hover any line for its game, days before tip-off and tickets sold), price changes marked on the
   curve and listed, and for played games expected vs attended and attendance by
   opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).
