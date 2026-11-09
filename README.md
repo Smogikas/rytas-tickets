@@ -19,8 +19,8 @@ seat by seat, with a live web page:
   GitHub starts the hourly runs 25-50 min late, so the scan times of the game day are kept
   (`day_scans` in `_events`) and the tickets sold between two scans are shared out over the clock
   hours between them in proportion to time; the other charts use each scan as it is;
-  hover any line for its game, days before tip-off and tickets sold), price changes marked on the
-  curve and listed, and for played games expected vs attended and attendance by
+  hover any line for its game, days before tip-off and tickets sold), the game's price changes
+  listed below the chart, and for played games expected vs attended and attendance by
   opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).
 - **Sales map** (Pardavimų žemėlapis): replay how a game's sections filled up over the last 7 / 14 / 30 days or
   all of tracking (slider / play), and section popularity over played games (average fill rate incl. season

@@ -157,7 +157,6 @@ svg.chart .me{fill:none;stroke:var(--c2);stroke-width:2.5;stroke-linejoin:round}
 svg.chart .medot{fill:var(--c2);stroke:var(--panel);stroke-width:2}
 svg.chart .lbl{fill:var(--ink);font:700 13px Inter,sans-serif}
 svg.chart .ev{fill:var(--ink);stroke:var(--panel);stroke-width:1.5}
-svg.chart .evn{font-size:10px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:3px}
 svg.chart .mebar{fill:var(--c2)}
 svg.chart .xhair{stroke:var(--muted);stroke-width:1}
 svg.chart .over{fill:transparent}
@@ -587,25 +586,13 @@ function renderAnalysis(){
   const X = (d) => L + (d - x0) / (x1 - x0) * (W - L - R), Y = (v) => Tp + (1 - v / yTop) * (H - Tp - B);
   const step = (pts) => pts.map(([x, y], i) => (i ? `H${X(x).toFixed(1)}V${Y(y).toFixed(1)}` : `M${X(x).toFixed(1)},${Y(y).toFixed(1)}`)).join("");
   const nice = (m) => { const e = Math.pow(10, Math.floor(Math.log10(m))), f = m / e; return (f <= 2 ? 0.5 : f <= 5 ? 1 : 2) * e; };
-  const yt = nice(ymax), yTop = Math.ceil(ymax * 1.08 / yt) * yt,   // headroom for the price-change markers
-        yTicks = []; for (let v = 0; v <= yTop + 1e-9; v += yt) yTicks.push(v);
+  const yt = nice(ymax), yTop = Math.ceil(ymax / yt) * yt, yTicks = []; for (let v = 0; v <= yTop + 1e-9; v += yt) yTicks.push(v);
   const maxTicks = W < 600 ? 4 : 8, xTicks = [];
   if (isDay){ const st = [1, 2, 3, 4, 6].find((h) => (x1 - x0) / h <= maxTicks) || 6; for (let h = 0; h <= x1; h += st) xTicks.push(h); }
   else { const xs = [1, 2, 5, 7, 14, 30, 60, 90].find((st) => -x0 / st <= maxTicks) || 180; for (let d = 0; d >= x0; d -= xs) xTicks.push(d); }
   const others = isDay ? [] : vis.filter((c) => c.g.id !== sel.id && c.pts.length > 1);   // game day: this game only
   const me = vis.find((c) => c.g.id === sel.id);
   const startMs = new Date(sel.start).getTime(), midMs = localMidnight(sel.start);
-  const evs = (sel.priceEvents || []).map((e) => ({ e, d: isDay ? (new Date(e.ts).getTime() - midMs) / 36e5 : (new Date(e.ts).getTime() - startMs) / DAY }))
-    .filter((x) => isDay ? x.d >= 0 && x.d <= me.tip : x.d >= x0 && x.d <= 0);
-  const evGroups = [];                       // changes closer than 16 px drawn as one group
-  for (const x of evs.slice().sort((a, b) => a.d - b.d)){
-    const g = evGroups[evGroups.length - 1];
-    if (g && X(x.d) - g.x0 < 16) g.list.push(x); else evGroups.push({ x0: X(x.d), list: [x] });
-  }
-  for (const g of evGroups){
-    const dl = g.list[g.list.length - 1].d;
-    g.x = (g.x0 + X(dl)) / 2; g.y = Y(valueAt(me.all, dl) || 0);
-  }
   const zeroX = isDay ? me.tip : 0;
   const noDay = isDay && !(me && me.pts.length > 1);
   const last = me.pts[me.pts.length - 1];
@@ -619,11 +606,6 @@ function renderAnalysis(){
     ${isDay ? (me.vals || []).map((v, k) => v ? `<rect x="${(X(k) + (X(k + 1) - X(k)) * 0.15).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${((X(k + 1) - X(k)) * 0.7).toFixed(1)}" height="${(Y(0) - Y(v)).toFixed(1)}" rx="3" class="mebar"/>` : "").join("")
       : `<path d="${step(me.pts)}" class="me" data-g="${esc(sel.id)}"/>`}
     <circle class="hdot" r="4.5" style="display:none"/>
-    ${evGroups.map((gr) => {
-      const ups = gr.list.filter(({ e }) => e.to > e.from).length, downs = gr.list.length - ups, both = ups && downs;
-      const tri = (cx, up, n) => `<path d="M${cx - 6},${gr.y - (up ? 7 : 16)} h12 l-6,${up ? -9 : 9} z" class="ev"/>`
-        + (n > 1 ? `<text x="${cx}" y="${gr.y - 21}" class="evn" text-anchor="middle">${n}</text>` : "");
-      return (ups ? tri(both ? gr.x - 7 : gr.x, true, ups) : "") + (downs ? tri(both ? gr.x + 7 : gr.x, false, downs) : ""); }).join("")}
     ${last && !isDay ? `<circle cx="${X(last[0])}" cy="${Y(last[1])}" r="4.5" class="medot"/><text x="${X(last[0]) - 8}" y="${Math.min(Y(last[1]) + 20, H - B - 4)}" class="lbl" text-anchor="end">${nf(last[1])}</text>` : ""}
     <line class="xhair" y1="${Tp}" y2="${H - B}" style="display:none"/>
     <rect x="${L}" y="${Tp}" width="${W - L - R}" height="${H - Tp - B}" class="over"/>
@@ -643,7 +625,7 @@ function renderAnalysis(){
         </div>
       </div>
       <div class="chartwrap" id="chartWrap">${noDay ? `<div class="note" style="padding:28px 0">${t("dayEmpty", { d: dShort(sel.start) + " (" + sel.opp + ")" })}</div>` : svg}<div class="tip" id="aTip" hidden></div></div>
-      <div class="clegend small"><span>${isDay ? '<i class="sq c2"></i>' : '<i class="ln me"></i>'}${esc(sel.opp)}</span>${isDay ? "" : `<span><i class="ln other"></i>${t("otherGames")}</span>`}${evs.length ? `<span><i class="tri"></i>${t("priceChange")}</span>` : ""}</div>
+      <div class="clegend small"><span>${isDay ? '<i class="sq c2"></i>' : '<i class="ln me"></i>'}${esc(sel.opp)}</span>${isDay ? "" : `<span><i class="ln other"></i>${t("otherGames")}</span>`}</div>
       <p class="note" style="margin:6px 0 0">${t(isDay ? "daySub" : "curveSub")}</p>
     </section>
     ${evList.length ? `<section class="panel" style="padding:14px 16px">
@@ -676,17 +658,6 @@ function renderAnalysis(){
   const over = svgEl.querySelector("rect.over");
   svgEl.addEventListener("pointermove", (e) => {
     const r = svgEl.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
-    const eg = evGroups.find((g) => Math.abs(x - g.x) < 16 && y > g.y - 34 && y < g.y);
-    if (eg){
-      hide();
-      const lines = eg.list.slice().sort((a, b) => b.d - a.d).map(({ e }) => `${esc(dTime(e.ts))} · ${esc(e.section)}${e.zone ? ` <span class="muted">(${esc(e.zone)})</span>` : ""}: ${eur(e.from)} → <b>${eur(e.to)}</b> ${e.to > e.from ? "▲" : "▼"}`);
-      tip.innerHTML = `<b>${t("priceChanges")}</b><br>` + lines.slice(0, 10).join("<br>") + (lines.length > 10 ? `<br><span class="muted">+${lines.length - 10}</span>` : "");
-      tip.hidden = false;
-      const px = (eg.x / W) * r.width, py = ((eg.y - 30) / H) * r.height;
-      tip.style.left = Math.max(4, Math.min(px - tip.offsetWidth / 2, r.width - tip.offsetWidth - 4)) + "px";
-      tip.style.top = Math.max(0, py - tip.offsetHeight - 4) + "px";
-      return;
-    }
     const n = nearest(x, y);
     if (!n){ hide(); return; }
     hovered = n.c.g.id;
