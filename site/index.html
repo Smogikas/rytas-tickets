@@ -1078,11 +1078,11 @@ function priceHistoryHtml(s){
 
 function historyRows(h){
   if (!h.length) return "";
-  if (h.length === 1) return `<div class="muted">${t("unchanged", { d: dTime(h[0][0]) })}</div>`;
+  if (h.length === 1) return `<div class="muted">${h[0][3] ? esc(h[0][3]) + " · " : ""}${t("unchanged", { d: dTime(h[0][0]) })}</div>`;
   const first = h[0][1], now = h[h.length - 1][1], diff = now - first;
   const head = diff ? `<div class="pchg ${diff > 0 ? "up" : "down"}" style="font-size:13px">${diff > 0 ? "▲" : "▼"} ${esc(t("priceSummary", { a: eur(first), b: eur(now), d: (diff > 0 ? "+" : "−") + eur(Math.abs(diff)) }))}</div>`
                     : `<div class="muted">${esc(t("priceBack", { a: eur(first) }))}</div>`;
-  const named = new Set(h.map((x) => x[3]).filter(Boolean)).size > 1;   // the level changed: name it per row
+  const named = h.some((x) => x[3]);        // the price level (bilietai.lt name) on every row
   const rows = h.map((x, i) => {
     const prev = i ? h[i - 1][1] : null, arrow = prev == null ? "" : x[1] > prev ? "▲" : x[1] < prev ? "▼" : "";
     return `<div><span class="muted">${esc(dTime(x[0]))}${named ? ` · ${esc(x[3])}` : ""}</span><span class="num">${arrow ? `<span class="pchg ${x[1] > prev ? "up" : "down"}">${arrow}</span> ` : ""}${eur(x[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(x[1] - x[2])})</span></span></div>`;
