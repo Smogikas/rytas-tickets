@@ -1068,7 +1068,9 @@ function priceChg(s){
 // price history card: first -> now summary, then every change (newest first) with its direction
 function priceHistoryHtml(s){
   const zs = (s.zones || []).filter((z) => z.history && z.history.length);
-  if (zs.length > 1)   // several price zones: one history per zone, open zones first
+  // several price levels on sale at once: one history per level, open ones first; otherwise one
+  // history of the price on sale (a level replaced by a dearer one shows as a price change)
+  if (zs.length > 1 && zs.filter((z) => z.open).length > 1)
     return zs.slice().sort((a, b) => (b.open - a.open) || (a.price - b.price))
       .map((z) => `<div style="font-weight:600;margin-top:8px">${esc(z.name)}${z.open ? "" : ` <span class="tag soldout">${t("soldOut")}</span>`}</div>${historyRows(z.history)}`).join("");
   return historyRows(s.history || []);
@@ -1080,9 +1082,10 @@ function historyRows(h){
   const first = h[0][1], now = h[h.length - 1][1], diff = now - first;
   const head = diff ? `<div class="pchg ${diff > 0 ? "up" : "down"}" style="font-size:13px">${diff > 0 ? "▲" : "▼"} ${esc(t("priceSummary", { a: eur(first), b: eur(now), d: (diff > 0 ? "+" : "−") + eur(Math.abs(diff)) }))}</div>`
                     : `<div class="muted">${esc(t("priceBack", { a: eur(first) }))}</div>`;
+  const named = new Set(h.map((x) => x[3]).filter(Boolean)).size > 1;   // the level changed: name it per row
   const rows = h.map((x, i) => {
     const prev = i ? h[i - 1][1] : null, arrow = prev == null ? "" : x[1] > prev ? "▲" : x[1] < prev ? "▼" : "";
-    return `<div><span class="muted">${esc(dTime(x[0]))}</span><span class="num">${arrow ? `<span class="pchg ${x[1] > prev ? "up" : "down"}">${arrow}</span> ` : ""}${eur(x[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(x[1] - x[2])})</span></span></div>`;
+    return `<div><span class="muted">${esc(dTime(x[0]))}${named ? ` · ${esc(x[3])}` : ""}</span><span class="num">${arrow ? `<span class="pchg ${x[1] > prev ? "up" : "down"}">${arrow}</span> ` : ""}${eur(x[1])} <span class="muted">(${t("value").toLowerCase()} ${eur(x[1] - x[2])})</span></span></div>`;
   }).reverse().join("");
   return head + rows;
 }

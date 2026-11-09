@@ -37,6 +37,7 @@ class FakeSite:
                 sid: {f"{sid}-{i}": (0 if i < 6 else 1) for i in range(n)}
                 for sid, n in SECTION_SEATS.items()}
         self.requests = []
+        self.classes = {}                      # seat_id -> price level (priceClass), default 1
 
     def sell(self, eid, sid, n):
         free = [s for s, st in self.seats[eid][sid].items() if st == 1]
@@ -85,8 +86,8 @@ class FakeSite:
             if sid not in {s["id"] for s in self.prices[eid]["eventSections"]}:
                 raise rytas.urllib.error.HTTPError(url, 400, "closed", {}, None)
             return {"seatMapTickets": [
-                {"seatId": seat, "row": "1", "place": seat.split("-")[1], "priceClass": 1, "status": st,
-                 "x": 10 + 16 * int(seat.split("-")[1]), "y": 20}
+                {"seatId": seat, "row": "1", "place": seat.split("-")[1], "priceClass": self.classes.get(seat, 1),
+                 "status": st, "x": 10 + 16 * int(seat.split("-")[1]), "y": 20}
                 for seat, st in self.seats[eid][sid].items()]}
         raise AssertionError(f"unexpected URL {url}")
 
@@ -166,6 +167,28 @@ class Seats(Base):
         self.site.sell(self.E, "72935", 5)
         _, w, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
         self.assertEqual([(r["section_id"], r["status"]) for r in w], [("72935", 0)] * 5)
+
+    def test_free_seat_moved_to_another_price_level_is_logged(self):
+        rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
+        sec = self.site.seats[self.E]["72935"]
+        free = [x for x, st in sec.items() if st == 1]
+        taken = [x for x, st in sec.items() if st == 0]
+        for x in free + taken:                  # the club reprices the section: only free seats matter
+            self.site.classes[x] = 2
+        _, w, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
+        self.assertEqual(sorted(r["seat_id"] for r in w), sorted(free))
+        self.assertTrue(all(r["status"] == 1 and r["price_class"] == "2" for r in w))
+        _, w, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
+        self.assertEqual(w, [])                 # logged once
+        self.site.sell(self.E, "72935", 1)
+        _, w, _ = rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
+        self.assertEqual([(r["status"], r["price_class"]) for r in w], [(0, "2")])
+        tl = rytas.timelines(rytas.load_seats(self.E))
+        rows = tl[w[0]["seat_id"]]
+        self.assertEqual([r["status"] for r in rows], [1, 1, 0])
+        cls = rytas.classify_seats(tl, {}, set())[w[0]["seat_id"]]
+        self.assertEqual((cls[1], cls[4]), (rytas.SOLD_SEEN, w[0]["ts_utc"]))   # sale time = the sale, not the repricing
+        self.assertEqual(rytas.recent_sales(rytas.load_seats(self.E), "0"), 1)
 
     def test_closed_section_remaining_seats_marked_taken_and_not_refetched(self):
         rytas.take_seat_snapshot(self.E, rytas.fetch_prices(self.E))
@@ -318,6 +341,24 @@ class Zones(unittest.TestCase):
         self.assertEqual(rytas.price_at(pl, "S", "T1", "1371"), (69.0, 7.0))  # seat sold at T1 in the 69 zone
         self.assertEqual([x[1] for x in rytas.price_history(pl, "S")], [79.0, 85.0])
         self.assertEqual([x[1] for x in rytas.zone_histories(pl, "S")["22-ta kaina"]], [69.0])
+
+    def test_level_replaced_by_a_dearer_one(self):
+        """122: '6-a kaina' 16 EUR ends and the unsold seats move to '15-ta kaina' 24 EUR."""
+        r = self.rows([("T1", "6-a kaina", "1334", 16.0, 22),
+                       ("T2", "15-ta kaina", "1353", 24.0, 13), ("T2", "6-a kaina", "1334", 16.0, 0)])
+        pl = rytas.price_lookup(r)
+        self.assertEqual(rytas.headline_history(pl, "S"),
+                         [("T1", 16.0, 7.0, "6-a kaina"), ("T2", 24.0, 7.0, "15-ta kaina")])
+        self.assertEqual(rytas.price_at(pl, "S", "T2", "1334"), (16.0, 7.0))               # sold seat: its level
+        self.assertEqual(rytas.price_at(pl, "S", "T2", "1334", on_sale=True), (24.0, 7.0))  # free seat: what it sells at
+        T1, T2 = "2026-11-06T00:23:00+00:00", "2026-11-09T09:17:00+00:00"
+        for x in r:
+            x["ts_utc"] = {"T1": T1, "T2": T2}[x["ts_utc"]]
+        tl = {"x": [{"ts_utc": T1, "section_id": "S", "seat_id": "x", "status": 1, "price_class": "1334"}]}
+        sec = rytas.analyse_event(tl, r, set())["sections"][0]
+        self.assertEqual([h[1] for h in sec["history"]], [16.0, 24.0])
+        self.assertEqual((sec["price"], sec["status"]), (24.0, "open"))
+        self.assertEqual(sec["revenue"], 0)
 
     def test_zone_replaced_section_stays_open(self):
         """101 Lounge: zone 'Premium lounge 5' replaced by 'Premium lounge 6' (same price).

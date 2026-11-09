@@ -408,7 +408,10 @@ def take_seat_snapshot(event_id, prices, only=None, sellout=False):
                 known_layout.add(seat)
                 new_layout.append({"seat_id": seat, "section_id": sid, "row": t.get("row", ""),
                                    "place": t.get("place", ""), "x": t["x"], "y": t["y"]})
-    written = [r for k, r in current.items() if k not in last or last[k]["status"] != r["status"]]
+    # changes only: a seat whose status changed, or a free seat moved to another price
+    # level (the club repricing unsold seats: the seat plan then shows the new price)
+    written = [r for k, r in current.items() if k not in last or last[k]["status"] != r["status"]
+               or (r["status"] == 1 and str(last[k].get("price_class", "")) != r["price_class"])]
     append_csv(seat_path(event_id), SEAT_FIELDS, written)
     append_csv(LAYOUT, LAYOUT_FIELDS, new_layout)
     return current, written, len(to_fetch)
@@ -650,9 +653,11 @@ def state_at(sec, ts):
     return sec["states"][max(i, 0)]
 
 
-def price_at(prices, sid, ts, zone_id=None):
+def price_at(prices, sid, ts, zone_id=None, on_sale=False):
     """(price, fee) in force at ts for the seat's price zone (its priceClass); without
-    a known zone the cheapest zone still on sale. (None, None) without prices."""
+    a known zone the cheapest zone still on sale. on_sale (a free seat): if the seat's
+    zone has nothing left on sale but another zone does, the seat sells at that one.
+    (None, None) without prices."""
     sec = prices.get(sid)
     if not sec or not sec["states"]:
         return None, None
@@ -660,7 +665,7 @@ def price_at(prices, sid, ts, zone_id=None):
     z = sec["ids"].get(norm_id(zone_id)) if zone_id not in (None, "") else None
     if z is None and len(zones) == 1:
         z = next(iter(zones))
-    if z in zones:
+    if z in zones and not (on_sale and zones[z][2] == 0 and any(v[2] > 0 for v in zones.values())):
         return zones[z][0], zones[z][1]
     pick = [v for v in zones.values() if v[2] > 0] or list(zones.values())
     p, f, _a = min(pick)
@@ -678,6 +683,24 @@ def zone_histories(prices, sid):
             h = out.setdefault(z, [])
             if not h or (h[-1][1], h[-1][2]) != (p, f):
                 h.append((t, p, f))
+    return out
+
+
+def headline_history(prices, sid):
+    """[(ts, price, fee, zone)]: the cheapest price on sale in the section over time, across
+    its zones, so a cheaper level running out or being replaced by a dearer one shows as
+    the price change it is for a buyer (e.g. "6-a kaina" 16 EUR -> "15-ta kaina" 24 EUR)."""
+    sec = prices.get(sid)
+    out = []
+    if not sec:
+        return out
+    for t, zones in zip(sec["times"], sec["states"]):
+        on = [(p, f, z) for z, (p, f, a) in zones.items() if a > 0]
+        if not on:
+            continue                  # nothing on sale: keep the last price
+        p, f, z = min(on)
+        if not out or (out[-1][1], out[-1][2]) != (p, f):
+            out.append((t, p, f, z))
     return out
 
 
@@ -737,7 +760,7 @@ def classify_seats(tl, prices, season):
             cat, ts = SOLD_SEEN, last["ts_utc"]   # changes-only log: last row = the sale
         else:
             cat, ts = SOLD_BEFORE, first["ts_utc"]
-        p, f = price_at(prices, sid, ts, last.get("price_class"))
+        p, f = price_at(prices, sid, ts, last.get("price_class"), on_sale=cat == AVAILABLE)
         out[seat] = (sid, cat, p, f, last["ts_utc"] if cat == SOLD_SEEN else None)
     return out
 
@@ -817,7 +840,8 @@ def analyse_event(tl, price_rows, season, names=None):
                                     for z, zp, zf, zo in zs],
                              opened_later=first_seen[sid] if later else None,
                              status=status, closed_at=since if status != "open" and not on_sale else None,
-                             history=hist.get(open_zs[0][0], []) if open_zs else []))
+                             history=headline_history(prices, sid)
+                             or [h + (open_zs[0][0],) for h in hist.get(open_zs[0][0], [])] if open_zs else []))
     sections.sort(key=lambda x: x["section"])
     tot = {k: sum(x[k] for x in sections) for k in keys + ["singles", "revenue", "gross"]}
     # free seats in withdrawn sections cannot be bought: not counted as available
@@ -1374,7 +1398,7 @@ def cmd_export(args):
             "seats": x["seats"], "available": x["available"], "season": x["season"], "singles": x["singles"],
             "seen": x["sold_seen"], "before": x["pre_taken"], "revenue": r2(x["revenue"]), "gross": r2(x["gross"]),
             "openedLater": x["opened_later"], "status": x["status"], "closedAt": x["closed_at"],
-            "history": [[h[0], h[1], h[2]] for h in x["history"]],
+            "history": [[h[0], h[1], h[2], h[3]] for h in x["history"]],
         } for x in r["sections"]]
         # seats per section: [row, place, x, y, category, price, fee, sold_at]
         per = defaultdict(list)
