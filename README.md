@@ -15,7 +15,10 @@ seat by seat, with a live web page:
   prices and a revenue range (low = holders renewed at the renewal price where there was one,
   high = all paid the open-sale price).
 - **Insights** (Analizė): single-ticket sales curves by days before tip-off (7 / 14 / 30 days / all;
-  „Rungtynių diena": tickets sold in each hour of the game day, 00:00 to tip-off;
+  „Rungtynių diena": tickets sold in each clock hour of the selected game's day, 00:00 to tip-off.
+  GitHub starts the hourly runs 25-50 min late, so the scan times of the game day are kept
+  (`day_scans` in `_events`) and the tickets sold between two scans are shared out over the clock
+  hours between them in proportion to time; the other charts use each scan as it is;
   hover any line for its game, days before tip-off and tickets sold), price changes marked on the
   curve and listed, and for played games expected vs attended and attendance by
   opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).

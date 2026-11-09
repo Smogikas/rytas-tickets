@@ -254,7 +254,7 @@ const T = {
     curveSub: "Parduota pavienių bilietų (iš viso) pagal dienas iki rungtynių pradžios. Linija prasideda nuo stebėjimo pradžios; pirmas taškas – bilietai, parduoti iki tol.",
     rangeAll: "Visas", gameDay: "Rungtynių diena", gameDayShort: "Diena", soldThatHour: "parduota per valandą",
     dayEmpty: "Rungtynių dienos pardavimai bus rodomi nuo {d} 00:00 – tą dieną pradedama stebėti kas valandą, paskutinis patikrinimas 10 min. iki pradžios.",
-    daySub: "Kiek pavienių bilietų parduota kiekvieną rungtynių dienos valandą, nuo 00:00 iki pradžios Patikrinimas kas valandą (:17), paskutinis – 10 min. iki pradžios.", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
+    daySub: "Kiek pavienių bilietų parduota kiekvieną rungtynių dienos valandą, nuo 00:00 iki pradžios. Patikrinimas kas valandą, paskutinis – 10 min. iki pradžios.", daysShort: "d.", daysBeforeShort: "d. iki rungtynių", daysBefore: "dienų iki rungtynių", sold: "parduota", otherGames: "kitos rungtynės",
     priceChange: "kainos pokytis", priceChanges: "Kainų pokyčiai", noPriceChanges: "Šių rungtynių kainos nesikeitė.",
     gameLbl: "Rungtynės", tipoff: "pradžia", evaTitle: "Laukta ir atėjo", evaSub: "Laukiama žiūrovų (prieš rungtynes) ir įrašytas lankomumas sužaistose rungtynėse.",
     evaEmpty: "Bus rodoma, kai įrašysite lankomumą (Google Sheet, skirtukas „Rungtynės“, paskutinis stulpelis).",
@@ -323,7 +323,7 @@ const T = {
     curveSub: "Single tickets sold (total) by days before tip-off. A line starts when tracking began; its first point is the tickets sold before then.",
     rangeAll: "All", gameDay: "Game day", gameDayShort: "Day", soldThatHour: "sold in that hour",
     dayEmpty: "Game-day sales are shown from {d} 00:00 – checked every hour that day, the last check 10 min before tip-off.",
-    daySub: "Single tickets sold in each hour of the game day, from 00:00 to tip-off Checked every hour (:17), the last check 10 min before tip-off.", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
+    daySub: "Single tickets sold in each hour of the game day, from 00:00 to tip-off. Checked every hour, the last check 10 min before tip-off.", daysShort: "d", daysBeforeShort: "days before tip-off", daysBefore: "days before tip-off", sold: "sold", otherGames: "other games",
     priceChange: "price change", priceChanges: "Price changes", noPriceChanges: "No price changes for this game.",
     gameLbl: "Game", tipoff: "tip-off", evaTitle: "Expected vs attended", evaSub: "Expected crowd (before the game) and recorded attendance of played games.",
     evaEmpty: "Shown once attendance is entered (Google Sheet, tab „Rungtynės“, last column).",
@@ -500,12 +500,37 @@ function soldBetween(g, a, b){            // single tickets sold in slots starti
   if (end == null) return 0;
   return Math.max(0, end - (before == null ? pts[0][1] : before));   // first point = sold before tracking
 }
+// Sold by clock hour from the game-day scans: scans start at irregular times (GitHub runs
+// them 25-50 min late), so the tickets sold between two scans are spread evenly over the
+// time between them and each clock hour gets its share (rounded on the running total).
+function splitByHour(reads, mid, n){
+  const r = reads.map(([t, v]) => [(new Date(t).getTime() - mid) / 36e5, v]);
+  const at = (h) => {                      // tickets sold (since tracking) at hour h
+    if (h <= r[0][0]) return r[0][1];
+    for (let i = 1; i < r.length; i++){
+      const [x0, y0] = r[i - 1], [x1, y1] = r[i];
+      if (h <= x1) return y0 + (y1 - y0) * (x1 > x0 ? (h - x0) / (x1 - x0) : 1);
+    }
+    return r[r.length - 1][1];
+  };
+  const vals = [];
+  for (let k = 0; k < n; k++) vals.push(Math.max(0, Math.round(at(k + 1)) - Math.round(at(k))));
+  return vals;
+}
 function hourlyOf(g){                     // game day: [[hour, sold that hour] ...] as a step series, tip-off hour
   const mid = localMidnight(g.start), tip = (new Date(g.start).getTime() - mid) / 36e5;
   const nowH = (Date.now() - mid) / 36e5;
   if (nowH < 0 || !(g.sales || []).length) return { pts: [], vals: [], tip };
-  const n = Math.min(Math.ceil(tip), Math.ceil(nowH)), vals = [];
-  for (let k = 0; k < n; k++) vals.push(soldBetween(g, mid + k * 36e5, mid + (k + 1) * 36e5));
+  const reads = (g.dayReads || []).filter((x) => x[0]);
+  let vals = [];
+  if (reads.length > 1){
+    const lastH = (new Date(reads[reads.length - 1][0]).getTime() - mid) / 36e5;
+    const n = Math.max(0, Math.min(Math.ceil(tip), Math.ceil(lastH)));
+    vals = splitByHour(reads, mid, n);
+  } else {                                 // no scan times recorded: whole scans per hour
+    const n = Math.min(Math.ceil(tip), Math.ceil(nowH));
+    for (let k = 0; k < n; k++) vals.push(soldBetween(g, mid + k * 36e5, mid + (k + 1) * 36e5));
+  }
   const pts = vals.map((v, k) => [k, v]); if (vals.length) pts.push([vals.length, vals[vals.length - 1]]);
   return { pts, vals, tip };
 }
@@ -550,7 +575,7 @@ function renderAnalysis(){
   const range = x0;
   const ymax = Math.max(10, ...vis.map((c) => Math.max(0, ...c.pts.map((p) => p[1]))));
   // drawn at the real width (text stays at its normal size), shorter on phones
-  const W = Math.max(300, ($("view").clientWidth || 900) - 34), H = W < 600 ? 230 : 290, L = 48, R = 18, Tp = 14, B = 34;
+  const W = Math.max(300, ($("view").clientWidth || 900) - 34), H = W < 600 ? 230 : 290, L = 48, R = 18, Tp = isDay ? 30 : 14, B = 34;   // game day: room above the bars for the tip-off label
   const X = (d) => L + (d - x0) / (x1 - x0) * (W - L - R), Y = (v) => Tp + (1 - v / ymax) * (H - Tp - B);
   const step = (pts) => pts.map(([x, y], i) => (i ? `H${X(x).toFixed(1)}V${Y(y).toFixed(1)}` : `M${X(x).toFixed(1)},${Y(y).toFixed(1)}`)).join("");
   const nice = (m) => { const e = Math.pow(10, Math.floor(Math.log10(m))), f = m / e; return (f <= 2 ? 0.5 : f <= 5 ? 1 : 2) * e; };
@@ -570,7 +595,7 @@ function renderAnalysis(){
     ${yTicks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${L - 8}" y="${Y(v)}" class="ax" text-anchor="end" dominant-baseline="central">${nf(v)}</text>`).join("")}
     ${xTicks.map((d) => `<text x="${X(d)}" y="${H - B + 18}" class="ax" text-anchor="middle">${isDay ? hhmm(d) : d === 0 ? t("tipoff") : d + " " + t("daysShort")}</text>`).join("")}
     <line x1="${X(zeroX)}" x2="${X(zeroX)}" y1="${Tp}" y2="${H - B}" class="zero"/>
-    ${isDay ? `<text x="${X(zeroX) - 5}" y="${H - B - 6}" class="ax" text-anchor="end">${t("tipoff")} ${hhmm(me.tip)}</text>` : ""}
+    ${isDay ? `<text x="${X(zeroX) - 5}" y="${Tp - 10}" class="ax" text-anchor="end">${t("tipoff")} ${hhmm(me.tip)}</text>` : ""}
     ${others.map((c) => `<path d="${step(c.pts)}" class="other" data-g="${esc(c.g.id)}"/>`).join("")}
 
     ${isDay ? (me.vals || []).map((v, k) => v ? `<rect x="${(X(k) + (X(k + 1) - X(k)) * 0.15).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${((X(k + 1) - X(k)) * 0.7).toFixed(1)}" height="${(Y(0) - Y(v)).toFixed(1)}" rx="3" class="mebar"/>` : "").join("")

@@ -253,6 +253,24 @@ class SheetsTest(unittest.TestCase):
         self.assertEqual(f.props["Rungtynės"]["gridProperties"]["columnCount"], len(sheets.OVERVIEW_HEAD))
         self.assertEqual(f.tabs["Rungtynės"][0], sheets.OVERVIEW_HEAD)
 
+    def test_events_tab_from_before_day_scans_is_widened_and_round_trips(self):
+        self.write_local_data()
+        sheets.pull()
+        sheets.push()
+        f, n = self.fake, len(sheets.EVENT_FIELDS) - 1                    # as made by the older version
+        f.props["_events"]["gridProperties"]["columnCount"] = n
+        f.tabs["_events"] = [r[:n] for r in f.tabs["_events"]]
+        self.wipe_local()
+        sheets.pull()                                                     # old tab: day_scans just missing
+        ev = rytas.load_events()
+        ev["events"]["G1"]["day_scans"] = "2026-11-10T21:44:00+00:00 2026-11-10T22:50:00+00:00"
+        rytas.save_json(rytas.EVENTS, ev)
+        sheets.push()
+        self.assertEqual(f.props["_events"]["gridProperties"]["columnCount"], len(sheets.EVENT_FIELDS))
+        self.wipe_local()
+        sheets.pull()
+        self.assertEqual(rytas.load_events()["events"]["G1"]["day_scans"].split()[1], "2026-11-10T22:50:00+00:00")
+
     def test_game_tab_from_before_the_zone_column_gets_the_new_header(self):
         self.write_local_data()
         sheets.pull()

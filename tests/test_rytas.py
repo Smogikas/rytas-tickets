@@ -341,6 +341,21 @@ class Zones(unittest.TestCase):
         self.assertEqual(rytas.price_at(pl, "S", "T1", "1370"), (99.0, 7.0))  # this game's 21-ta kaina
         self.assertEqual(rytas.price_at(rytas.price_lookup(old), "S", "T1", "1370"), (89.0, 7.0))  # without: cheapest
 
+    def test_game_day_scan_times(self):
+        # game 2026-11-11 19:00 Vilnius (17:00 UTC): local midnight = 22:00 UTC the day before
+        meta = {"start_utc": "2026-11-11T17:00:00+00:00"}
+        rytas.note_scan(meta, "2026-11-10T14:45:00+00:00")       # 16:45 the day before: too early
+        self.assertNotIn("day_scans", meta)
+        for ts in ("2026-11-10T16:45:00+00:00", "2026-11-10T21:44:00+00:00", "2026-11-10T22:50:00+00:00"):
+            rytas.note_scan(meta, ts)
+        self.assertEqual(meta["day_scans"].split(), ["2026-11-10T16:45:00+00:00", "2026-11-10T21:44:00+00:00",
+                                                     "2026-11-10T22:50:00+00:00"])
+        sales = ["2026-11-10T21:30:00+00:00", "2026-11-10T22:10:00+00:00", "2026-11-10T22:44:00+00:00"]
+        self.assertEqual(rytas.day_reads(meta, 5, sales),
+                         [["2026-11-10T16:45:00+00:00", 5], ["2026-11-10T21:44:00+00:00", 6],
+                          ["2026-11-10T22:50:00+00:00", 8]])
+        self.assertEqual(rytas.day_reads({"start_utc": meta["start_utc"]}, 5, sales), [])
+
     def test_sales_curve_and_price_events(self):
         curve = rytas.sales_curve("2026-11-05T22:23:12+00:00", 10,
                                   ["2026-11-06T08:05:00+00:00", "2026-11-06T08:40:00+00:00", "2026-11-06T11:00:00+00:00"])

@@ -30,6 +30,7 @@ import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 API = "https://www.bilietai.lt/api/v1"
 ROOT = Path(__file__).resolve().parent
@@ -489,6 +490,32 @@ def seats_due(meta, now, hot=False):
     return now - parse_ts(last) >= timedelta(hours=interval * 0.9)
 
 
+def game_midnight(start_utc):
+    """00:00 Vilnius time of the game's date, as a UTC datetime."""
+    local = parse_ts(start_utc).astimezone(ZoneInfo("Europe/Vilnius"))
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+
+def note_scan(meta, ts):
+    """Remember the times of full seat scans around the game day (from 18:00 the evening
+    before), space-separated in meta["day_scans"]: the page splits the tickets sold between
+    two scans over the clock hours they span (hourly game-day chart)."""
+    keep_from = game_midnight(meta["start_utc"]) - timedelta(hours=6)
+    if parse_ts(ts) < keep_from:
+        return
+    scans = [x for x in str(meta.get("day_scans", "")).split() if parse_ts(x) >= keep_from]
+    meta["day_scans"] = " ".join((scans + [ts])[-48:])
+
+
+def day_reads(meta, pre_taken, sale_times):
+    """[[scan time, single tickets sold up to it]] for the recorded game-day scans."""
+    scans = str(meta.get("day_scans", "")).split()
+    if len(scans) < 2:
+        return []
+    times = sorted(parse_ts(x) for x in sale_times)
+    return [[x, pre_taken + bisect_right(times, parse_ts(x))] for x in scans]
+
+
 def snapshot_event(event_id, meta, now, force_seats=False):
     if not meta.get("conf_id"):  # venue layout id, looked up once per game
         meta["conf_id"] = str(fetch_info(event_id).get("confId") or "")
@@ -504,6 +531,7 @@ def snapshot_event(event_id, meta, now, force_seats=False):
     if force_seats or seats_due(meta, now, hot):
         current, changed, n = take_seat_snapshot(event_id, prices, sellout=sellout)
         meta["last_seats_utc"] = now_utc()
+        note_scan(meta, meta["last_seats_utc"])
         avail = sum(r["status"] for r in current.values())
         msg += f"; seats: {len(current)} in {n} sections, {avail} available, {len(changed)} changed"
     elif written:
@@ -1336,6 +1364,7 @@ def cmd_export(args):
             "sold24prev": sum(1 for x in r.get("sale_times", [])
                               if now - timedelta(hours=48) < parse_ts(x) <= now - timedelta(hours=24)),
             "priceEvents": r.get("price_events", []),
+            "dayReads": day_reads(meta, t["pre_taken"], r.get("sale_times", [])),
         })
         sections[eid] = [{
             "id": x["section_id"], "title": x["section"], "price": x["price"], "fee": x["fee"],
