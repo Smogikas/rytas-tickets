@@ -9,9 +9,8 @@ seat by seat, with a live web page:
   tickets sold), available tickets, club revenue and average ticket value; actual attendance
   for played games.
 - **Arena plan**: pick a game; sections coloured by % taken or price, or every seat ("Vietos": season ticket / sold / free;
-  each section's seat plan keeps its own proportions, scaled to fit its shape with row 1 towards the
-  court, or turned 90 degrees when that fits the shape clearly better; the map shapes are not to the
-  seats' scale, so seat spacing differs between sections); click
+  each section's seats fill its shape row by row, row 1 next to the court; the map shapes are not
+  to the seats' scale, so seat spacing differs between sections); click
   a section for its numbers, every seat (season ticket / sold and at what price / available)
   and its price history; a table of all sections below.
 - **Season tickets** (Abonementai): season seats per section with the club's 2026/27 membership
