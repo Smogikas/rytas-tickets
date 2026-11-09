@@ -137,6 +137,9 @@ svg.map polygon.stripes{pointer-events:none;stroke:none}
 .sw.striped{background:repeating-linear-gradient(45deg,var(--high) 0 3px,rgba(255,255,255,.55) 3px 5px)}
 svg.map polygon.sel{stroke:var(--sel);stroke-width:3.5}
 svg.map text{font:700 15px "Space Grotesk",Inter,sans-serif;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+svg.map text.halo{fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round;font-size:14px}
+svg.map.seatsmode polygon.fan{fill:var(--panel)}
+svg.map #mapSeats{pointer-events:none}
 svg.seats rect{cursor:pointer}
 .tablebox{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -246,7 +249,7 @@ const T = {
     inDays: "po {n} d.", tomorrow: "rytoj", today: "šiandien", playedLbl: "sužaista",
     legendSeason: "Abonementai", legendSingle: "Parduoti pavieniai", legendFree: "Laisvi",
     noGames: "Šiame sąraše rungtynių nėra.", noData: "vietų duomenys dar renkami",
-    modeTaken: "% užimta", modePrice: "Kaina", low: "mažai", high: "daug",
+    modeTaken: "% užimta", modePrice: "Kaina", modeSeats: "Vietos", seatsLoading: "Kraunamos vietos…", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
     salesMapTab: "Pardavimų žemėlapis", replay: "Pardavimų eiga", popular: "Populiarumas",
     replayAt: "Būsena", replayNote: "Spalva – kokia sektoriaus vietų dalis užimta (abonementai + parduoti bilietai) pasirinktu metu, nuo 0% iki 100%. Slinkite laiką arba spauskite „Groti“. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių. Tolimoms rungtynėms rinkitės 7–30 d.: anksčiau pardavimų būna mažai.",
@@ -315,7 +318,7 @@ const T = {
     inDays: "in {n} days", tomorrow: "tomorrow", today: "today", playedLbl: "played",
     legendSeason: "Season tickets", legendSingle: "Single tickets sold", legendFree: "Available",
     noGames: "No games in this list.", noData: "seat data still being collected",
-    modeTaken: "% taken", modePrice: "Price", low: "low", high: "high",
+    modeTaken: "% taken", modePrice: "Price", modeSeats: "Seats", seatsLoading: "Loading seats…", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
     salesMapTab: "Sales map", replay: "Sales replay", popular: "Popularity",
     replayAt: "As of", replayNote: "Colour: share of the section's seats taken (season tickets + tickets sold) at the chosen moment, 0% to 100%. Move the time or press Play. Tickets sold before tracking began show as taken from the start. For far-away games pick 7–30 days: earlier there are few sales.",
@@ -915,7 +918,7 @@ function arenaColors(g){
   const low = cssVar("--low"), mid = cssVar("--mid"), high = cssVar("--high"), closed = cssVar("--closed");
   const scale = (f) => f < 0.5 ? mix(low, mid, f * 2) : mix(mid, high, (f - 0.5) * 2);
   const labelInk = (fill) => { const rgb = fill.match(/\d+/g).map(Number); return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 > 0.55 ? "#1A1208" : "#FFFFFF"; };
-  const legend = { taken: ["0%", "100% " + t("takenWord")], price: [t("cheap"), eur(Math.max(...prices, 0))] }[S.mode];
+  const legend = S.mode === "price" ? [t("cheap"), eur(Math.max(...prices, 0))] : ["0%", "100% " + t("takenWord")];
   return { secs, byId, prices, scale, closed, labelInk, legend, shapes: DATA.shapes[g.conf] || [] };
 }
 
@@ -930,15 +933,16 @@ function renderArena(){
   const polys = shapes.map(([id, pts]) => {
     const s = byId[id];
     if (!s && fanById[id]) return `<polygon points="${esc(pts)}" class="fan ${id === S.sec ? "sel" : ""}" data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(fanById[id].title + " · " + FAN)}"></polygon>`;
-    const fill = s ? scale(sectionValue(s)) : closed;
+    const fill = S.mode === "seats" ? (s ? "var(--panel)" : closed) : s ? scale(sectionValue(s)) : closed;
     const lbl = s ? s.title + (isSoldOut(s) ? " · " + t("soldOut") : s.status === "closed" ? " · " + t("closedSec") : "") : "";
     const cls = !s ? "closed" : s.status === "closed" ? "withdrawn" : "";
     const poly = `<polygon points="${esc(pts)}" fill="${fill}" class="${cls} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
-    return poly + (isSoldOut(s) ? `<polygon points="${esc(pts)}" class="stripes" fill="url(#soldStripes)" aria-hidden="true"></polygon>` : "");
+    return poly + (isSoldOut(s) && S.mode !== "seats" ? `<polygon points="${esc(pts)}" class="stripes" fill="url(#soldStripes)" aria-hidden="true"></polygon>` : "");
   }).join("");
   const labels = shapes.filter(([id]) => byId[id] || fanById[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
     const [cx, cy] = polyCenter(n);
+    if (S.mode === "seats") return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" class="halo">${esc(shortTitle(byId[id] ? byId[id].title : fanById[id].title))}</text>`;
     if (!byId[id]) return `<text x="${cx.toFixed(0)}" y="${cy.toFixed(0)}" fill="#FFFFFF">${esc(fanById[id].title)}</text>`;
     // label colour by the fill's brightness (withdrawn sections have no fill)
     const ink = byId[id].status === "closed" ? "var(--muted)" : labelInk(scale(sectionValue(byId[id])));
@@ -963,17 +967,17 @@ function renderArena(){
           </div>
           <div class="small muted" style="margin-top:2px">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${(DATA.arenaCap || {})[g.conf] ? ` · <span style="white-space:nowrap">${t("arenaCap")} ${nf(DATA.arenaCap[g.conf])}</span>` : ""}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div>
         </div>
-        ${shapes.length ? `<svg class="map" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
+        ${shapes.length ? `<svg class="map${S.mode === "seats" ? " seatsmode" : ""}" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
           <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
           <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
           <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
           <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="rotate(45)"><rect width="8" height="20" fill="rgba(255,255,255,.5)"></rect></pattern></defs>
-          ${polys}${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
-        <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
+          ${polys}<g id="mapSeats"></g>${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
+        ${S.mode === "seats" ? `<div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}<span id="seatsNote" class="muted">${t("seatsLoading")}</span></div>` : `<div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
           ${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}
           <span><i class="sw striped"></i>${t("soldOut")}</span>
           <span><i class="sw" style="border:2px dashed var(--muted)"></i>${t("closedSec")}</span>
-          <span><i class="sw" style="border:1.5px dashed var(--seat-line)"></i>${t("notOnSale")}</span></div>
+          <span><i class="sw" style="border:1.5px dashed var(--seat-line)"></i>${t("notOnSale")}</span></div>`}
       </div>
       <div class="side">
         ${s ? sectionPanel(s, g) : fan ? fanPanel(fan) : `<div class="panel note">${t("pickSection")}</div>`}
@@ -989,7 +993,8 @@ function renderArena(){
       </tbody></table></div>
   </div>`;
 
-  segButtons($("modeSeg"), [["taken", t("modeTaken")], ["price", t("modePrice")]], S.mode, (v) => { S.mode = v; renderArena(); });
+  segButtons($("modeSeg"), [["taken", t("modeTaken")], ["price", t("modePrice")], ["seats", t("modeSeats")]], S.mode, (v) => { S.mode = v; renderArena(); });
+  if (S.mode === "seats") loadSeats(g.id).then((all) => drawMapSeats(g, all, shapes));
   $("arenaShare").addEventListener("click", () => openShare(g.id, "arena"));
   scrollIndicator($("chips"), $("chipsBar"), $("chipsThumb"), "chips");
   centerChip(prevChips);
@@ -1130,6 +1135,101 @@ function sectionPanel(s, g){
   </div>
   <div class="panel"><div style="font-weight:600">${t("seatPlan")}</div><div id="seatBox"><div class="note">${t("loading")}</div></div></div>
   <div class="panel"><div style="font-weight:600">${t("priceHistory")}</div><div class="hist sb sbauto">${priceHistoryHtml(s)}</div></div>`;
+}
+
+// Seat view of the arena map. Seat positions come from each section's own seat plan (its own
+// coordinates), so every section's seats are fitted into its shape on the map: turned so that
+// row 1 faces the court, stretched to the shape, then shrunk until every seat is inside it.
+const COURT = { x0: 390, x1: 615, y0: 170, y1: 600 };   // the court on the map
+function inPoly(x, y, n){
+  let c = false;
+  for (let i = 0, j = n.length - 1; i < n.length; j = i++){
+    const [xi, yi] = n[i], [xj, yj] = n[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+// smallest rectangle around a shape: its two axes (the shape's own orientation)
+function rectAxes(n){
+  const p = n.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], hi = [];
+  for (const q of p){ while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of p.slice().reverse()){ while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
+  const h = lo.slice(0, -1).concat(hi.slice(0, -1));
+  let best = null;
+  for (let i = 0; i < h.length; i++){
+    const a = h[i], b = h[(i + 1) % h.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (!l) continue;
+    const e = [(b[0] - a[0]) / l, (b[1] - a[1]) / l], m = [-e[1], e[0]];
+    const pe = h.map((q) => q[0] * e[0] + q[1] * e[1]), pm = h.map((q) => q[0] * m[0] + q[1] * m[1]);
+    const area = (Math.max(...pe) - Math.min(...pe)) * (Math.max(...pm) - Math.min(...pm));
+    if (!best || area < best.area) best = { area, e, m };
+  }
+  return best || { e: [1, 0], m: [0, 1] };
+}
+function fitSeats(list, n){
+  const [cx, cy] = polyCenter(n);
+  // away from the court: from the nearest point of the court to the shape, along the shape's own axis
+  const out = [cx - Math.max(COURT.x0, Math.min(COURT.x1, cx)), cy - Math.max(COURT.y0, Math.min(COURT.y1, cy))];
+  const { e, m } = rectAxes(n);
+  const de = out[0] * e[0] + out[1] * e[1], dm = out[0] * m[0] + out[1] * m[1];
+  let u = Math.abs(de) > Math.abs(dm) ? e : m;
+  if (u[0] * out[0] + u[1] * out[1] < 0) u = [-u[0], -u[1]];
+  const v = [-u[1], u[0]];
+  const P = n.map((q) => [q[0] * u[0] + q[1] * u[1], q[0] * v[0] + q[1] * v[1]]);       // shape in (depth, along)
+  const u0 = Math.min(...P.map((q) => q[0])), u1 = Math.max(...P.map((q) => q[0]));
+  // the shape's width (along the court) at depth t
+  const span = (t) => {
+    const xs = [];
+    for (let i = 0; i < P.length; i++){
+      const [a0, b0] = P[i], [a1, b1] = P[(i + 1) % P.length];
+      if ((a0 - t) * (a1 - t) <= 0 && a0 !== a1) xs.push(b0 + (b1 - b0) * (t - a0) / (a1 - a0));
+    }
+    return xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
+  };
+  // the seat plan's depth axis: where the row numbers grow, snapped to the plan's x or y axis
+  const rows = list.map((q) => parseFloat(q[0]));
+  let dd = [0, 1];
+  const pts = list.filter((_q, i) => isFinite(rows[i]));
+  if (new Set(pts.map((q) => q[0])).size > 1){
+    const rs = pts.map((q) => parseFloat(q[0])), mr = rs.reduce((a, r) => a + r, 0) / rs.length;
+    const mx = pts.reduce((a, q) => a + q[2], 0) / pts.length, my = pts.reduce((a, q) => a + q[3], 0) / pts.length;
+    let sx = 0, sy = 0; pts.forEach((q, i) => { sx += (q[2] - mx) * (rs[i] - mr); sy += (q[3] - my) * (rs[i] - mr); });
+    dd = Math.abs(sx) > Math.abs(sy) ? [Math.sign(sx) || 1, 0] : [0, Math.sign(sy) || 1];
+  }
+  const da = [-dd[1], dd[0]];
+  const A = list.map((q) => q[2] * da[0] + q[3] * da[1]), B = list.map((q) => q[2] * dd[0] + q[3] * dd[1]);
+  const a0 = Math.min(...A), a1 = Math.max(...A), b0 = Math.min(...B), b1 = Math.max(...B);
+  // each seat: its depth in the shape (front row next to the court), then across the shape's width there
+  const pad = (u1 - u0) * 0.07;
+  const seats = list.map((q, i) => {
+    const t = u0 + pad + (b1 > b0 ? (B[i] - b0) / (b1 - b0) : 0.5) * (u1 - u0 - 2 * pad);
+    const sp = span(t) || [0, 0], w = sp[1] - sp[0], inset = w * 0.08;
+    const s2 = sp[0] + inset + (a1 > a0 ? (A[i] - a0) / (a1 - a0) : 0.5) * (w - 2 * inset);
+    return [u[0] * t + v[0] * s2, u[1] * t + v[1] * s2, q[4]];
+  });
+  const nRows = new Set(list.map((q) => q[0])).size || 1;
+  const perRow = Math.max(1, ...Object.values(list.reduce((mm, q) => { mm[q[0]] = (mm[q[0]] || 0) + 1; return mm; }, {})));
+  const mid = span((u0 + u1) / 2) || [0, 1];
+  const r = Math.max(1.1, Math.min(5, 0.42 * Math.min((mid[1] - mid[0]) * 0.84 / perRow, (u1 - u0 - 2 * pad) / nRows)));
+  return seats.map((x) => [x[0], x[1], x[2], r]);
+}
+function drawMapSeats(g, all, shapes){
+  const box = document.getElementById("mapSeats");
+  if (!box || S.mode !== "seats" || S.game !== g.id) return;
+  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)", C: "var(--closed)" };
+  let out = "", n = 0;
+  for (const [id, pts] of shapes){
+    const list = (all[id] || []).filter((q) => q[4] !== "X");
+    if (!list.length) continue;
+    const poly = pts.split(" ").map((p) => p.split(",").map(Number));
+    for (const [x, y, cat, r] of fitSeats(list, poly)){
+      out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="${color[cat] || "var(--avail)"}"${cat === "C" ? ' stroke="var(--seat-line)" stroke-width=".6"' : ""}/>`;
+      n++;
+    }
+  }
+  box.innerHTML = out;
+  const note = document.getElementById("seatsNote");
+  if (note) note.textContent = n ? nf(n) + " " + t("seats").toLowerCase() : t("noData");
 }
 
 function loadSeats(gid){
