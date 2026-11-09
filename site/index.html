@@ -114,7 +114,13 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .sb::-webkit-scrollbar-corner{background:transparent}
 @supports not selector(::-webkit-scrollbar){
   .sb{scrollbar-width:thin;scrollbar-color:var(--seat-line) transparent}
+  .sb.sbauto{scrollbar-color:transparent transparent}
+  .sb.sbauto:hover{scrollbar-color:var(--seat-line) transparent}
 }
+/* sbauto: the thumb only shows while the pointer is over the list */
+.sb.sbauto::-webkit-scrollbar-thumb{background:transparent}
+.sb.sbauto:hover::-webkit-scrollbar-thumb{background:var(--seat-line)}
+.sb.sbauto:hover::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 .chip small{display:block;font-size:11px;font-weight:500;opacity:.8}
 svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
 svg.map polygon{cursor:pointer;stroke:var(--line);stroke-width:2;vector-effect:non-scaling-stroke}
@@ -174,7 +180,8 @@ svg.chart .over{fill:transparent}
 .zone{display:inline-flex;align-items:center;gap:6px}.zone i{width:12px;height:12px;border-radius:3px;border:1px solid var(--line)}
 .minibar{display:inline-block;width:56px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle;overflow:hidden}.minibar i{display:block;height:100%;background:var(--season)}
 td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration:underline;font-weight:600}
-.hist{display:flex;flex-direction:column;gap:4px;font-size:13px;max-height:180px;overflow:auto}
+.hist{display:flex;flex-direction:column;gap:4px;font-size:13px;max-height:180px;overflow:auto;padding-right:4px}
+.hist.tall{max-height:min(70vh,640px)}
 .hist div{display:flex;justify-content:space-between;gap:10px}
 .note{font-size:12px;color:var(--muted)}
 .warnbtn{font:inherit;font-size:12px;font-weight:700;color:var(--warn);background:transparent;border:1px solid currentColor;border-radius:999px;padding:0 8px;margin-left:6px;cursor:pointer;line-height:18px}
@@ -576,10 +583,10 @@ function renderAnalysis(){
   const ymax = Math.max(10, ...vis.map((c) => Math.max(0, ...c.pts.map((p) => p[1]))));
   // drawn at the real width (text stays at its normal size), shorter on phones
   const W = Math.max(300, ($("view").clientWidth || 900) - 34), H = W < 600 ? 230 : 290, L = 48, R = 18, Tp = isDay ? 30 : 14, B = 34;   // game day: room above the bars for the tip-off label
-  const X = (d) => L + (d - x0) / (x1 - x0) * (W - L - R), Y = (v) => Tp + (1 - v / ymax) * (H - Tp - B);
+  const X = (d) => L + (d - x0) / (x1 - x0) * (W - L - R), Y = (v) => Tp + (1 - v / yTop) * (H - Tp - B);
   const step = (pts) => pts.map(([x, y], i) => (i ? `H${X(x).toFixed(1)}V${Y(y).toFixed(1)}` : `M${X(x).toFixed(1)},${Y(y).toFixed(1)}`)).join("");
   const nice = (m) => { const e = Math.pow(10, Math.floor(Math.log10(m))), f = m / e; return (f <= 2 ? 0.5 : f <= 5 ? 1 : 2) * e; };
-  const yt = nice(ymax), yTicks = []; for (let v = 0; v <= ymax; v += yt) yTicks.push(v);
+  const yt = nice(ymax), yTop = Math.ceil(ymax / yt) * yt, yTicks = []; for (let v = 0; v <= yTop + 1e-9; v += yt) yTicks.push(v);
   const maxTicks = W < 600 ? 4 : 8, xTicks = [];
   if (isDay){ const st = [1, 2, 3, 4, 6].find((h) => (x1 - x0) / h <= maxTicks) || 6; for (let h = 0; h <= x1; h += st) xTicks.push(h); }
   else { const xs = [1, 2, 5, 7, 14, 30, 60, 90].find((st) => -x0 / st <= maxTicks) || 180; for (let d = 0; d >= x0; d -= xs) xTicks.push(d); }
@@ -627,7 +634,7 @@ function renderAnalysis(){
     </section>
     ${evList.length ? `<section class="panel" style="padding:14px 16px">
       <h3 style="margin:0 0 8px;font-size:15px">${t("priceChanges")} · ${esc(sel.opp)}</h3>
-      <div class="hist">${evList.map((e) => `<div><span>${esc(dTime(e.ts))} · ${esc(e.section)}${e.zone ? ` <span class="muted">(${esc(e.zone)})</span>` : ""}</span><span class="num">${eur(e.from)} → <b>${eur(e.to)}</b> ${e.to > e.from ? "▲" : "▼"}</span></div>`).join("")}</div>
+      <div class="hist tall sb sbauto">${evList.map((e) => `<div><span>${esc(dTime(e.ts))} · ${esc(e.section)}${e.zone ? ` <span class="muted">(${esc(e.zone)})</span>` : ""}</span><span class="num">${eur(e.from)} → <b>${eur(e.to)}</b> ${e.to > e.from ? "▲" : "▼"}</span></div>`).join("")}</div>
     </section>` : ""}
     ${played.length ? expectedVsActual(played) : ""}
     ${attendanceBy(played)}
@@ -1124,7 +1131,7 @@ function sectionPanel(s, g){
     </div>
   </div>
   <div class="panel"><div style="font-weight:600">${t("seatPlan")}</div><div id="seatBox"><div class="note">${t("loading")}</div></div></div>
-  <div class="panel"><div style="font-weight:600">${t("priceHistory")}</div><div class="hist">${priceHistoryHtml(s)}</div></div>`;
+  <div class="panel"><div style="font-weight:600">${t("priceHistory")}</div><div class="hist sb sbauto">${priceHistoryHtml(s)}</div></div>`;
 }
 
 function loadSeats(gid){
