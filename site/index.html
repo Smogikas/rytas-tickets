@@ -1207,12 +1207,9 @@ function fitSeats(list, n){
     const s2 = sp[0] + inset + (a1 > a0 ? (A[i] - a0) / (a1 - a0) : 0.5) * (w - 2 * inset);
     return [u[0] * t + v[0] * s2, u[1] * t + v[1] * s2, q[4]];
   });
-  const nRows = new Set(list.map((q) => q[0])).size || 1;
-  const perRow = Math.max(1, ...Object.values(list.reduce((mm, q) => { mm[q[0]] = (mm[q[0]] || 0) + 1; return mm; }, {})));
-  const mid = span((u0 + u1) / 2) || [0, 1];
-  const r = Math.max(1.1, Math.min(5, 0.42 * Math.min((mid[1] - mid[0]) * 0.84 / perRow, (u1 - u0 - 2 * pad) / nRows)));
-  return seats.map((x) => [x[0], x[1], x[2], r]);
+  return seats;
 }
+const SEAT_R = 1.7;                       // one dot size for every seat (map units; seats are ~3-8 apart)
 function drawMapSeats(g, all, shapes){
   const box = document.getElementById("mapSeats");
   if (!box || S.mode !== "seats" || S.game !== g.id) return;
@@ -1222,8 +1219,8 @@ function drawMapSeats(g, all, shapes){
     const list = (all[id] || []).filter((q) => q[4] !== "X");
     if (!list.length) continue;
     const poly = pts.split(" ").map((p) => p.split(",").map(Number));
-    for (const [x, y, cat, r] of fitSeats(list, poly)){
-      out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="${color[cat] || "var(--avail)"}"${cat === "C" ? ' stroke="var(--seat-line)" stroke-width=".6"' : ""}/>`;
+    for (const [x, y, cat] of fitSeats(list, poly)){
+      out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${SEAT_R}" fill="${color[cat] || "var(--avail)"}"${cat === "C" ? ' stroke="var(--seat-line)" stroke-width=".6"' : ""}/>`;
       n++;
     }
   }
