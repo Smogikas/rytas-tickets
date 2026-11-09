@@ -358,6 +358,8 @@ class Zones(unittest.TestCase):
         sec = rytas.analyse_event(tl, r, set())["sections"][0]
         self.assertEqual([h[1] for h in sec["history"]], [16.0, 24.0])
         self.assertEqual((sec["price"], sec["status"]), (24.0, "open"))
+        ev = rytas.analyse_event(tl, r, set())["price_events"]
+        self.assertEqual(ev, [{"ts": T2, "section": "Sec", "zone": "6-a kaina → 15-ta kaina", "from": 16.0, "to": 24.0}])
         self.assertEqual(sec["revenue"], 0)
 
     def test_zone_replaced_section_stays_open(self):

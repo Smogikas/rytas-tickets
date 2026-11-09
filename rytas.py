@@ -851,7 +851,8 @@ def analyse_event(tl, price_rows, season, names=None):
     tot["avg_paid"] = tot["gross"] / tot["singles"] if tot["singles"] else None
     tot["sections"] = len(sections)
     tot["first_ts"] = first_ts
-    # price changes (per zone; a zone selling out is not a change)
+    # price changes: a level's own price changing, and the price on sale moving to another
+    # level (122: "6-a kaina" 16 EUR ran out, the seats left went to "15-ta kaina" 24 EUR)
     events = []
     for x in sections:
         multi = len(x["zones"]) > 1
@@ -861,6 +862,10 @@ def analyse_event(tl, price_rows, season, names=None):
                 if p1 != p0:
                     events.append({"ts": t1, "section": x["section"], "zone": z["name"] if multi else None,
                                    "from": p0, "to": p1})
+        h = [e for e in x["history"] if len(e) > 3]
+        for (t0, p0, _f0, z0), (t1, p1, _f1, z1) in zip(h, h[1:]):
+            if z1 != z0 and p1 != p0:
+                events.append({"ts": t1, "section": x["section"], "zone": f"{z0} → {z1}", "from": p0, "to": p1})
     tot["last_ts"] = max((rows[-1]["ts_utc"] for rows in tl.values()), default=None)
     return {"sections": sections, "totals": tot, "sale_times": sorted(sale_times),
             "price_events": sorted(events, key=lambda e: e["ts"])}
