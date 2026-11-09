@@ -1279,11 +1279,13 @@ function wrapLines(c, text, maxW){
 async function makeShareImage(g, kind){
   try { await Promise.all(["700 120px \"Space Grotesk\"", "500 30px Inter", "700 30px Inter"].map((f) => document.fonts.load(f))); } catch (e) {}
   const draw = kind === "arena" ? drawArenaShare : drawShare;
+  // the seat view: every seat on the picture too
+  const seats = kind === "arena" && S.mode === "seats" ? await loadSeats(g.id) : null;
   // first pass measures how tall the content is, second pass draws at that height
   const probe = document.createElement("canvas"); probe.width = 1080; probe.height = 2400;
-  const contentEnd = draw(probe.getContext("2d"), g, 1080, 2400);
+  const contentEnd = draw(probe.getContext("2d"), g, 1080, 2400, seats);
   const cv = document.createElement("canvas"); cv.width = 1080; cv.height = Math.ceil(contentEnd + 130);
-  draw(cv.getContext("2d"), g, cv.width, cv.height);
+  draw(cv.getContext("2d"), g, cv.width, cv.height, seats);
   return new Promise((res) => cv.toBlob((b) => res({ blob: b, ratio: cv.width / cv.height }), "image/png"));
 }
 
@@ -1311,13 +1313,13 @@ function drawShareFooter(c, W, H, v, BODY){
   c.fillText(site, W - 72 - c.measureText(site).width, H - 56);
 }
 
-function drawArenaShare(c, g, W, H){
+function drawArenaShare(c, g, W, H, seats){
   const v = (n) => cssVar(n), HEAD = '"Space Grotesk", Inter, sans-serif', BODY = 'Inter, system-ui, sans-serif';
   const A = arenaColors(g), x0 = 72, x1 = W - 72;
   c.fillStyle = v("--panel"); c.fillRect(0, 0, W, H);
   let y = drawShareHeader(c, g, W, v, HEAD, BODY);
   y += 52; c.fillStyle = v("--muted"); c.font = `500 30px ${BODY}`;
-  c.fillText(`${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()} · ${S.mode === "price" ? t("modePrice") : t("modeTaken")}`, x0, y);
+  c.fillText(`${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()} · ${seats ? t("modeSeats") : S.mode === "price" ? t("modePrice") : t("modeTaken")}`, x0, y);
   // the map: section outlines in a 1000x1000 space, cropped to what is drawn
   y += 24;
   const pts = A.shapes.map(([id, p]) => [id, p.split(" ").map((q) => q.split(",").map(Number))]);
@@ -1334,7 +1336,8 @@ function drawArenaShare(c, g, W, H){
     const s = A.byId[id];
     c.beginPath(); p.forEach(([px, py], i) => (i ? c.lineTo(X(px), Y(py)) : c.moveTo(X(px), Y(py)))); c.closePath();
     const isFan = !s && (g.fanSections || []).some((f) => f.id === id);
-    if (isFan){ c.setLineDash([]); c.fillStyle = v("--fan"); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke(); }
+    if (seats && (s || isFan)){ c.setLineDash([]); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke(); }   // seat view: outlines
+    else if (isFan){ c.setLineDash([]); c.fillStyle = v("--fan"); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke(); }
     else if (s && s.status === "closed"){ c.setLineDash([7, 6]); c.strokeStyle = v("--muted"); c.lineWidth = 2.5; c.stroke(); }
     else if (s){
       c.setLineDash([]); c.fillStyle = A.scale(sectionValue(s)); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
@@ -1346,9 +1349,26 @@ function drawArenaShare(c, g, W, H){
     }
     else { c.setLineDash([7, 6]); c.strokeStyle = v("--seat-line"); c.lineWidth = 1.5; c.stroke(); }
   }
-  c.setLineDash([]); c.textAlign = "center"; c.textBaseline = "middle"; c.font = `700 22px ${HEAD}`;
+  c.setLineDash([]);
+  if (seats){                                          // every seat, fitted into its section as on the page
+    const color = { S: v("--season"), O: v("--single"), B: v("--single"), A: v("--avail"), F: v("--fan"), C: v("--closed") };
+    const r = SEAT_R * k;
+    for (const [id, p] of pts){
+      const list = (seats[id] || []).filter((q) => q[4] !== "X");
+      if (!list.length) continue;
+      for (const [sx, sy, cat] of fitSeats(list, p)){
+        c.beginPath(); c.arc(X(sx), Y(sy), r, 0, Math.PI * 2); c.fillStyle = color[cat] || v("--avail"); c.fill();
+      }
+    }
+  }
+  c.textAlign = "center"; c.textBaseline = "middle"; c.font = `700 22px ${HEAD}`;
   for (const [id, p] of pts){
     const s = A.byId[id], f = (g.fanSections || []).find((x) => x.id === id);
+    if (seats && (s || f)){                            // labels with a halo over the seats
+      const [lx2, ly2] = polyCenter(p);
+      c.lineWidth = 6; c.lineJoin = "round"; c.strokeStyle = v("--bg"); c.strokeText(shortTitle((s || f).title), X(lx2), Y(ly2));
+      c.fillStyle = v("--ink"); c.fillText(shortTitle((s || f).title), X(lx2), Y(ly2)); continue;
+    }
     if (!s && f){
       const [fx, fy] = polyCenter(p);
       c.fillStyle = "#FFFFFF"; c.fillText(f.title, X(fx), Y(fy)); continue;
@@ -1360,7 +1380,17 @@ function drawArenaShare(c, g, W, H){
   c.textAlign = "left"; c.textBaseline = "alphabetic";
   y = Y(maxY) + 54;
   // legend
-  c.font = `500 26px ${BODY}`; c.fillStyle = v("--muted"); c.fillText(A.legend[0], x0, y);
+  c.font = `500 26px ${BODY}`;
+  if (seats){                                          // seat view: what the colours mean
+    let lx = x0;
+    for (const [col, label] of [[v("--season"), t("catS")], [v("--single"), t("seatSingle")], [v("--avail"), t("catA")]].concat(g.fans ? [[v("--fan"), FAN]] : [])){
+      const w = 38 + c.measureText(label).width;
+      if (lx > x0 && lx + w > x1){ lx = x0; y += 44; }
+      c.beginPath(); c.arc(lx + 13, y - 9, 12, 0, Math.PI * 2); c.fillStyle = col; c.fill();
+      c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += w + 36;
+    }
+  } else {
+  c.fillStyle = v("--muted"); c.fillText(A.legend[0], x0, y);
   let lx = x0 + c.measureText(A.legend[0]).width + 16;
   const grad = c.createLinearGradient(lx, 0, lx + 220, 0);
   grad.addColorStop(0, v("--low")); grad.addColorStop(0.5, v("--mid")); grad.addColorStop(1, v("--high"));
@@ -1374,6 +1404,7 @@ function drawArenaShare(c, g, W, H){
     if (lx + 38 + c.measureText(FAN).width > x1){ lx = x0; y += 44; }
     roundRect(c, lx, y - 22, 26, 26, 6); c.fillStyle = v("--fan"); c.fill();
     c.fillStyle = v("--muted"); c.fillText(FAN, lx + 38, y);
+  }
   }
   // key numbers
   y += 40; const cells = [[t("season"), nf(g.season)], [t("singles"), nf(g.singles)], [t("revenue"), eur(g.revenue)]], colW = (x1 - x0) / 3;
