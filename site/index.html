@@ -1175,17 +1175,6 @@ function fitSeats(list, n){
   let u = Math.abs(de) > Math.abs(dm) ? e : m;
   if (u[0] * out[0] + u[1] * out[1] < 0) u = [-u[0], -u[1]];
   const v = [-u[1], u[0]];
-  const P = n.map((q) => [q[0] * u[0] + q[1] * u[1], q[0] * v[0] + q[1] * v[1]]);       // shape in (depth, along)
-  const u0 = Math.min(...P.map((q) => q[0])), u1 = Math.max(...P.map((q) => q[0]));
-  // the shape's width (along the court) at depth t
-  const span = (t) => {
-    const xs = [];
-    for (let i = 0; i < P.length; i++){
-      const [a0, b0] = P[i], [a1, b1] = P[(i + 1) % P.length];
-      if ((a0 - t) * (a1 - t) <= 0 && a0 !== a1) xs.push(b0 + (b1 - b0) * (t - a0) / (a1 - a0));
-    }
-    return xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
-  };
   // the seat plan's depth axis: where the row numbers grow, snapped to the plan's x or y axis
   const rows = list.map((q) => parseFloat(q[0]));
   let dd = [0, 1];
@@ -1196,18 +1185,38 @@ function fitSeats(list, n){
     let sx = 0, sy = 0; pts.forEach((q, i) => { sx += (q[2] - mx) * (rs[i] - mr); sy += (q[3] - my) * (rs[i] - mr); });
     dd = Math.abs(sx) > Math.abs(sy) ? [Math.sign(sx) || 1, 0] : [0, Math.sign(sy) || 1];
   }
+  // row direction as read from the plan; if the plan turned 90 degrees fits the shape much better,
+  // the rows were most likely read the wrong way (the map shapes follow the real sections)
+  const a1 = fitPlan(list, n, cx, cy, u, v, dd), a2 = fitPlan(list, n, cx, cy, u, v, [-dd[1], dd[0]]);
+  return (a2.k > a1.k * 1.1 ? a2 : a1).seats;
+}
+function fitPlan(list, n, cx, cy, u, v, dd){
   const da = [-dd[1], dd[0]];
+  // the plan in (along, depth), centred; one scale for both directions keeps its real proportions
   const A = list.map((q) => q[2] * da[0] + q[3] * da[1]), B = list.map((q) => q[2] * dd[0] + q[3] * dd[1]);
-  const a0 = Math.min(...A), a1 = Math.max(...A), b0 = Math.min(...B), b1 = Math.max(...B);
-  // each seat: its depth in the shape (front row next to the court), then across the shape's width there
-  const pad = (u1 - u0) * 0.07;
-  const seats = list.map((q, i) => {
-    const t = u0 + pad + (b1 > b0 ? (B[i] - b0) / (b1 - b0) : 0.5) * (u1 - u0 - 2 * pad);
-    const sp = span(t) || [0, 0], w = sp[1] - sp[0], inset = w * 0.08;
-    const s2 = sp[0] + inset + (a1 > a0 ? (A[i] - a0) / (a1 - a0) : 0.5) * (w - 2 * inset);
-    return [u[0] * t + v[0] * s2, u[1] * t + v[1] * s2, q[4]];
-  });
-  return seats;
+  const am = (Math.min(...A) + Math.max(...A)) / 2, bm = (Math.min(...B) + Math.max(...B)) / 2;
+  const rel = list.map((_q, i) => [A[i] - am, B[i] - bm]);
+  const at = (o, k, i) => [o[0] + v[0] * rel[i][0] * k + u[0] * rel[i][1] * k, o[1] + v[1] * rel[i][0] * k + u[1] * rel[i][1] * k];
+  const fits = (o, k) => rel.every((_r, i) => { const [x, y] = at(o, k, i); return inPoly(x, y, n); });
+  // where in the shape and how large: try a grid of centres inside the shape, keep the largest fit
+  const P = n.map((q) => [q[0] * u[0] + q[1] * u[1], q[0] * v[0] + q[1] * v[1]]);
+  const u0 = Math.min(...P.map((q) => q[0])), u1 = Math.max(...P.map((q) => q[0]));
+  const v0 = Math.min(...P.map((q) => q[1])), v1 = Math.max(...P.map((q) => q[1]));
+  const cands = [[cx, cy]];
+  for (let a = 1; a <= 5; a++) for (let b = 1; b <= 5; b++){
+    const tu = u0 + (u1 - u0) * a / 6, tv = v0 + (v1 - v0) * b / 6, x = u[0] * tu + v[0] * tv, y = u[1] * tu + v[1] * tv;
+    if (inPoly(x, y, n)) cands.push([x, y]);
+  }
+  const span = Math.max(1e-6, Math.max(...rel.map((r) => Math.abs(r[0]))) * 2, Math.max(...rel.map((r) => Math.abs(r[1]))) * 2);
+  let best = { k: 0, o: [cx, cy] };
+  for (const o of cands){
+    let lo = 0, hi = Math.hypot(u1 - u0, v1 - v0) / span;
+    if (!fits(o, lo + 1e-9)) continue;
+    for (let it = 0; it < 14; it++){ const mid = (lo + hi) / 2; if (fits(o, mid)) lo = mid; else hi = mid; }
+    if (lo > best.k) best = { k: lo, o };
+  }
+  const k = best.k * 0.94;                                      // a little margin inside the outline
+  return { k: best.k, seats: list.map((q, i) => [...at(best.o, k, i), q[4]]) };
 }
 const SEAT_R = 1.7;                       // one dot size for every seat (map units; seats are ~3-8 apart)
 function drawMapSeats(g, all, shapes){
