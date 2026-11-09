@@ -286,7 +286,7 @@ const T = {
     seats: "Vietos", season: "Abonementai", single: "Pavieniai", free: "Laisvos", full: "Užimta",
     price: "Kaina", value: "Vertė", fee: "Mokesčiai", section: "Sektorius",
     seatPlan: "Vietų planas", seatHint: "Užveskite arba palieskite vietą", row: "Eilė", place: "vieta",
-    catS: "abonementas", catX: "ne vieta (plano žymė)", seatSingle: "parduota pavieniui", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
+    catS: "abonementas", catX: "ne vieta (plano žymė)", catC: "eilinė vieta, šioms rungtynėms neparduodama", seatSingle: "parduota pavieniui", catO: "parduota {d}", catB: "parduota iki stebėjimo pradžios (kaina įvertinta)", catA: "laisva",
     paid: "pirkėjas moka {p}, klubui {v}",
     noLayout: "Šio sektoriaus vietų išdėstymas bus rodomas po kito vietų plano nuskaitymo.",
     priceHistory: "Kainų istorija", unchanged: "Kaina nesikeitė nuo {d}", openedLater: "Atidarytas pardavimui {d}",
@@ -355,7 +355,7 @@ const T = {
     seats: "Seats", season: "Season", single: "Single", free: "Available", full: "Taken",
     price: "Price", value: "Value", fee: "Fees", section: "Section",
     seatPlan: "Seat plan", seatHint: "Hover or tap a seat", row: "Row", place: "seat",
-    catS: "season ticket", catX: "not a seat (plan placeholder)", seatSingle: "single ticket sold", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
+    catS: "season ticket", catX: "not a seat (plan placeholder)", catC: "regular seat, not on sale for this game", seatSingle: "single ticket sold", catO: "sold {d}", catB: "sold before tracking began (price estimated)", catA: "available",
     paid: "buyer pays {p}, club gets {v}",
     noLayout: "Seat positions for this section appear after the next seat-plan scan.",
     priceHistory: "Price history", unchanged: "Price unchanged since {d}", openedLater: "Opened for sale {d}",
@@ -931,10 +931,10 @@ function renderArena(){
     const s = byId[id];
     if (!s && fanById[id]) return `<polygon points="${esc(pts)}" class="fan ${id === S.sec ? "sel" : ""}" data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(fanById[id].title + " · " + FAN)}"></polygon>`;
     const fill = s ? scale(sectionValue(s)) : closed;
-    const lbl = s ? s.title + (s.status === "soldout" ? " · " + t("soldOut") : s.status === "closed" ? " · " + t("closedSec") : "") : "";
+    const lbl = s ? s.title + (isSoldOut(s) ? " · " + t("soldOut") : s.status === "closed" ? " · " + t("closedSec") : "") : "";
     const cls = !s ? "closed" : s.status === "closed" ? "withdrawn" : "";
     const poly = `<polygon points="${esc(pts)}" fill="${fill}" class="${cls} ${id === S.sec ? "sel" : ""}" ${s ? `data-sec="${esc(id)}" tabindex="0" role="button" aria-label="${esc(t("section") + " " + lbl)}"` : 'aria-hidden="true"'}></polygon>`;
-    return poly + (s && s.status === "soldout" ? `<polygon points="${esc(pts)}" class="stripes" fill="url(#soldStripes)" aria-hidden="true"></polygon>` : "");
+    return poly + (isSoldOut(s) ? `<polygon points="${esc(pts)}" class="stripes" fill="url(#soldStripes)" aria-hidden="true"></polygon>` : "");
   }).join("");
   const labels = shapes.filter(([id]) => byId[id] || fanById[id]).map(([id, pts]) => {
     const n = pts.split(" ").map((p) => p.split(",").map(Number));
@@ -967,7 +967,7 @@ function renderArena(){
           <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
           <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
           <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
-          <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="12" height="12" patternTransform="rotate(45)"><rect width="5" height="12" fill="rgba(255,255,255,.45)"></rect></pattern></defs>
+          <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="rotate(45)"><rect width="8" height="20" fill="rgba(255,255,255,.5)"></rect></pattern></defs>
           ${polys}${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
         <div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
           ${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}
@@ -1054,8 +1054,10 @@ function scrollIndicator(el, bar, thumb, key){
   update();
 }
 
+// sold out: every seat taken (season tickets + single) or the price list says so; not for closed sections
+function isSoldOut(s){ return !!s && s.status !== "closed" && (s.status === "soldout" || (s.seats > 0 && s.available === 0)); }
 function statusTag(s){
-  if (s.status === "soldout") return ` <span class="tag soldout">${t("soldOut")}</span>`;
+  if (isSoldOut(s)) return ` <span class="tag soldout">${t("soldOut")}</span>`;
   if (s.status === "closed") return ` <span class="tag closed">${t("closedSec")}</span>`;
   return "";
 }
@@ -1144,13 +1146,13 @@ async function drawSeats(g, s){
   if (!list.length){ box.innerHTML = `<div class="note">${t("noLayout")}</div>`; return; }
   const xs = list.map((q) => q[2]), ys = list.map((q) => q[3]);
   const x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 16, h = Math.max(...ys) - y0 + 16;
-  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)", X: "var(--closed)" };
-  const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" || q[4] === "X" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
+  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)", X: "var(--closed)", C: "var(--closed)" };
+  const rects = list.map((q, i) => `<rect x="${q[2] - x0 + 1.5}" y="${q[3] - y0 + 1.5}" width="13" height="13" rx="3" fill="${color[q[4]]}" stroke="${q[4] === "A" || q[4] === "X" || q[4] === "C" ? "var(--seat-line)" : color[q[4]]}" stroke-width="1" data-i="${i}" ${S.seat === i ? 'stroke-width="2.5" style="stroke:var(--ink)"' : ""}><title>${esc(seatLabel(q))}</title></rect>`).join("");
   const K = 1.1;  // px per seat-map unit: the same seat size in every section
   box.innerHTML = `<div class="seatwrap sb" id="seatWrap"><svg class="seats" viewBox="0 0 ${w} ${h}" width="${Math.round(w * K)}" height="${Math.round(h * K)}" role="img" aria-label="${esc(t("seatPlan") + " " + s.title)}">${rects}</svg></div>
     <div class="small num" id="seatInfo" style="min-height:20px">${esc(S.seat != null && list[S.seat] ? seatLabel(list[S.seat]) : t("seatHint"))}</div>
     <div class="legend">${list.some((q) => q[4] === "F") ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN} · ${t("catF")}</span>`
-      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>${list.some((q) => q[4] === "X") ? `<span><i class="sw" style="background:var(--closed);border-color:var(--seat-line)"></i>${t("catX")}</span>` : ""}`}</div>`;
+      : `<span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>${list.some((q) => q[4] === "X") ? `<span><i class="sw" style="background:var(--closed);border-color:var(--seat-line)"></i>${t("catX")}</span>` : ""}${list.some((q) => q[4] === "C") ? `<span><i class="sw" style="background:var(--closed);border-color:var(--seat-line)"></i>${t("catC")}</span>` : ""}`}</div>`;
   const svg = box.querySelector("svg");
   const show = (e) => { const r = e.target.closest("rect[data-i]"); if (!r) return; S.seat = +r.dataset.i; $("seatInfo").textContent = seatLabel(list[S.seat]); };
   svg.addEventListener("mouseover", show); svg.addEventListener("click", show);
@@ -1158,7 +1160,7 @@ async function drawSeats(g, s){
 
 function seatLabel(q){
   const [row, place, , , cat, price, fee, ts] = q;
-  let st = cat === "F" ? FAN + " · " + t("catF") : cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : cat === "X" ? t("catX") : t("catA");
+  let st = cat === "F" ? FAN + " · " + t("catF") : cat === "S" ? t("catS") : cat === "O" ? t("catO", { d: ts ? dTime(ts) : "" }) : cat === "B" ? t("catB") : cat === "X" ? t("catX") : cat === "C" ? t("catC") : t("catA");
   if (cat !== "S" && price != null) st += " · " + t("paid", { p: eur(price), v: eur(price - (fee || 0)) });
   return `${t("row")} ${row}, ${t("place")} ${place} · ${st}`;
 }
@@ -1239,7 +1241,7 @@ function drawArenaShare(c, g, W, H){
     else if (s && s.status === "closed"){ c.setLineDash([7, 6]); c.strokeStyle = v("--muted"); c.lineWidth = 2.5; c.stroke(); }
     else if (s){
       c.setLineDash([]); c.fillStyle = A.scale(sectionValue(s)); c.fill(); c.strokeStyle = v("--line"); c.lineWidth = 2; c.stroke();
-      if (s.status === "soldout"){
+      if (isSoldOut(s)){
         c.save(); c.clip(); c.strokeStyle = "rgba(255,255,255,.45)"; c.lineWidth = 6;
         for (let d = -1100; d < 1100; d += 16){ c.beginPath(); c.moveTo(x0 + d, y); c.lineTo(x0 + d + 1100, y + 1100); c.stroke(); }
         c.restore();

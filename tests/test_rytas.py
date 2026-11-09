@@ -579,7 +579,8 @@ class Analysis(Base):
         self.assertEqual(res["ZPHZTQITUH"]["season_sections"], [("72935", "401", 40)])
         self.assertEqual(lkl["season"], 6 + 6 + 40)            # 6 season seats in each sold section + the whole of 401
         sec = {x["section_id"]: x for x in res["ZPHZTQITUH"]["sections"]}["72935"]
-        self.assertEqual((sec["seats"], sec["season"], sec["status"]), (40, 40, "soldout"))
+        self.assertEqual((sec["seats"], sec["season"], sec["status"]), (40, 40, "closed"))   # not on sale: shown closed
+        self.assertEqual(res["ZPHZTQITUH"]["season_total"], 12 + 40)
         top8 = res["PNJMMUNJYB"]["totals"]
         self.assertEqual(top8["season"], 0)                    # Top 8: every taken seat is a single ticket
         self.assertEqual(top8["singles"], top8["taken"])
@@ -587,6 +588,32 @@ class Analysis(Base):
         self.assertTrue(rytas.season_covered("BCL: Vilniaus ''Rytas'' - Nantero ''Nanterre 92''"))
         self.assertFalse(rytas.season_covered("BCL Top 8: Rytas - X"))
         self.assertTrue(rytas.season_covered("LKL: Rytas - X (ketvirtfinalis)"))   # LKL playoffs are covered
+
+    def test_membership_section_put_on_sale_with_one_seat(self):
+        """107 for Nanterre: 1 of its seats on single sale, the rest taken (memberships)."""
+        rytas.main(["add-series", "PNJMMUNJYB"])
+        self.site.prices = {e: copy.deepcopy(p) for e, p in self.site.prices.items()}
+        games = list(self.site.prices)
+        one = games[-1]
+        for e in games[:-1]:
+            self.site.close_section(e, "72935")
+        self.site.seats.setdefault(one, {})["72935"] = {f"72935-{i}": (1 if i == 0 else 0) for i in range(40)}
+        with unittest.mock.patch.object(rytas, "SEASON_SECTIONS", {"72935": "401"}), \
+                unittest.mock.patch.object(rytas, "SEASON_MIN_GAMES", 2):
+            self.assertEqual(self.snapshot_all(), 0)
+            res = rytas.analyse_all(rytas.load_events())
+            data_dir = Path(self.tmp) / "site"
+            rytas.main(["export", str(data_dir)])
+        covered = [e for e in games if res[e]["season_group_size"]]
+        self.assertEqual({res[e]["season_total"] for e in covered}, {len(rytas.season_seats(
+            rytas.season_groups({x: m["name"] for x, m in rytas.load_events()["events"].items()})[one],
+            {x: rytas.timelines(rytas.load_seats(x)) for x in games})) + 39})          # same in every game
+        sec = {x["section_id"]: x for x in res[one]["sections"]}["72935"]
+        self.assertEqual((sec["seats"], sec["season"], sec["available"], sec["singles"]), (40, 39, 1, 0))
+        other = {x["section_id"]: x for x in res[games[0]]["sections"]}["72935"]
+        self.assertEqual((other["seats"], other["season"], other["status"]), (39, 39, "closed"))
+        seats = json.loads((data_dir / "seats" / f"{games[0]}.json").read_text(encoding="utf-8"))["72935"]
+        self.assertEqual(sorted(q[4] for q in seats).count("C"), 1)                 # the regular seat: not on sale
 
     def test_seat_sold_in_one_game_before_tracking_is_not_season(self):
         rytas.main(["add-series", "PNJMMUNJYB"])

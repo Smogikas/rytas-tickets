@@ -78,9 +78,12 @@ Seat ids are the same in every game, so for each game:
   the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
   For some games (Žalgiris) B Tribūna covers 109–112: sections 109 and 112 count as B Tribūna (full)
   in a game where they are not on sale online but are on sale in other games.
-- **107** (137 seats) was sold out as memberships (club posts, Aug 2026): while it is not on single
-  sale all its seats count as season tickets; when a seat or two is put on sale (Nanterre, 9 Nov: 1
-  seat at 30 EUR) the seats already taken stay season tickets and only seats seen sold count as single. (107 AMUSNET Lounge, the 20-seat corner, is read normally.)
+- **107** (137 seats) was sold out as memberships (club posts, Aug 2026). A seat of 107 ever put on
+  single sale (Nanterre, 9 Nov: 1 seat at 30 EUR) is a regular seat; the other 136 are season tickets
+  in every game. When 107 is not on sale the section is shown closed (its 136 season seats still
+  count; the regular seat is closed); when it is on sale it is read like any section, the seats taken
+  then staying season tickets and only seats seen sold counting as single.
+- A section is shown sold out (hatched) when every seat is taken or bilietai.lt lists it as sold out. (107 AMUSNET Lounge, the 20-seat corner, is read normally.)
 - **BCL Top 8** games are not covered by memberships: every seat is a normal ticket there, no
   season tickets are counted.
 - Season seats in a section that is not on sale online for a game still count (as season tickets,
