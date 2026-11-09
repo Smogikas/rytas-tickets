@@ -59,6 +59,8 @@ Seat ids are the same in every game, so for each game:
     in the seat's own price zone (a seat's price class = the zone id; a section can have
     several zones, e.g. 21-ta kaina 79 €, 22-ta kaina 69 €)
   - **sold before tracking began** (5 Nov 2026): priced at the first logged price (estimate)
+  - **taken when a section opens later** (e.g. 123–126 for Nanterre): counted as sold at the
+    moment the section first appeared, at its price then, so they count in that day's sales
 - **Club revenue** = **ticket value = price − fee**. The bilietai.lt price includes fees
   (booking, Arena Vilnius, venue administration, lounge), which do not go to the club:
   e.g. a 45 € lounge ticket = 30 € ticket value + 15 € fees.

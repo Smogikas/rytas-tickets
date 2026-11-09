@@ -362,6 +362,21 @@ class Zones(unittest.TestCase):
         self.assertEqual(ev, [{"ts": T2, "section": "Sec", "zone": "6-a kaina → 15-ta kaina", "from": 16.0, "to": 24.0}])
         self.assertEqual(sec["revenue"], 0)
 
+    def test_seats_taken_in_a_section_opened_later_count_as_sold_that_day(self):
+        T0, T3 = "2026-11-09T08:00:00+00:00", "2026-11-09T10:09:00+00:00"
+        r = [dict(x, section_id=sid, section=sid) for sid, x in (("A", self.rows([(T0, "5-a kaina", "1", 20.0, 22)])[0]),
+                                                                 ("B", self.rows([(T3, "23-čia kaina", "2", 8.0, 22)])[0]))]
+        seat = lambda sid, i, ts, st, pc: {"ts_utc": ts, "section_id": sid, "seat_id": f"{sid}{i}", "status": st, "price_class": pc}
+        tl = {"A1": [seat("A", 1, T0, 0, "1")],                                   # open from the start: before tracking
+              "B1": [seat("B", 1, T3, 0, "0")], "B2": [seat("B", 2, T3, 0, "0")],  # taken when B opened
+              "B3": [seat("B", 3, T3, 1, "2")]}
+        res = rytas.analyse_event(tl, r, set())
+        a, b = sorted(res["sections"], key=lambda x: x["section_id"])
+        self.assertEqual((a["pre_taken"], a["sold_seen"]), (1, 0))
+        self.assertEqual((b["pre_taken"], b["sold_seen"], b["singles"], b["available"]), (0, 2, 2, 1))
+        self.assertEqual(res["sale_times"], [T3, T3])
+        self.assertEqual(b["gross"], 16.0)                                        # 2 x 8 EUR
+
     def test_zone_replaced_section_stays_open(self):
         """101 Lounge: zone 'Premium lounge 5' replaced by 'Premium lounge 6' (same price).
         The old zone going to 0 must not make the section 'withdrawn'."""

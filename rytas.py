@@ -774,6 +774,8 @@ def analyse_event(tl, price_rows, season, names=None):
     season      taken seats in the season-ticket estimate
     sold_seen   seats seen going available -> taken while tracked: exact online sales
     pre_taken   taken when first seen and not season: sold before tracking began
+                (in a section that opened later, those count as sold when it opened:
+                sold_seen, at the time the section was first seen)
     singles     taken - season: single-game tickets (estimate)
     revenue     club revenue = ticket value (price - fee) of the singles; seen sales
                 at the price in force when seen, earlier ones at the first logged price
@@ -795,6 +797,10 @@ def analyse_event(tl, price_rows, season, names=None):
     for seat, (sid, cat, p, f, _ts) in classify_seats(tl, prices, season).items():
         if cat == BLOCKED:
             continue
+        if cat == SOLD_BEFORE and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1):
+            # section opened after tracking began: seats already taken then were sold
+            # (or given out) by then, so they count as sales of that day
+            cat, _ts = SOLD_SEEN, tl[seat][0]["ts_utc"]
         if cat == SOLD_SEEN:
             sale_times.append(_ts)
         x = sec[sid]
