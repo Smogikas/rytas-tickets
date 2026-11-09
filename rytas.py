@@ -797,7 +797,11 @@ def analyse_event(tl, price_rows, season, names=None):
     for seat, (sid, cat, p, f, _ts) in classify_seats(tl, prices, season).items():
         if cat == BLOCKED:
             continue
-        if cat == SOLD_BEFORE and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1):
+        if cat == SOLD_BEFORE and sid in SEASON_SECTIONS:
+            # a season-ticket section (107) put on sale: the seats already taken are the
+            # season tickets, only seats seen sold later are single tickets
+            cat = SEASON
+        elif cat == SOLD_BEFORE and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1):
             # section opened after tracking began: seats already taken then were sold
             # (or given out) by then, so they count as sales of that day
             cat, _ts = SOLD_SEEN, tl[seat][0]["ts_utc"]

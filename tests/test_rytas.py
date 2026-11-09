@@ -377,6 +377,21 @@ class Zones(unittest.TestCase):
         self.assertEqual(res["sale_times"], [T3, T3])
         self.assertEqual(b["gross"], 16.0)                                        # 2 x 8 EUR
 
+    def test_season_section_put_on_sale_keeps_its_taken_seats_as_season(self):
+        """107 (sold out as season tickets) opens for Nanterre with 1 seat free."""
+        T0, T3, T4 = "2026-11-09T08:00:00+00:00", "2026-11-09T15:00:00+00:00", "2026-11-09T16:00:00+00:00"
+        sid = next(iter(rytas.SEASON_SECTIONS))
+        r = [dict(x, section_id=k, section=k) for k, x in (("A", self.rows([(T0, "5-a kaina", "1", 20.0, 22)])[0]),
+                                                           (sid, self.rows([(T3, "17-ta kaina", "2", 30.0, 2)])[0]))]
+        seat = lambda k, i, ts, st: {"ts_utc": ts, "section_id": k, "seat_id": f"{k}-{i}", "status": st, "price_class": "2"}
+        tl = {"A-1": [seat("A", 1, T0, 1)],
+              f"{sid}-1": [seat(sid, 1, T3, 0)], f"{sid}-2": [seat(sid, 2, T3, 0)],
+              f"{sid}-3": [seat(sid, 3, T3, 1), seat(sid, 3, T4, 0)]}            # the free one sells later
+        res = rytas.analyse_event(tl, r, set())
+        x = next(s for s in res["sections"] if s["section_id"] == sid)
+        self.assertEqual((x["season"], x["singles"], x["sold_seen"], x["pre_taken"]), (2, 1, 1, 0))
+        self.assertEqual(res["sale_times"], [T4])
+
     def test_zone_replaced_section_stays_open(self):
         """101 Lounge: zone 'Premium lounge 5' replaced by 'Premium lounge 6' (same price).
         The old zone going to 0 must not make the section 'withdrawn'."""
