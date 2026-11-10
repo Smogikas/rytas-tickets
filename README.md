@@ -30,6 +30,8 @@ seat by seat, with a live web page:
   hover any line for its game, days before tip-off and tickets sold), the game's price changes
   listed below the chart, and for played games expected vs attended and attendance by
   opponent, weekday, tip-off time and competition (once attendance is typed into the Sheet).
+- **Sales map** (Pardavimų žemėlapis): a section that opened (or closed) after tracking began is drawn
+  dashed (not on sale) until that hour; the openings are listed and marked on the slider (click to jump).
 - **Sales map** (Pardavimų žemėlapis): replay how a game's sections filled up over the last 7 / 14 / 30 days or
   all of tracking (slider / play), and section popularity over played games (average fill rate incl. season
   tickets, and average seats taken; far-away games are left out so they don't pull the averages down).

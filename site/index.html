@@ -127,6 +127,12 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .chip small{display:block;font-size:11px;font-weight:500;opacity:.8}
 svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
 .mapwrap{position:relative}
+.rp-track{position:relative}
+.rp-track input{width:100%}
+.rp-tick{position:absolute;bottom:-4px;width:2px;height:9px;margin-left:-1px;border-radius:1px;background:var(--ink);pointer-events:none;opacity:.8}
+.rp-ev{display:block;width:100%;text-align:left;background:none;border:0;padding:3px 0;color:var(--ink);cursor:pointer;font:inherit}
+.rp-ev:hover{text-decoration:underline}
+.rp-ev.past{opacity:1} .rp-ev:not(.past){opacity:.55}
 .map-expand{position:absolute;top:0;right:0;z-index:2}
 .btn.icon{padding:8px;min-width:40px;min-height:40px;justify-content:center}
 .btn.icon svg{width:20px;height:20px}
@@ -281,7 +287,9 @@ const T = {
     modeTaken: "% užimta", modePrice: "Kaina", modeSeats: "Vietos", seatsLoading: "Kraunamos vietos…", low: "mažai", high: "daug",
     cheap: "pigiausia", notOnSale: "Šioms rungtynėms neparduodama",
     salesMapTab: "Pardavimų žemėlapis", replay: "Pardavimų eiga", popular: "Populiarumas",
-    replayAt: "Būsena", replayNote: "Spalva – kokia sektoriaus vietų dalis užimta (abonementai + parduoti bilietai) pasirinktu metu, nuo 0% iki 100%. Slinkite laiką arba spauskite „Groti“. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių. Tolimoms rungtynėms rinkitės 7–30 d.: anksčiau pardavimų būna mažai.",
+    replayAt: "Būsena", openings: "Sektorių atidarymai", openedNow: "atidaryta pardavimui", closedNow: "uždaryta", notYet: "dar neparduodamas",
+    replayNote2: "Brūkšniuotas kontūras – sektorius tuo metu dar (arba jau) neparduodamas; jis nuspalvinamas nuo tos valandos, kai atsirado bilietai.lt. ",
+    replayNote: "Spalva – kokia sektoriaus vietų dalis užimta (abonementai + parduoti bilietai) pasirinktu metu, nuo 0% iki 100%. Slinkite laiką arba spauskite „Groti“. Bilietai, parduoti iki stebėjimo pradžios, rodomi kaip užimti nuo pradžių. Tolimoms rungtynėms rinkitės 7–30 d.: anksčiau pardavimų būna mažai.",
     popFill: "Užpildymas", popCount: "Užimta vietų", avgTakenLbl: "vid. užimta", seatsWord: "vietų",
     popEmpty: "Bus rodoma po pirmųjų sužaistų rungtynių ({d}): skaičiuojama tik pagal sužaistas rungtynes (galutinė būsena rungtynių pradžioje), kad tolimos rungtynės neiškreiptų vidurkių.",
     popNoteFill: "Vidutinis sektoriaus užpildymas sužaistose rungtynėse ({n}): užimtos vietos (abonementai + parduoti bilietai) ÷ visos sektoriaus vietos, rungtynių pradžioje.",
@@ -350,7 +358,9 @@ const T = {
     modeTaken: "% taken", modePrice: "Price", modeSeats: "Seats", seatsLoading: "Loading seats…", low: "low", high: "high",
     cheap: "cheapest", notOnSale: "Not on sale for this game",
     salesMapTab: "Sales map", replay: "Sales replay", popular: "Popularity",
-    replayAt: "As of", replayNote: "Colour: share of the section's seats taken (season tickets + tickets sold) at the chosen moment, 0% to 100%. Move the time or press Play. Tickets sold before tracking began show as taken from the start. For far-away games pick 7–30 days: earlier there are few sales.",
+    replayAt: "As of", openings: "Sections opened", openedNow: "opened for sale", closedNow: "closed", notYet: "not on sale yet",
+    replayNote2: "Dashed outline: the section was not (or no longer) on sale at that moment; it is coloured from the hour it appeared on bilietai.lt. ",
+    replayNote: "Colour: share of the section's seats taken (season tickets + tickets sold) at the chosen moment, 0% to 100%. Move the time or press Play. Tickets sold before tracking began show as taken from the start. For far-away games pick 7–30 days: earlier there are few sales.",
     popFill: "Fill rate", popCount: "Seats taken", avgTakenLbl: "avg taken", seatsWord: "seats",
     popEmpty: "Shown after the first played game ({d}): only played games count (final state at tip-off), so far-away games don't distort the averages.",
     popNoteFill: "Average fill rate in played games ({n}): seats taken (season tickets + tickets sold) ÷ all seats of the section, at tip-off.",
@@ -794,6 +804,14 @@ function renderSalesMap(){
       S.replayWin = rr;
       const secsById = {}; (DATA.sections[sel.id] || []).forEach((x) => { secsById[x.id] = x; });
       const fanIds = new Set((sel.fanSections || []).map((f) => f.id));
+      // sections that opened (or closed) after tracking began, grouped by the hour they changed
+      const evs = {};
+      for (const x of DATA.sections[sel.id] || []){
+        if (x.openedLater){ const k = x.openedLater.slice(0, 13); (evs[k] = evs[k] || { t: new Date(x.openedLater).getTime(), open: [], shut: [] }).open.push(shortTitle(x.title)); }
+        if (x.status === "closed" && x.closedAt){ const k = x.closedAt.slice(0, 13); (evs[k] = evs[k] || { t: new Date(x.closedAt).getTime(), open: [], shut: [] }).shut.push(shortTitle(x.title)); }
+      }
+      const evList = Object.values(evs).filter((e) => e.t >= t0 && e.t <= t1).sort((a, b) => a.t - b.t);
+      const natSort = (arr) => arr.sort((a, b) => a.localeCompare(b, "lt", { numeric: true })).join(", ");
       const draw = () => {
         const T = t0 + S.replayT * 36e5;
         let soldThen = 0;
@@ -805,10 +823,18 @@ function renderSalesMap(){
             if (taken) k++; if (cat === "B" || (cat === "O" && taken)) soldThen++; }
           if (n) share[sid] = k / n;
         }
+        const offAt = (x) => !!x && ((x.openedLater && T < new Date(x.openedLater).getTime()) ||
+          (x.status === "closed" && x.closedAt && T >= new Date(x.closedAt).getTime()));
+        for (const [sid, list] of Object.entries(seats)){                       // seats of a section not yet on sale don't count
+          const x = secsById[sid]; if (!offAt(x)) continue;
+          for (const q of list) if (q[4] === "O" && q[7] && new Date(q[7]).getTime() <= T) soldThen--;
+        }
         const cell = (id) => { if (fanIds.has(id)) return { fill: cssVar("--fan"), label: "", cls: "fan" };
+          if (offAt(secsById[id])) return null;                                 // drawn as not on sale (dashed)
           if (share[id] == null) return null; const fill = scale(share[id]);
           const x = secsById[id]; return { fill, label: x ? shortTitle(x.title) : "", ink: labelInk(fill), title: `${x ? x.title : id}: ${(100 * share[id]).toFixed(0)}%` }; };
         $("smMap").innerHTML = mapSvg(shapes, cell);
+        document.querySelectorAll("#smOpen [data-t]").forEach((el) => el.classList.toggle("past", Number(el.dataset.t) <= T));
         $("smWhen").textContent = dTime(new Date(T).toISOString());
         $("smSold").textContent = t("soldByThen", { n: nf(soldThen) });
       };
@@ -818,14 +844,20 @@ function renderSalesMap(){
         <div class="replay"><div class="seg small-seg" role="group" id="rpRange" style="margin-bottom:12px"></div>
           <div class="small muted">${t("replayAt")}</div><div class="disp" style="font-size:20px;font-weight:700" id="smWhen"></div>
           <div class="small" id="smSold" style="margin:2px 0 10px"></div>
-          <input type="range" id="smRange" min="0" max="${hours}" step="1" value="${S.replayT}" aria-label="${esc(t("replayAt"))}">
+          <div class="rp-track"><input type="range" id="smRange" min="0" max="${hours}" step="1" value="${S.replayT}" aria-label="${esc(t("replayAt"))}">
+            ${evList.map((e) => `<i class="rp-tick" style="left:${(100 * (e.t - t0) / (t1 - t0)).toFixed(2)}%" title="${esc(dTime(new Date(e.t).toISOString()))}"></i>`).join("")}</div>
           <div style="display:flex;justify-content:space-between" class="small muted"><span>${esc(dTime(new Date(t0).toISOString()))}</span><span>${esc(dTime(new Date(t1).toISOString()))}</span></div>
           <button type="button" class="btn" id="smPlay" style="margin-top:10px">${replayTimer ? t("pause") : t("play")}</button>
-          <p class="note" style="margin:10px 0 0">${t("replayNote")}</p></div></div>`;
+          ${evList.length ? `<div id="smOpen" style="margin-top:14px"><div class="small" style="font-weight:600;margin-bottom:4px">${t("openings")}</div>
+            ${evList.map((e) => `<button type="button" class="rp-ev small" data-t="${e.t}"><span class="muted">${esc(dTime(new Date(e.t).toISOString()))}</span> · ${e.open.length ? `${esc(natSort(e.open))} <span class="muted">${t("openedNow")}</span>` : ""}${e.open.length && e.shut.length ? "; " : ""}${e.shut.length ? `${esc(natSort(e.shut))} <span class="muted">${t("closedNow")}</span>` : ""}</button>`).join("")}</div>` : ""}
+          <p class="note" style="margin:10px 0 0">${evList.length ? t("replayNote2") : ""}${t("replayNote")}</p></div></div>`;
       draw();
       segButtons($("rpRange"), [["7", "7 " + t("daysShort")], ["14", "14 " + t("daysShort")], ["30", "30 " + t("daysShort")], ["all", t("rangeAll")]], rr,
         (v) => { S.rrange = v; store.set("rrange", v); if (replayTimer){ clearInterval(replayTimer); replayTimer = null; } render(); }, t("replay"));
       $("smRange").oninput = (e) => { S.replayT = Number(e.target.value); draw(); };
+      document.querySelectorAll("#smOpen [data-t]").forEach((el) => el.addEventListener("click", () => {   // jump to that hour
+        if (replayTimer){ clearInterval(replayTimer); replayTimer = null; $("smPlay").textContent = t("play"); }
+        S.replayT = Math.min(hours, Math.max(0, Math.ceil((Number(el.dataset.t) - t0) / 36e5))); $("smRange").value = S.replayT; draw(); }));
       $("smPlay").onclick = () => {
         if (replayTimer){ clearInterval(replayTimer); replayTimer = null; $("smPlay").textContent = t("play"); return; }
         if (S.replayT >= hours) S.replayT = 0;
