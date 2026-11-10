@@ -942,12 +942,17 @@ function arenaColors(g){
   const secs = DATA.sections[g.id] || [];
   const byId = {}; secs.forEach((s) => { byId[s.id] = s; });
   const prices = secs.map((s) => s.price || 0).filter((p) => p > 0);
-  const lo = Math.log(Math.min(...prices, 1e9)), hi = Math.log(Math.max(...prices, 1));
-  secs.forEach((s) => { s._p = s.price && hi > lo ? (Math.log(s.price) - lo) / (hi - lo) : 0; });
+  // VIP boxes (189 EUR vs 8-43 EUR) are left out of the price scale, so the regular sections stay
+  // distinguishable; anything dearer than the scale's top gets the top colour ("43 EUR+")
+  const scaled = secs.filter((s) => s.price > 0 && !/\bVIP\b/i.test(s.title || "")).map((s) => s.price);
+  const ref = scaled.length ? scaled : prices;
+  const top = Math.max(...ref, 1), over = prices.some((p) => p > top);
+  const lo = Math.log(Math.min(...ref, 1e9)), hi = Math.log(top);
+  secs.forEach((s) => { s._p = s.price && hi > lo ? Math.min(1, Math.max(0, (Math.log(s.price) - lo) / (hi - lo))) : 0; });
   const low = cssVar("--low"), mid = cssVar("--mid"), high = cssVar("--high"), closed = cssVar("--closed");
   const scale = (f) => f < 0.5 ? mix(low, mid, f * 2) : mix(mid, high, (f - 0.5) * 2);
   const labelInk = (fill) => { const rgb = fill.match(/\d+/g).map(Number); return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 > 0.55 ? "#1A1208" : "#FFFFFF"; };
-  const legend = S.mode === "price" ? [t("cheap"), eur(Math.max(...prices, 0))] : ["0%", "100% " + t("takenWord")];
+  const legend = S.mode === "price" ? [t("cheap"), eur(top) + (over ? "+" : "")] : ["0%", "100% " + t("takenWord")];
   return { secs, byId, prices, scale, closed, labelInk, legend, shapes: DATA.shapes[g.conf] || [] };
 }
 
