@@ -11,8 +11,8 @@ seat by seat, with a live web page:
 - **Arena plan**: pick a game; sections coloured by % taken or price, or every seat ("Vietos": season ticket / sold / free;
   bilietai.lt gives seat positions only within each section's own plan, so each section's real
   rows are drawn in its map shape: one map row per plan row (row 1 by the court), each row
-  stretched across the shape's width at its depth, seats in their plan columns (aisles and gaps
-  kept); spacing differs between sections; one dot size, smaller only in a cramped row; every dot
+  stretched across the shape's width at its depth (short rows at most 1.5x the usual spacing,
+  staying compact where the plan has them), seats in their plan columns (aisles and gaps kept); spacing differs between sections; one dot size, smaller only in a cramped row; every dot
   clear of its outline and of overlapping smaller sections (VIP over 120-121, 113/114); light theme
   uses teal / orange / white rings / purple); the expand
   button on the map opens it full screen (any view, with its colour key; pinch / mouse wheel to

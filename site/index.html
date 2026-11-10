@@ -1325,19 +1325,26 @@ function fitSeats(list, n, others = []){
     const t0 = nR > 1 ? tA : u0 + D / 2;
     const rowSteps = [];
     const pos = new Array(list.length), cap = new Array(list.length);
-    for (const [r, idx] of Object.entries(rowsOf)){
+    // first each row's stretch and how far apart its seats would be if it filled it
+    const rows = Object.entries(rowsOf).map(([r, idx]) => {
       const t = t0 + Number(r) * stepD;
       const c0 = Math.min(...idx.map((i) => cI[i])), c1 = Math.max(...idx.map((i) => cI[i]));
-      // the row's stretch; if a notch or a neighbour leaves too little room, the full width at that depth
       // the row's stretch at least m inside the outline; if nothing qualifies, the shape's width there less m
       let sp = usable(t, m);
       if (!sp){ const full = spanAt(t) || midU, w = full[1] - full[0], inset = Math.min(m, w / 2 - 0.01); sp = [full[0] + inset, full[1] - inset]; }
-      const rowStep = c1 > c0 ? (sp[1] - sp[0]) / (c1 - c0) : stepD;
-      if (c1 > c0) rowSteps.push(rowStep);
+      return { idx, t, c0, c1, sp, fill: c1 > c0 ? (sp[1] - sp[0]) / (c1 - c0) : null };
+    });
+    // a short row (113's 2-seat front rows) is not pulled apart to the shape's edges: no row is spaced
+    // more than 1.5x the section's usual spacing, it stays compact at its place in the plan
+    const fills = rows.map((x) => x.fill).filter((x) => x).sort((a, b) => a - b);
+    const usual = fills.length ? fills[Math.floor(fills.length / 2)] : stepD;
+    const cMid = (Math.min(...cI) + Math.max(...cI)) / 2;
+    for (const { idx, t, c0, c1, sp, fill } of rows){
+      const rowStep = fill ? Math.min(fill, 1.5 * usual) : stepD;
+      if (fill) rowSteps.push(rowStep);
       // the row centred where the plan has it relative to the section's columns, kept inside its stretch
-      const cMid = (Math.min(...cI) + Math.max(...cI)) / 2, rowMid = (sp[0] + sp[1]) / 2;
+      const rowMid = (sp[0] + sp[1]) / 2, half = (c1 - c0) / 2 * rowStep;
       let off = rowMid + ((c0 + c1) / 2 - cMid) * rowStep;
-      const half = (c1 - c0) / 2 * rowStep;
       off = Math.max(sp[0] + half, Math.min(sp[1] - half, off));
       for (const i of idx){ pos[i] = [t, off + (cI[i] - (c0 + c1) / 2) * rowStep]; cap[i] = 0.45 * Math.min(rowStep, stepD); }
     }
