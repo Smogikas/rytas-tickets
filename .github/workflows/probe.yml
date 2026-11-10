@@ -1,0 +1,25 @@
+name: probe
+on: workflow_dispatch
+permissions: { contents: read }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+      SHEET_ID: 12u2OBPsVzivfjZopgrjTtUKfc-TtXARYcEODmzRVGaM
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install google-auth==2.38.0 requests==2.32.3
+      - run: |
+          python sheets.py pull && python rytas.py export _out
+          python - <<'PY'
+          import json
+          d = json.load(open("_out/data.json", encoding="utf-8"))
+          for g in d["games"][:2]:
+              print("GAME", g["opp"], "dataFrom", g.get("dataFrom"), "first sale", g["sales"][0][0] if g.get("sales") else None)
+              for s in d["sections"][g["id"]]:
+                  if s.get("openedLater") or s["title"][:3] in ("123", "124", "422", "426", "107"):
+                      print("  ", s["title"], "| openedLater", s.get("openedLater"), "| status", s["status"], "| closedAt", s.get("closedAt"))
+          PY
