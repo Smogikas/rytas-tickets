@@ -14,7 +14,8 @@
 :root{
   --bg:#F6EFE2; --panel:#FFFAF0; --ink:#2A1C11; --muted:#6B5644; --line:#E2D3BA;
   --accent:#7B4A23; --accent-ink:#FFF8EC; --season:#6F6052; --single:#C47A2C; --free:#F6EFE2; --seat-line:#B8A386;
-  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46; --warn:#B4532A; --c1:#008C80; --c2:#C7701A;
+  --closed:#EFE5D2; --low:#F0E2C8; --mid:#CF9F67; --high:#7B4A23; --court:#D8C7A8; --focus:#7B4A23; --bcl:#2E5C8A; --sel:#C47A2C; --avail:#E2C79C; --fan:#8E3B46;
+  --dot-s:#0F8278; --dot-o:#E08A1E; --dot-a:#FFFFFF; --dot-a-line:#A8977F; --dot-a-w:.5; --dot-f:#7C5CB8; --warn:#B4532A; --c1:#008C80; --c2:#C7701A;
   color-scheme: light;
 }
 /* dark: charcoal with amber; teal for the data (as in light) */
@@ -22,14 +23,16 @@
   :root:not([data-theme="light"]){
     --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
     --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
+    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
+    --dot-s:#3F8F88; --dot-o:#E0A458; --dot-a:#D9DDD4; --dot-a-line:transparent; --dot-a-w:0; --dot-f:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
   --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
+  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
+    --dot-s:#3F8F88; --dot-o:#E0A458; --dot-a:#D9DDD4; --dot-a-line:transparent; --dot-a-w:0; --dot-f:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
@@ -140,6 +143,9 @@ svg.map text{font:700 15px "Space Grotesk",Inter,sans-serif;pointer-events:none;
 svg.map text.halo{fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round;font-size:14px}
 svg.map.seatsmode polygon.fan{fill:var(--panel)}
 svg.map #mapSeats{pointer-events:none}
+.legend .sw.dot{border-radius:50%}
+#mapSeats .dS{fill:var(--dot-s)} #mapSeats .dO,#mapSeats .dB{fill:var(--dot-o)} #mapSeats .dF{fill:var(--dot-f)}
+#mapSeats .dA{fill:var(--dot-a);stroke:var(--dot-a-line);stroke-width:var(--dot-a-w)} #mapSeats .dC{fill:var(--closed);stroke:var(--seat-line);stroke-width:.6}
 svg.seats rect{cursor:pointer}
 .tablebox{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -973,7 +979,7 @@ function renderArena(){
           <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
           <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="rotate(45)"><rect width="8" height="20" fill="rgba(255,255,255,.5)"></rect></pattern></defs>
           ${polys}<g id="mapSeats"></g>${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
-        ${S.mode === "seats" ? `<div class="legend"><span><i class="sw" style="background:var(--season)"></i>${t("catS")}</span><span><i class="sw" style="background:var(--single)"></i>${t("seatSingle")}</span><span><i class="sw" style="background:var(--avail);border-color:var(--seat-line)"></i>${t("catA")}</span>${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}<span id="seatsNote" class="muted">${t("seatsLoading")}</span></div>` : `<div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
+        ${S.mode === "seats" ? `<div class="legend"><span><i class="sw dot" style="background:var(--dot-s)"></i>${t("catS")}</span><span><i class="sw dot" style="background:var(--dot-o)"></i>${t("seatSingle")}</span><span><i class="sw dot" style="background:var(--dot-a);border-color:var(--dot-a-line)"></i>${t("catA")}</span>${g.fans ? `<span><i class="sw dot" style="background:var(--dot-f)"></i>${FAN}</span>` : ""}<span id="seatsNote" class="muted">${t("seatsLoading")}</span></div>` : `<div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
           ${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}
           <span><i class="sw striped"></i>${t("soldOut")}</span>
           <span><i class="sw" style="border:2px dashed var(--muted)"></i>${t("closedSec")}</span>
@@ -1166,27 +1172,97 @@ function rectAxes(n){
   }
   return best || { e: [1, 0], m: [0, 1] };
 }
-function fitSeats(list, n){
+function polyEdgeDist(x, y, n){
+  let best = Infinity;
+  for (let i = 0; i < n.length; i++){
+    const a = n[i], b = n[(i + 1) % n.length], dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
+    let k = l ? ((x - a[0]) * dx + (y - a[1]) * dy) / l : 0; k = Math.max(0, Math.min(1, k));
+    best = Math.min(best, Math.hypot(x - a[0] - k * dx, y - a[1] - k * dy));
+  }
+  return best;
+}
+// Some section outlines overlap on the map (VIP over 120-121, 113 over 114): the larger
+// section keeps its seats clear of the smaller one's outline, so no two dots sit on each other.
+function polyArea(n){ let a = 0; for (let i = 0; i < n.length; i++){ const p = n[i], q = n[(i + 1) % n.length]; a += p[0] * q[1] - q[0] * p[1]; } return Math.abs(a) / 2; }
+function polysOverlap(a, b){
+  const bx = (p) => [Math.min(...p.map((q) => q[0])), Math.max(...p.map((q) => q[0])), Math.min(...p.map((q) => q[1])), Math.max(...p.map((q) => q[1]))];
+  const A = bx(a), B = bx(b);
+  if (A[0] >= B[1] || B[0] >= A[1] || A[2] >= B[3] || B[2] >= A[3]) return false;
+  if (a.some(([x, y]) => inPoly(x, y, b)) || b.some(([x, y]) => inPoly(x, y, a))) return true;
+  const cr = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  for (let i = 0; i < a.length; i++) for (let j = 0; j < b.length; j++){
+    const p1 = a[i], p2 = a[(i + 1) % a.length], q1 = b[j], q2 = b[(j + 1) % b.length];
+    if (cr(p1, p2, q1) * cr(p1, p2, q2) < 0 && cr(q1, q2, p1) * cr(q1, q2, p2) < 0) return true;
+  }
+  return false;
+}
+function neighbours(n, all){
+  const area = polyArea(n);
+  return all.filter((o) => o !== n && polyArea(o) < area && polysOverlap(n, o));
+}
+function fitSeats(list, n, others = []){
   const [cx, cy] = polyCenter(n);
-  // away from the court: from the nearest point of the court to the shape, along the shape's own axis
+  // the shape's own axes: u away from the court (from the nearest point of the court), v along it
   const out = [cx - Math.max(COURT.x0, Math.min(COURT.x1, cx)), cy - Math.max(COURT.y0, Math.min(COURT.y1, cy))];
   const { e, m } = rectAxes(n);
   const de = out[0] * e[0] + out[1] * e[1], dm = out[0] * m[0] + out[1] * m[1];
   let u = Math.abs(de) > Math.abs(dm) ? e : m;
   if (u[0] * out[0] + u[1] * out[1] < 0) u = [-u[0], -u[1]];
   const v = [-u[1], u[0]];
-  const P = n.map((q) => [q[0] * u[0] + q[1] * u[1], q[0] * v[0] + q[1] * v[1]]);       // shape in (depth, along)
+  const P = n.map((q) => [q[0] * u[0] + q[1] * u[1], q[0] * v[0] + q[1] * v[1]]);
   const u0 = Math.min(...P.map((q) => q[0])), u1 = Math.max(...P.map((q) => q[0]));
-  // the shape's width (along the court) at depth t
-  const span = (t) => {
+  const spanAt = (t) => {                                  // the shape's extent along the court at depth t
     const xs = [];
     for (let i = 0; i < P.length; i++){
       const [a0, b0] = P[i], [a1, b1] = P[(i + 1) % P.length];
       if ((a0 - t) * (a1 - t) <= 0 && a0 !== a1) xs.push(b0 + (b1 - b0) * (t - a0) / (a1 - a0));
     }
-    return xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
+    return xs.length >= 2 ? [Math.min(...xs), Math.max(...xs)] : null;
   };
-  // the seat plan's depth axis: where the row numbers grow, snapped to the plan's x or y axis
+  // distance from a point (in u,v terms) to the shape's outline
+  const edgeDist = (t, sv) => {
+    let best = Infinity;
+    for (let i = 0; i < P.length; i++){
+      const [a0, b0] = P[i], [a1, b1] = P[(i + 1) % P.length], du = a1 - a0, dv = b1 - b0, l = du * du + dv * dv;
+      let k = l ? ((t - a0) * du + (sv - b0) * dv) / l : 0; k = Math.max(0, Math.min(1, k));
+      best = Math.min(best, Math.hypot(t - a0 - k * du, sv - b0 - k * dv));
+    }
+    return best;
+  };
+  const inside = (t, sv) => inPoly(u[0] * t + v[0] * sv, u[1] * t + v[1] * sv, n);
+  const near = others.map((o) => ({ p: o, box: [Math.min(...o.map((q) => q[0])), Math.max(...o.map((q) => q[0])), Math.min(...o.map((q) => q[1])), Math.max(...o.map((q) => q[1]))] }));
+  // an even grid in the shape with step d: rows parallel to the court, front row first; every
+  // point keeps 0.42 d from the outline, so no dot crosses it or touches a neighbouring section's
+  const grid = (d) => {
+    const g = [], m = d * 0.42;
+    const ok = (t, sv) => {
+      if (!inside(t, sv) || edgeDist(t, sv) < m) return false;
+      const x = u[0] * t + v[0] * sv, y = u[1] * t + v[1] * sv;
+      for (const o of near){                              // quick box test first: most points are far from neighbours
+        const b = o.box;
+        if (x < b[0] - m || x > b[1] + m || y < b[2] - m || y > b[3] + m) continue;
+        if (inPoly(x, y, o.p) || polyEdgeDist(x, y, o.p) < m) return false;
+      }
+      return true;
+    };
+    for (let t = u0 + m, row = 0; t <= u1 - m; t += d, row++){
+      const sp = spanAt(t); if (!sp) continue;
+      let lo = null, hi = null;
+      for (let sv = sp[0]; sv <= sp[1]; sv += d / 5) if (ok(t, sv)){ if (lo === null) lo = sv; hi = sv; }
+      if (lo === null) continue;
+      const k = Math.floor((hi - lo) / d) + 1, off = lo + (hi - lo - (k - 1) * d) / 2;
+      for (let i = 0; i < k; i++){ const sv = off + i * d; if (ok(t, sv)) g.push({ t, s: sv, row }); }
+    }
+    return g;
+  };
+  // the largest step that still gives every seat a grid point
+  const N = list.length;
+  let lo = 0.2, hi = Math.max(2, u1 - u0);
+  for (let it = 0; it < 18; it++){ const mid = (lo + hi) / 2; if (grid(mid).length >= N) lo = mid; else hi = mid; }
+  const d = lo, G = grid(d);
+  // no room once the neighbours' outlines are kept clear of: fit in the own outline only
+  if (G.length < N) return others.length ? fitSeats(list, n, []) : list.map((q) => [cx, cy, q[4]]);
+  // each seat's place in its section (0..1 front to back, 0..1 along the row) from its seat plan
   const rows = list.map((q) => parseFloat(q[0]));
   let dd = [0, 1];
   const pts = list.filter((_q, i) => isFinite(rows[i]));
@@ -1198,31 +1274,49 @@ function fitSeats(list, n){
   }
   const da = [-dd[1], dd[0]];
   const A = list.map((q) => q[2] * da[0] + q[3] * da[1]), B = list.map((q) => q[2] * dd[0] + q[3] * dd[1]);
-  const a0 = Math.min(...A), a1 = Math.max(...A), b0 = Math.min(...B), b1 = Math.max(...B);
-  // each seat: its depth in the shape (front row next to the court), then across the shape's width there
-  const pad = (u1 - u0) * 0.07;
-  const seats = list.map((q, i) => {
-    const t = u0 + pad + (b1 > b0 ? (B[i] - b0) / (b1 - b0) : 0.5) * (u1 - u0 - 2 * pad);
-    const sp = span(t) || [0, 0], w = sp[1] - sp[0], inset = w * 0.08;
-    const s2 = sp[0] + inset + (a1 > a0 ? (A[i] - a0) / (a1 - a0) : 0.5) * (w - 2 * inset);
-    return [u[0] * t + v[0] * s2, u[1] * t + v[1] * s2, q[4]];
-  });
+  const norm = (arr) => { const a0 = Math.min(...arr), a1 = Math.max(...arr); return arr.map((x) => a1 > a0 ? (x - a0) / (a1 - a0) : 0.5); };
+  const na = norm(A), nb = norm(B);
+  // the grid points' place in the same terms
+  const gt = norm(G.map((p) => p.t));
+  const gs = G.map((p) => { const sp = spanAt(p.t); return sp && sp[1] > sp[0] ? (p.s - sp[0]) / (sp[1] - sp[0]) : 0.5; });
+  // seats front to back each take the nearest free grid point
+  const order = list.map((_q, i) => i).sort((x, y) => nb[x] - nb[y] || na[x] - na[y]);
+  const free = G.map(() => true), at = new Array(N);
+  for (const i of order){
+    let best = -1, bd = Infinity;
+    for (let j = 0; j < G.length; j++){
+      if (!free[j]) continue;
+      const dist = (gt[j] - nb[i]) ** 2 * 1.5 + (gs[j] - na[i]) ** 2;
+      if (dist < bd){ bd = dist; best = j; }
+    }
+    free[best] = false; at[i] = G[best];
+  }
+  const seats = list.map((q, i) => [u[0] * at[i].t + v[0] * at[i].s, u[1] * at[i].t + v[1] * at[i].s, q[4]]);
+  seats.step = d;
   return seats;
 }
-const SEAT_R = 1.7;                       // one dot size for every seat (map units; seats are ~3-8 apart)
+// one dot size for every seat: from the tightest section's grid step (so no dots touch)
+function seatRadius(fitted){
+  const steps = fitted.filter((f) => f.length >= 20).map((f) => f.step).filter((x) => x > 0);
+  const tight = steps.length ? Math.min(...steps) : 4;
+  return Math.min(2.6, tight * 0.36);
+}
 function drawMapSeats(g, all, shapes){
   const box = document.getElementById("mapSeats");
   if (!box || S.mode !== "seats" || S.game !== g.id) return;
-  const color = { S: "var(--season)", O: "var(--single)", B: "var(--single)", A: "var(--avail)", F: "var(--fan)", C: "var(--closed)" };
-  let out = "", n = 0;
-  for (const [id, pts] of shapes){
+  let out = "", n = 0; const fitted = [];
+  const polys = shapes.map(([id, pts]) => [id, pts.split(" ").map((p) => p.split(",").map(Number))]);
+  const allP = polys.filter(([id]) => (all[id] || []).some((q) => q[4] !== "X")).map((x) => x[1]);   // sections with seats drawn
+  for (const [id, poly] of polys){
     const list = (all[id] || []).filter((q) => q[4] !== "X");
     if (!list.length) continue;
-    const poly = pts.split(" ").map((p) => p.split(",").map(Number));
-    for (const [x, y, cat] of fitSeats(list, poly)){
-      out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${SEAT_R}" fill="${color[cat] || "var(--avail)"}"${cat === "C" ? ' stroke="var(--seat-line)" stroke-width=".6"' : ""}/>`;
-      n++;
-    }
+    fitted.push(fitSeats(list, poly, neighbours(poly, allP)));
+  }
+  const r = seatRadius(fitted);
+  for (const f of fitted) for (const [x, y, cat] of f){
+    // a section too small for that size (VIP, a few seats) draws its own seats smaller
+    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${Math.min(r, f.step * 0.4).toFixed(2)}" class="d${cat}"/>`;
+    n++;
   }
   box.innerHTML = out;
   const note = document.getElementById("seatsNote");
@@ -1351,14 +1445,18 @@ function drawArenaShare(c, g, W, H, seats){
   }
   c.setLineDash([]);
   if (seats){                                          // every seat, fitted into its section as on the page
-    const color = { S: v("--season"), O: v("--single"), B: v("--single"), A: v("--avail"), F: v("--fan"), C: v("--closed") };
-    const r = SEAT_R * k;
+    const color = { S: v("--dot-s"), O: v("--dot-o"), B: v("--dot-o"), A: v("--dot-a"), F: v("--dot-f"), C: v("--closed") };
+    const ring = parseFloat(v("--dot-a-w")) > 0 ? v("--dot-a-line") : null;
+    const fitted = [];
+    const allP = pts.filter(([id]) => (seats[id] || []).some((q) => q[4] !== "X")).map((x) => x[1]);
     for (const [id, p] of pts){
       const list = (seats[id] || []).filter((q) => q[4] !== "X");
-      if (!list.length) continue;
-      for (const [sx, sy, cat] of fitSeats(list, p)){
-        c.beginPath(); c.arc(X(sx), Y(sy), r, 0, Math.PI * 2); c.fillStyle = color[cat] || v("--avail"); c.fill();
-      }
+      if (list.length) fitted.push(fitSeats(list, p, neighbours(p, allP)));
+    }
+    const r = seatRadius(fitted) * k;
+    for (const f of fitted) for (const [sx, sy, cat] of f){
+      c.beginPath(); c.arc(X(sx), Y(sy), Math.min(r, f.step * 0.4 * k), 0, Math.PI * 2); c.fillStyle = color[cat] || color.A; c.fill();
+      if (cat === "A" && ring){ c.lineWidth = 1.2; c.strokeStyle = ring; c.stroke(); }
     }
   }
   c.textAlign = "center"; c.textBaseline = "middle"; c.font = `700 22px ${HEAD}`;
@@ -1383,10 +1481,11 @@ function drawArenaShare(c, g, W, H, seats){
   c.font = `500 26px ${BODY}`;
   if (seats){                                          // seat view: what the colours mean
     let lx = x0;
-    for (const [col, label] of [[v("--season"), t("catS")], [v("--single"), t("seatSingle")], [v("--avail"), t("catA")]].concat(g.fans ? [[v("--fan"), FAN]] : [])){
+    for (const [col, label] of [[v("--dot-s"), t("catS")], [v("--dot-o"), t("seatSingle")], [v("--dot-a"), t("catA")]].concat(g.fans ? [[v("--dot-f"), FAN]] : [])){
       const w = 38 + c.measureText(label).width;
       if (lx > x0 && lx + w > x1){ lx = x0; y += 44; }
       c.beginPath(); c.arc(lx + 13, y - 9, 12, 0, Math.PI * 2); c.fillStyle = col; c.fill();
+      if (col === v("--dot-a") && parseFloat(v("--dot-a-w")) > 0){ c.lineWidth = 2; c.strokeStyle = v("--dot-a-line"); c.stroke(); }
       c.fillStyle = v("--muted"); c.fillText(label, lx + 38, y); lx += w + 36;
     }
   } else {
