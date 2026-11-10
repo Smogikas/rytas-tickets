@@ -1255,41 +1255,31 @@ function fitSeats(list, n, others = []){
   };
   const inside = (t, sv) => inPoly(u[0] * t + v[0] * sv, u[1] * t + v[1] * sv, n);
   const near = others.map((o) => ({ p: o, box: [Math.min(...o.map((q) => q[0])), Math.max(...o.map((q) => q[0])), Math.min(...o.map((q) => q[1])), Math.max(...o.map((q) => q[1]))] }));
-  // an even grid in the shape with step d: rows parallel to the court, front row first; every
-  // point keeps 0.42 d from the outline, so no dot crosses it or touches a neighbouring section's
-  const grid = (d) => {
-    const g = [], m = d * 0.42;
-    const ok = (t, sv) => {
-      if (!inside(t, sv) || edgeDist(t, sv) < m) return false;
-      const x = u[0] * t + v[0] * sv, y = u[1] * t + v[1] * sv;
-      for (const o of near){                              // quick box test first: most points are far from neighbours
-        const b = o.box;
-        if (x < b[0] - m || x > b[1] + m || y < b[2] - m || y > b[3] + m) continue;
-        if (inPoly(x, y, o.p) || polyEdgeDist(x, y, o.p) < m) return false;
-      }
-      return true;
-    };
-    for (let t = u0 + m, row = 0; t <= u1 - m; t += d, row++){
-      const sp = spanAt(t); if (!sp) continue;
-      let lo = null, hi = null;
-      for (let sv = sp[0]; sv <= sp[1]; sv += d / 5) if (ok(t, sv)){ if (lo === null) lo = sv; hi = sv; }
-      if (lo === null) continue;
-      const k = Math.floor((hi - lo) / d) + 1, off = lo + (hi - lo - (k - 1) * d) / 2;
-      for (let i = 0; i < k; i++){ const sv = off + i * d; if (ok(t, sv)) g.push({ t, s: sv, row }); }
+  const valid = (t, sv, m) => {
+    if (!inside(t, sv) || edgeDist(t, sv) < m) return false;
+    const x = u[0] * t + v[0] * sv, y = u[1] * t + v[1] * sv;
+    for (const o of near){
+      const b = o.box;
+      if (x < b[0] - m || x > b[1] + m || y < b[2] - m || y > b[3] + m) continue;
+      if (inPoly(x, y, o.p) || polyEdgeDist(x, y, o.p) < m) return false;
     }
-    return g;
+    return true;
   };
-  // the largest step that still gives every seat a grid point
-  const N = list.length;
-  let lo = 0.2, hi = Math.max(2, u1 - u0);
-  for (let it = 0; it < 18; it++){ const mid = (lo + hi) / 2; if (grid(mid).length >= N) lo = mid; else hi = mid; }
-  const d = lo, G = grid(d);
-  // no room once the neighbours' outlines are kept clear of: fit in the own outline only
-  if (G.length < N) return others.length ? fitSeats(list, n, []) : list.map((q) => [cx, cy, q[4]]);
-  // each seat's place in its section (0..1 front to back, 0..1 along the row) from its seat plan
-  const rows = list.map((q) => parseFloat(q[0]));
+  // the usable stretch of a row at depth t: inside the shape and at least m from any outline
+  const usable = (t, m) => {
+    const sp = spanAt(t); if (!sp) return null;
+    // the longest unbroken stretch (a notch in the outline splits a row)
+    let best = null, run = null; const stp = Math.max(0.3, (sp[1] - sp[0]) / 80);
+    for (let sv = sp[0]; sv <= sp[1] + 1e-9; sv += stp){
+      if (valid(t, sv, m)){ run = run ? [run[0], sv] : [sv, sv]; if (!best || run[1] - run[0] > best[1] - best[0]) best = run.slice(); }
+      else run = null;
+    }
+    return best;
+  };
+  // the seat plan's own rows and columns: depth axis where the row numbers grow (snapped to the plan's x/y)
+  const rnum = list.map((q) => parseFloat(q[0]));
   let dd = [0, 1];
-  const pts = list.filter((_q, i) => isFinite(rows[i]));
+  const pts = list.filter((_q, i) => isFinite(rnum[i]));
   if (new Set(pts.map((q) => q[0])).size > 1){
     const rs = pts.map((q) => parseFloat(q[0])), mr = rs.reduce((a, r) => a + r, 0) / rs.length;
     const mx = pts.reduce((a, q) => a + q[2], 0) / pts.length, my = pts.reduce((a, q) => a + q[3], 0) / pts.length;
@@ -1298,32 +1288,84 @@ function fitSeats(list, n, others = []){
   }
   const da = [-dd[1], dd[0]];
   const A = list.map((q) => q[2] * da[0] + q[3] * da[1]), B = list.map((q) => q[2] * dd[0] + q[3] * dd[1]);
-  const norm = (arr) => { const a0 = Math.min(...arr), a1 = Math.max(...arr); return arr.map((x) => a1 > a0 ? (x - a0) / (a1 - a0) : 0.5); };
-  const na = norm(A), nb = norm(B);
-  // the grid points' place in the same terms
-  const gt = norm(G.map((p) => p.t));
-  const gs = G.map((p) => { const sp = spanAt(p.t); return sp && sp[1] > sp[0] ? (p.s - sp[0]) / (sp[1] - sp[0]) : 0.5; });
-  // seats front to back each take the nearest free grid point
-  const order = list.map((_q, i) => i).sort((x, y) => nb[x] - nb[y] || na[x] - na[y]);
-  const free = G.map(() => true), at = new Array(N);
-  for (const i of order){
-    let best = -1, bd = Infinity;
-    for (let j = 0; j < G.length; j++){
-      if (!free[j]) continue;
-      const dist = (gt[j] - nb[i]) ** 2 * 1.5 + (gs[j] - na[i]) ** 2;
-      if (dist < bd){ bd = dist; best = j; }
+  // rows exactly as in the seat plan (its row labels), in order front to back; columns in units of the
+  // usual distance between neighbouring seats of a row (gaps and aisles kept, half steps for staggering)
+  const byRow = {};
+  list.forEach((q, i) => { (byRow[q[0]] = byRow[q[0]] || []).push(i); });
+  const rowKeys = Object.keys(byRow).sort((x, y) => byRow[x].reduce((a, i) => a + B[i], 0) / byRow[x].length - byRow[y].reduce((a, i) => a + B[i], 0) / byRow[y].length);
+  const nb = [];
+  for (const k of rowKeys){ const xs = byRow[k].map((i) => A[i]).sort((a, b) => a - b); for (let i = 1; i < xs.length; i++) if (xs[i] - xs[i - 1] > 0.5) nb.push(xs[i] - xs[i - 1]); }
+  nb.sort((a, b) => a - b);
+  const seatGap = nb.length ? nb[Math.floor(nb.length / 2)] : 1;
+  const minA = Math.min(...A);
+  const cI = A.map((x) => Math.round((x - minA) / seatGap * 2) / 2);
+  const means = rowKeys.map((k) => byRow[k].reduce((a, i) => a + B[i], 0) / byRow[k].length);
+  const rg = means.slice(1).map((x, i) => x - means[i]).filter((g) => g > 0.5).sort((a, b) => a - b);
+  const rowGap = rg.length ? rg[Math.floor(rg.length / 2)] : 1;
+  const rI = new Array(list.length);
+  rowKeys.forEach((k, j) => { const ri = Math.round((means[j] - means[0]) / rowGap * 2) / 2; for (const i of byRow[k]) rI[i] = ri; });
+  const nR = Math.max(...rI) + 1, rowsOf = {};
+  list.forEach((_q, i) => { (rowsOf[rI[i]] = rowsOf[rI[i]] || []).push(i); });
+  const place = (m) => {
+    // rows evenly from front to back: the first and last row where a row has (nearly) its full width,
+    // i.e. not squeezed by a slanted front or back edge
+    const D = u1 - u0;
+    const roomy = (t) => { const a = usable(t, m), b = spanAt(t); return a && b && a[1] - a[0] >= 0.85 * (b[1] - b[0] - 2 * m); };
+    let tA = u0 + m, tB = u1 - m;
+    while (tA < u0 + D / 2 && !roomy(tA)) tA += Math.max(0.2, m / 4);
+    while (tB > u0 + D / 2 && !roomy(tB)) tB -= Math.max(0.2, m / 4);
+    if (tB <= tA){ tA = u0 + D * 0.25; tB = u0 + D * 0.75; }
+    let stepD = nR > 1 ? (tB - tA) / (nR - 1) : D;
+    // widest row stretch at the middle depth, for the spacing along a row
+    const midU = usable((u0 + u1) / 2, m) || spanAt((u0 + u1) / 2) || [0, 1];
+    const nC = Math.max(...cI) - Math.min(...cI);
+    let stepA = nC > 0 ? (midU[1] - midU[0]) / nC : stepD || 1;
+    // keep the spacing along a row and between rows within 1.4x of each other (no stripes)
+    stepA = Infinity;                                   // each row is stretched across the shape (spacing may differ)
+    const t0 = nR > 1 ? tA : u0 + D / 2;
+    const rowSteps = [];
+    const pos = new Array(list.length), cap = new Array(list.length);
+    for (const [r, idx] of Object.entries(rowsOf)){
+      const t = t0 + Number(r) * stepD;
+      const c0 = Math.min(...idx.map((i) => cI[i])), c1 = Math.max(...idx.map((i) => cI[i]));
+      // the row's stretch; if a notch or a neighbour leaves too little room, the full width at that depth
+      // the row's stretch at least m inside the outline; if nothing qualifies, the shape's width there less m
+      let sp = usable(t, m);
+      if (!sp){ const full = spanAt(t) || midU, w = full[1] - full[0], inset = Math.min(m, w / 2 - 0.01); sp = [full[0] + inset, full[1] - inset]; }
+      const rowStep = c1 > c0 ? (sp[1] - sp[0]) / (c1 - c0) : stepD;
+      if (c1 > c0) rowSteps.push(rowStep);
+      // the row centred where the plan has it relative to the section's columns, kept inside its stretch
+      const cMid = (Math.min(...cI) + Math.max(...cI)) / 2, rowMid = (sp[0] + sp[1]) / 2;
+      let off = rowMid + ((c0 + c1) / 2 - cMid) * rowStep;
+      const half = (c1 - c0) / 2 * rowStep;
+      off = Math.max(sp[0] + half, Math.min(sp[1] - half, off));
+      for (const i of idx){ pos[i] = [t, off + (cI[i] - (c0 + c1) / 2) * rowStep]; cap[i] = 0.45 * Math.min(rowStep, stepD); }
     }
-    free[best] = false; at[i] = G[best];
-  }
-  const seats = list.map((q, i) => [u[0] * at[i].t + v[0] * at[i].s, u[1] * at[i].t + v[1] * at[i].s, q[4]]);
-  seats.step = d;
+    // the section's usual spacing (between rows, and in a typical row); each seat also has its own row's limit
+    rowSteps.sort((a, b) => a - b);
+    const typical = rowSteps.length ? rowSteps[Math.floor(rowSteps.length / 2)] : stepD;
+    return { pos, cap, step: Math.min(stepD, typical) };
+  };
+  // two passes: the margin from the outline follows the spacing
+  let res = place(0.42 * (u1 - u0) / nR);
+  const margin = 0.47 * res.step;
+  res = place(margin);
+  // [x, y, category, the largest dot that keeps clear of its row neighbours and of the outline]
+  const seats = list.map((q, i) => {
+    const [t, sv] = res.pos[i], x = u[0] * t + v[0] * sv, y = u[1] * t + v[1] * sv;
+    let room = edgeDist(t, sv);                                   // never larger than the distance to an outline
+    for (const o of near){ const bb = o.box; if (x > bb[0] - 10 && x < bb[1] + 10 && y > bb[2] - 10 && y < bb[3] + 10) room = Math.min(room, polyEdgeDist(x, y, o.p)); }
+    return [x, y, q[4], Math.min(res.cap[i], 0.98 * margin, 0.98 * room)];
+  });
+  seats.step = res.step;
   return seats;
 }
+
 // one dot size for every seat: from the tightest section's grid step (so no dots touch)
 function seatRadius(fitted){
-  const steps = fitted.filter((f) => f.length >= 20).map((f) => f.step).filter((x) => x > 0);
-  const tight = steps.length ? Math.min(...steps) : 4;
-  return Math.min(2.6, tight * 0.36);
+  const steps = fitted.filter((f) => f.length >= 20).map((f) => f.step).filter((x) => x > 0).sort((a, b) => a - b);
+  const tight = steps.length ? steps[Math.floor(steps.length * 0.2)] : 4;      // the tighter sections set the size
+  return Math.min(2.6, tight * 0.42);
 }
 function drawMapSeats(g, all, shapes){
   const box = document.getElementById("mapSeats");
@@ -1337,9 +1379,9 @@ function drawMapSeats(g, all, shapes){
     fitted.push(fitSeats(list, poly, neighbours(poly, allP)));
   }
   const r = seatRadius(fitted);
-  for (const f of fitted) for (const [x, y, cat] of f){
-    // a section too small for that size (VIP, a few seats) draws its own seats smaller
-    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${Math.min(r, f.step * 0.4).toFixed(2)}" class="d${cat}"/>`;
+  for (const f of fitted) for (const [x, y, cat, rmax] of f){
+    // one size for all; smaller only in a row too cramped for it (or a tiny section like VIP)
+    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${Math.min(r, rmax).toFixed(2)}" class="d${cat}"/>`;
     n++;
   }
   box.innerHTML = out;
@@ -1546,8 +1588,8 @@ function drawArenaShare(c, g, W, H, seats){
       if (list.length) fitted.push(fitSeats(list, p, neighbours(p, allP)));
     }
     const r = seatRadius(fitted) * k;
-    for (const f of fitted) for (const [sx, sy, cat] of f){
-      c.beginPath(); c.arc(X(sx), Y(sy), Math.min(r, f.step * 0.4 * k), 0, Math.PI * 2); c.fillStyle = color[cat] || color.A; c.fill();
+    for (const f of fitted) for (const [sx, sy, cat, rmax] of f){
+      c.beginPath(); c.arc(X(sx), Y(sy), Math.min(r, rmax * k), 0, Math.PI * 2); c.fillStyle = color[cat] || color.A; c.fill();
       if (cat === "A" && ring){ c.lineWidth = 1.2; c.strokeStyle = ring; c.stroke(); }
     }
   }
