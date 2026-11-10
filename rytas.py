@@ -909,7 +909,13 @@ def analyse_all(ev, with_seats=False):
         out[eid]["season_total"] = len(cache[g]) + sum(max(0, conf_cap[sid] - regular[sid])
                                                        for sid in SEASON_SECTIONS if g and sid in conf_cap)
         if with_seats:
-            out[eid]["seats"] = classify_seats(tls[eid], price_lookup(price_rows, zn), cache[g])
+            seats = classify_seats(tls[eid], price_lookup(price_rows, zn), cache[g])
+            # 107 put on sale: its seats already taken are season tickets (as in the totals), so the
+            # seat plan shows them as season tickets, not as single tickets sold before tracking
+            for seat, (sid, cat, p, f, ts) in seats.items():
+                if cat == SOLD_BEFORE and sid in SEASON_SECTIONS:
+                    seats[seat] = (sid, SEASON, None, None, ts)
+            out[eid]["seats"] = seats
         # B Tribūna not on sale for this game: assume full (their whole capacity).
         # 110-111 always; 109 / 112 when on sale in other games but not in this one.
         cap = load_capacity(ev["events"][eid].get("conf_id", ""))

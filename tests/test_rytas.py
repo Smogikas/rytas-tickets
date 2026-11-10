@@ -601,7 +601,7 @@ class Analysis(Base):
         with unittest.mock.patch.object(rytas, "SEASON_SECTIONS", {"72935": "401"}), \
                 unittest.mock.patch.object(rytas, "SEASON_MIN_GAMES", 2):
             self.assertEqual(self.snapshot_all(), 0)
-            res = rytas.analyse_all(rytas.load_events())
+            res = rytas.analyse_all(rytas.load_events(), with_seats=True)
             data_dir = Path(self.tmp) / "site"
             rytas.main(["export", str(data_dir)])
         covered = [e for e in games if res[e]["season_group_size"]]
@@ -610,6 +610,8 @@ class Analysis(Base):
             {x: rytas.timelines(rytas.load_seats(x)) for x in games})) + 39})          # same in every game
         sec = {x["section_id"]: x for x in res[one]["sections"]}["72935"]
         self.assertEqual((sec["seats"], sec["season"], sec["available"], sec["singles"]), (40, 39, 1, 0))
+        cats = [c for (sid, c, *_rest) in res[one]["seats"].values() if sid == "72935"]
+        self.assertEqual((cats.count("S"), cats.count("A"), cats.count("B")), (39, 1, 0))   # seat plan agrees with totals
         other = {x["section_id"]: x for x in res[games[0]]["sections"]}["72935"]
         self.assertEqual((other["seats"], other["season"], other["status"]), (39, 39, "closed"))
         seats = json.loads((data_dir / "seats" / f"{games[0]}.json").read_text(encoding="utf-8"))["72935"]
