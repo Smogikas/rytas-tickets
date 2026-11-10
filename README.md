@@ -13,7 +13,9 @@ seat by seat, with a live web page:
   even grid in its map shape with one point per seat, rows parallel to the court, and each seat
   takes the point matching its place in its section (front rows by the court, left-right order
   kept); one dot size for all, every dot clear of its outline and of overlapping smaller sections
-  (VIP over 120-121, 113/114); light theme uses teal / orange / white rings / purple); click
+  (VIP over 120-121, 113/114); light theme uses teal / orange / white rings / purple); the expand
+  button on the map opens it full screen (any view, with its colour key; pinch / mouse wheel to
+  zoom, drag to move, double tap to reset; Esc or Back closes it); click
   a section for its numbers, every seat (season ticket / sold and at what price / available)
   and its price history; a table of all sections below.
 - **Season tickets** (Abonementai): season seats per section with the club's 2026/27 membership

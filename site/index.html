@@ -126,6 +126,20 @@ h1{margin:2px 0 0;font-size:32px;letter-spacing:-.01em}
 .sb.sbauto:hover::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 .chip small{display:block;font-size:11px;font-weight:500;opacity:.8}
 svg.map{width:100%;max-width:720px;margin:0 auto;display:block;height:auto}
+.mapwrap{position:relative}
+.map-expand{position:absolute;top:0;right:0;z-index:2}
+.btn.icon{padding:8px;min-width:40px;min-height:40px;justify-content:center}
+.btn.icon svg{width:20px;height:20px}
+.mapfull{position:fixed;inset:0;z-index:55;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;gap:8px;
+  padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.mapfull[hidden]{display:none}
+.mf-head{display:flex;align-items:center;gap:12px}
+.mf-title{flex:1;min-width:0}
+.mf-title .disp{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mf-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.mapfull svg.map{width:100%;height:100%;max-width:none;margin:0;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.mapfull svg.map polygon{cursor:default}
+.mf-legend .legend{justify-content:center;margin-top:0}
 svg.map polygon{cursor:pointer;stroke:var(--line);stroke-width:2;vector-effect:non-scaling-stroke}
 svg.map polygon.closed{cursor:default;fill:transparent;stroke-dasharray:6 5;stroke:var(--seat-line);stroke-width:1.5}
 svg.map polygon.fan{fill:var(--fan);stroke:var(--line);stroke-width:2;cursor:pointer}
@@ -144,8 +158,8 @@ svg.map text.halo{fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-wid
 svg.map.seatsmode polygon.fan{fill:var(--panel)}
 svg.map #mapSeats{pointer-events:none}
 .legend .sw.dot{border-radius:50%}
-#mapSeats .dS{fill:var(--dot-s)} #mapSeats .dO,#mapSeats .dB{fill:var(--dot-o)} #mapSeats .dF{fill:var(--dot-f)}
-#mapSeats .dA{fill:var(--dot-a);stroke:var(--dot-a-line);stroke-width:var(--dot-a-w)} #mapSeats .dC{fill:var(--closed);stroke:var(--seat-line);stroke-width:.6}
+svg.map .dS{fill:var(--dot-s)} svg.map .dO,svg.map .dB{fill:var(--dot-o)} svg.map .dF{fill:var(--dot-f)}
+svg.map .dA{fill:var(--dot-a);stroke:var(--dot-a-line);stroke-width:var(--dot-a-w)} svg.map .dC{fill:var(--closed);stroke:var(--seat-line);stroke-width:.6}
 svg.seats rect{cursor:pointer}
 .tablebox{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -224,6 +238,15 @@ td button.link{cursor:pointer;border:0;background:none;padding:0;text-decoration
   <section class="kpis" id="kpis" aria-live="polite"></section>
   <main id="view"><div class="empty" data-t="loading"></div></main>
   <footer class="note" id="foot"></footer>
+</div>
+
+<div class="mapfull" id="mapFull" hidden role="dialog" aria-modal="true">
+  <div class="mf-head">
+    <div class="mf-title"><div class="disp" id="mfTitle"></div><div class="small muted" id="mfSub"></div></div>
+    <button type="button" class="btn icon" id="mfX" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="mf-body" id="mfBody"></div>
+  <div class="mf-legend" id="mfLegend"></div>
 </div>
 
 <div class="modal" id="shareModal" hidden role="dialog" aria-modal="true">
@@ -305,7 +328,7 @@ const T = {
     fanPart: "be B Tribūnos {n}", fanNote: "Ultras sektorius, neparduodamas bilietai.lt. Į laukiamus žiūrovus įskaičiuotas kaip pilnas.",
     catF: "neparduodama internetu", est: "įvert.",
     copy: "Kopijuoti", copied: "Nukopijuota", copyFailed: "Nepavyko – atsisiųskite",
-    share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", making: "Ruošiamas paveikslėlis…",
+    share: "Dalintis", shareTitle: "Dalintis rungtynėmis", download: "Atsisiųsti", close: "Uždaryti", fullScreen: "Visas ekranas", zoomHint: "artinkite pirštais ar pelės ratuku, du kartus – atgal", making: "Ruošiamas paveikslėlis…",
     shareFoot: "Duomenys {d}",
     soldOut: "Išparduota", closedSec: "Uždarytas", closedOn: "uždarytas {d}", priceFrom: "anksčiau {p} (pakeista {d})",
     priceSummary: "pradinė {a} → dabar {b} ({d})", priceBack: "kaina keitėsi, bet dabar vėl {a}"
@@ -374,7 +397,7 @@ const T = {
     fanPart: "without B Tribūna {n}", fanNote: "Ultras section, not sold on bilietai.lt. Counted as full in the expected crowd.",
     catF: "not sold online", est: "est.",
     copy: "Copy", copied: "Copied", copyFailed: "Failed – download it",
-    share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", making: "Making the picture…",
+    share: "Share", shareTitle: "Share this game", download: "Download", close: "Close", fullScreen: "Full screen", zoomHint: "pinch or scroll to zoom, double-tap to reset", making: "Making the picture…",
     shareFoot: "Data {d}",
     soldOut: "Sold out", closedSec: "Closed", closedOn: "closed {d}", priceFrom: "was {p} (changed {d})",
     priceSummary: "first {a} → now {b} ({d})", priceBack: "price changed but is back to {a}"
@@ -973,12 +996,12 @@ function renderArena(){
           </div>
           <div class="small muted" style="margin-top:2px">${esc(dFull(g.start))} · ${nf(expectedOf(g))} ${t("expected")} · ${nf(g.available)} ${t("available").toLowerCase()}${(DATA.arenaCap || {})[g.conf] ? ` · <span style="white-space:nowrap">${t("arenaCap")} ${nf(DATA.arenaCap[g.conf])}</span>` : ""}${g.played && g.attendance != null ? " · " + t("attendance") + " " + nf(g.attendance) : ""}</div>
         </div>
-        ${shapes.length ? `<svg class="map${S.mode === "seats" ? " seatsmode" : ""}" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
+        ${shapes.length ? `<div class="mapwrap"><button type="button" class="btn icon map-expand" id="mapExpand" aria-label="${esc(t("fullScreen"))}" title="${esc(t("fullScreen"))}">${ICON_EXPAND}</button><svg class="map${S.mode === "seats" ? " seatsmode" : ""}" viewBox="0 0 1000 1000" role="group" aria-label="${esc(t("arena"))}">
           <rect x="390" y="170" width="225" height="430" rx="10" fill="none" stroke="var(--court)" stroke-width="3"></rect>
           <line x1="390" y1="385" x2="615" y2="385" stroke="var(--court)" stroke-width="2"></line>
           <circle cx="502" cy="385" r="38" fill="none" stroke="var(--court)" stroke-width="2"></circle>
           <defs><pattern id="soldStripes" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="rotate(45)"><rect width="8" height="20" fill="rgba(255,255,255,.5)"></rect></pattern></defs>
-          ${polys}<g id="mapSeats"></g>${labels}</svg>` : `<div class="empty">${t("noData")}</div>`}
+          ${polys}<g id="mapSeats"></g>${labels}</svg></div>` : `<div class="empty">${t("noData")}</div>`}
         ${S.mode === "seats" ? `<div class="legend"><span><i class="sw dot" style="background:var(--dot-s)"></i>${t("catS")}</span><span><i class="sw dot" style="background:var(--dot-o)"></i>${t("seatSingle")}</span><span><i class="sw dot" style="background:var(--dot-a);border-color:var(--dot-a-line)"></i>${t("catA")}</span>${g.fans ? `<span><i class="sw dot" style="background:var(--dot-f)"></i>${FAN}</span>` : ""}<span id="seatsNote" class="muted">${t("seatsLoading")}</span></div>` : `<div class="legend"><span>${esc(legend[0])}</span><span style="width:150px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--low),var(--mid),var(--high))"></span><span>${esc(legend[1])}</span>
           ${g.fans ? `<span><i class="sw" style="background:var(--fan)"></i>${FAN}</span>` : ""}
           <span><i class="sw striped"></i>${t("soldOut")}</span>
@@ -1002,6 +1025,7 @@ function renderArena(){
   segButtons($("modeSeg"), [["taken", t("modeTaken")], ["price", t("modePrice")], ["seats", t("modeSeats")]], S.mode, (v) => { S.mode = v; renderArena(); });
   if (S.mode === "seats") loadSeats(g.id).then((all) => drawMapSeats(g, all, shapes));
   $("arenaShare").addEventListener("click", () => openShare(g.id, "arena"));
+  if ($("mapExpand")) $("mapExpand").addEventListener("click", () => openMapFull(g));
   scrollIndicator($("chips"), $("chipsBar"), $("chipsThumb"), "chips");
   centerChip(prevChips);
   const v = $("view");
@@ -1357,11 +1381,79 @@ function seatLabel(q){
 }
 
 // ---------------------------------------------------------------- share picture
+const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>';
 const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
 const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
 const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
 const ICON_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
 const share = { url: null, file: null, open: false, game: null };
+
+// Full screen arena: a copy of the map as drawn (any view, seats included) and its colour key
+const full = { open: false };
+async function openMapFull(g){
+  if (S.mode === "seats"){ try { await loadSeats(g.id); } catch (e) {} await new Promise((r) => setTimeout(r, 0)); }   // seats drawn first
+  const src = document.querySelector(".mapbox svg.map"); if (!src) return;
+  const svg = src.cloneNode(true);
+  svg.querySelectorAll("[id]").forEach((el) => { if (el.id !== "soldStripes") el.removeAttribute("id"); });
+  svg.querySelectorAll("polygon.sel").forEach((el) => el.classList.remove("sel"));
+  $("mfBody").replaceChildren(svg);
+  $("mfLegend").replaceChildren(...[...document.querySelectorAll(".mapbox .legend")].map((l) => {
+    const c = l.cloneNode(true); c.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id")); return c; }));
+  $("mfTitle").textContent = g.opp;
+  $("mfSub").textContent = dFull(g.start) + " · " + (S.mode === "seats" ? t("modeSeats") : S.mode === "price" ? t("modePrice") : t("modeTaken")) + " · " + t("zoomHint");
+  $("mfX").setAttribute("aria-label", t("close")); $("mapFull").setAttribute("aria-label", t("fullScreen"));
+  $("mapFull").hidden = false; full.open = true; document.body.style.overflow = "hidden";
+  try { const bb = svg.getBBox(); svg.setAttribute("viewBox", `${bb.x - 8} ${bb.y - 8} ${bb.width + 16} ${bb.height + 16}`); } catch (e) {}   // crop to the map
+  enableZoom(svg);
+  if (!(history.state && history.state.mapfull)) history.pushState({ mapfull: 1 }, "");   // phone/browser Back closes it
+  const fs = $("mapFull").requestFullscreen;                                              // real full screen where allowed
+  if (fs) $("mapFull").requestFullscreen().catch(() => {});
+  $("mfX").focus();
+}
+// zoom and pan the full screen map: pinch / mouse wheel to zoom, drag to move, double tap to reset
+function enableZoom(svg){
+  const base = svg.getAttribute("viewBox").split(" ").map(Number);
+  let vb = base.slice();
+  const set = () => {
+    vb[2] = Math.min(base[2], Math.max(base[2] / 8, vb[2])); vb[3] = vb[2] * base[3] / base[2];
+    vb[0] = Math.min(base[0] + base[2] - vb[2], Math.max(base[0], vb[0]));
+    vb[1] = Math.min(base[1] + base[3] - vb[3], Math.max(base[1], vb[1]));
+    svg.setAttribute("viewBox", vb.map((x) => x.toFixed(2)).join(" "));
+  };
+  const toSvg = (cx, cy) => { const pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  const zoomAt = (cx, cy, f) => {
+    const p = toSvg(cx, cy), w = Math.min(base[2], Math.max(base[2] / 8, vb[2] / f)), k = w / vb[2];
+    vb = [p.x - (p.x - vb[0]) * k, p.y - (p.y - vb[1]) * k, w, vb[3] * k]; set();
+  };
+  const unit = () => { const r = svg.getBoundingClientRect(); return Math.max(vb[2] / r.width, vb[3] / r.height); };
+  svg.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  const pts = new Map(); let last = null, lastTap = 0;
+  svg.addEventListener("pointerdown", (e) => {
+    svg.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 1){ const now = Date.now(); if (now - lastTap < 300){ vb = base.slice(); set(); } lastTap = now; }
+    last = null;
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 1){                                   // drag: move
+      const u = unit(); vb[0] -= (e.clientX - prev[0]) * u; vb[1] -= (e.clientY - prev[1]) * u; set();
+    } else if (pts.size === 2){                            // pinch: zoom around the fingers' midpoint
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      if (last){ zoomAt(mx, my, d / last.d); const u = unit(); vb[0] -= (mx - last.mx) * u; vb[1] -= (my - last.my) * u; set(); }
+      last = { d, mx, my };
+    }
+  });
+  const up = (e) => { pts.delete(e.pointerId); last = null; };
+  svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
+}
+function closeMapFull(fromBack){
+  if (!full.open) return;
+  full.open = false; $("mapFull").hidden = true; $("mfBody").replaceChildren(); document.body.style.overflow = "";
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (!fromBack && history.state && history.state.mapfull) history.back();
+  const b = $("mapExpand"); if (b) b.focus();
+}
 
 function roundRect(c, x, y, w, h, r){ c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 function wrapLines(c, text, maxW){
@@ -1642,8 +1734,10 @@ $("shareGo").addEventListener("click", async () => {
 });
 $("shareX").addEventListener("click", () => closeShare());
 $("shareModal").addEventListener("click", (e) => { if (e.target === $("shareModal")) closeShare(); });   // tap outside
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && share.open) closeShare(); });
-window.addEventListener("popstate", () => { if (share.open) closeShare(true); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && share.open) closeShare(); else if (e.key === "Escape" && full.open) closeMapFull(); });
+window.addEventListener("popstate", () => { if (share.open) closeShare(true); if (full.open) closeMapFull(true); });
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && full.open) closeMapFull(); });   // left full screen with the system key
+$("mfX").addEventListener("click", () => closeMapFull());
 
 // ---------------------------------------------------------------- start
 setTheme();
