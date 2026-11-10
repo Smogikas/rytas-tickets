@@ -23,7 +23,7 @@
   :root:not([data-theme="light"]){
     --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
     --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-    --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
+    --closed:#232528; --low:#26355A; --mid:#2A9D8F; --high:#F2C14E; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
     --dot-s:#3F8F88; --dot-o:#E0A458; --dot-a:#D9DDD4; --dot-a-line:transparent; --dot-a-w:0; --dot-f:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
     color-scheme: dark;
   }
@@ -31,7 +31,7 @@
 :root[data-theme="dark"]{
   --bg:#1B1C1E; --panel:#232528; --ink:#ECE9E3; --muted:#A6A39C; --line:#36393D;
   --accent:#E0A458; --accent-ink:#1B1C1E; --season:#3F8F88; --single:#E0A458; --free:#2A2D30; --seat-line:#5A5E63;
-  --closed:#232528; --low:#2C3432; --mid:#245F59; --high:#2A9D8F; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
+  --closed:#232528; --low:#26355A; --mid:#2A9D8F; --high:#F2C14E; --court:#45494E; --focus:#F0C27F; --bcl:#9DB8D9; --sel:#F4EEDC; --avail:#D9DDD4; --fan:#9C83C9;
     --dot-s:#3F8F88; --dot-o:#E0A458; --dot-a:#D9DDD4; --dot-a-line:transparent; --dot-a-w:0; --dot-f:#9C83C9; --warn:#F0A35E; --c1:#12A193; --c2:#D27B27;
   color-scheme: dark;
 }
@@ -942,9 +942,9 @@ function arenaColors(g){
   const secs = DATA.sections[g.id] || [];
   const byId = {}; secs.forEach((s) => { byId[s.id] = s; });
   const prices = secs.map((s) => s.price || 0).filter((p) => p > 0);
-  // VIP boxes (189 EUR vs 8-43 EUR) are left out of the price scale, so the regular sections stay
+  // VIP boxes and Parteris (189 / 89 EUR vs 8-65 EUR) are left out of the price scale, so the regular sections stay
   // distinguishable; anything dearer than the scale's top gets the top colour ("43 EUR+")
-  const scaled = secs.filter((s) => s.price > 0 && !/\bVIP\b/i.test(s.title || "")).map((s) => s.price);
+  const scaled = secs.filter((s) => s.price > 0 && !/\bVIP\b|parter/i.test(s.title || "")).map((s) => s.price);
   const ref = scaled.length ? scaled : prices;
   const top = Math.max(...ref, 1), over = prices.some((p) => p > top);
   const lo = Math.log(Math.min(...ref, 1e9)), hi = Math.log(top);
