@@ -268,9 +268,9 @@ def pull():
           f"{sum(state['counts'].get(f'seats:{e}', 0) for e in game_tabs)} seat rows")
 
 
-def overview_rows(ev, order):
+def overview_rows(ev, order, now=None):
     res = rytas.analyse_all(ev)
-    now = rytas.datetime.now(rytas.timezone.utc)
+    now = now or rytas.datetime.now(rytas.timezone.utc)
     rows = []
     for eid in order:
         m = ev["events"][eid]

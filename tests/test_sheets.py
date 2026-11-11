@@ -162,7 +162,12 @@ class SheetsTest(unittest.TestCase):
         self.assertEqual(game[2][3], "108")             # section title filled in on seat rows
         ov = f.tabs["Rungtynės"]
         self.assertEqual(ov[0], sheets.OVERVIEW_HEAD)
-        self.assertEqual(ov[1][:5], ["G1", "2026-11-11 19:30", "BCL", "Nantero „Nanterre 92“", "Būsima"])
+        self.assertEqual(ov[1][:4], ["G1", "2026-11-11 19:30", "BCL", "Nantero „Nanterre 92“"])
+        # played or upcoming against a fixed time (not today's date, so the test never goes stale)
+        ev = rytas.load_events()
+        before = rytas.parse_ts("2026-11-11T17:00:00+00:00"); after = rytas.parse_ts("2026-11-11T18:00:00+00:00")
+        self.assertEqual(sheets.overview_rows(ev, ["G1"], now=before)[0][4], "Būsima")
+        self.assertEqual(sheets.overview_rows(ev, ["G1"], now=after)[0][4], "Sužaista")
         self.assertEqual(ov[2][1], "2027-04-18 16:50")  # summer time in Vilnius
 
         # a later run starts with nothing local (nothing in the repo)
