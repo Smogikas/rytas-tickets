@@ -59,8 +59,9 @@ Seat ids are the same in every game, so for each game:
 - **Taken** = seats − available = **expected crowd** if every season holder comes
 - **Season tickets** (estimate): seats seen in 3+ games (2 while fewer games have seat data) and
   **taken when first seen in every one** (games of the same competition; all games if it has
-  fewer than 3). The set does not shrink during the season: a season seat given back later stays
-  a season seat, and in that game counts as available, or as a single ticket once resold.
+  fewer than 3). A seat ever put on single sale in a game with season tickets is a regular seat
+  the club held back (partners, guests, technical holds) and is no season ticket in any game
+  (Nanterre, Nov 2026: 114 row 7 seat 5, 104 Lounge row 8 seat 8, and 1 seat of 107).
   Far-away games, with few single tickets sold yet, keep seats sold to single buyers out.
   They cluster in the central sideline sections (108, 116–120, lounges 102–104), mostly in
   the middle rows, in blocks of 2–10 seats.

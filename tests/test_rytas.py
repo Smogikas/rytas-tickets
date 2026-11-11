@@ -558,7 +558,7 @@ class Analysis(Base):
         self.assertEqual(t3["season_off"], 0)                  # its season seats are inside B Tribūna, not counted twice
         self.assertEqual(t3["expected"], t3["taken"] + 46)
 
-    def test_season_seat_given_back_later_stays_season(self):
+    def test_season_seat_given_back_later_stays_in_the_raw_set(self):
         def tl(*seats):
             return {seat: [{"ts_utc": f"T{i}", "section_id": "S", "seat_id": seat, "status": st}
                            for i, st in enumerate(sts)] for seat, sts in seats}
@@ -571,6 +571,20 @@ class Analysis(Base):
         self.assertEqual(rytas.classify_seats(tls["a"], {}, season)["x"][1], rytas.SEASON)
         tls["c"]["x"].append({"ts_utc": "T3", "section_id": "S", "seat_id": "x", "status": 1})
         self.assertEqual(rytas.classify_seats(tls["c"], {}, season)["x"][1], rytas.AVAILABLE)
+
+    def test_seat_ever_put_on_sale_is_not_a_season_ticket_anywhere(self):
+        """Nanterre: 114 r7 s5 taken in every game, then released for sale: a held-back regular seat."""
+        def tl(*seats):
+            return {seat: [{"ts_utc": f"T{i}", "section_id": "S", "seat_id": seat, "status": st}
+                           for i, st in enumerate(sts)] for seat, sts in seats}
+        tls = {"a": tl(("x", [0]), ("z", [0])), "b": tl(("x", [0]), ("z", [0])), "c": tl(("x", [0, 1]), ("z", [0])),
+               "t8": tl(("z", [1]))}                    # z free only in a game without season tickets
+        names = {"a": "LKL: Rytas - A", "b": "LKL: Rytas - B", "c": "BCL: Rytas - C", "t8": "BCL TOP 8: Rytas - D"}
+        released = rytas.released_seats(names, tls)
+        self.assertEqual(released, {"x"})
+        season = rytas.season_seats(("a", "b", "c"), tls) - released
+        self.assertEqual(season, {"z"})
+        self.assertEqual(rytas.classify_seats(tls["a"], {}, season)["x"][1], rytas.SOLD_BEFORE)   # not season in game a either
 
     def test_membership_section_counts_as_season_and_bcl_top8_has_none(self):
         rytas.main(["add-series", "PNJMMUNJYB"])

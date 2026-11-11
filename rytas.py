@@ -563,6 +563,14 @@ def timelines(seat_rows):
     return tl
 
 
+def released_seats(names, tls):
+    """Seats ever put on single sale (seen free) in a game that has season tickets: regular
+    seats, not season tickets, in every game - the club held them back (partners, guests,
+    technical holds) and released them, e.g. Nanterre: 114 row 7 seat 5, 104 Lounge row 8 seat 8."""
+    return {seat for eid, tl in tls.items() if season_covered(names[eid])
+            for seat, rows in tl.items() if any(str(r["status"]) == "1" for r in rows)}
+
+
 def season_groups(names):
     """event_id -> tuple of event_ids to compare with for the season-ticket estimate.
 
@@ -899,10 +907,11 @@ def analyse_all(ev, with_seats=False):
     # seats, not season tickets (Nanterre: 1 of 107's 137 seats)
     regular = Counter(rows[0]["section_id"] for tl in tls.values() for rows in tl.values()
                       if rows[0]["section_id"] in SEASON_SECTIONS and any(str(r["status"]) == "1" for r in rows))
+    released = released_seats(names, tls)
     for eid in names:
         g = groups[eid]
         if g not in cache:
-            cache[g] = season_seats(g, tls)
+            cache[g] = season_seats(g, tls) - released
         price_rows = load_snapshots(eid)
         out[eid] = analyse_event(tls[eid], price_rows, cache[g], zn)
         out[eid]["season_group_size"] = len(g)
@@ -1247,7 +1256,7 @@ def cmd_season(args):
     names = {eid: m["name"] for eid, m in ev["events"].items()}
     tls = {eid: timelines(load_seats(eid)) for eid in names}
     for group in sorted(set(season_groups(names).values())):
-        seats = season_seats(group, tls)
+        seats = season_seats(group, tls) - released_seats(names, tls)
         comps = sorted({competition(names[e]) for e in group})
         with_data = sum(1 for e in group if tls[e])
         print(f"\n{'/'.join(comps)}: {len(group)} games ({with_data} with seat data) -> "
