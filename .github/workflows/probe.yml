@@ -1,0 +1,34 @@
+name: probe
+on: workflow_dispatch
+permissions: { contents: read }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
+      SHEET_ID: 12u2OBPsVzivfjZopgrjTtUKfc-TtXARYcEODmzRVGaM
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install google-auth==2.38.0 requests==2.32.3
+      - run: |
+          python sheets.py pull
+          python - <<'PY'
+          import rytas
+          ev = rytas.load_events(); names = {e: m["name"] for e, m in ev["events"].items()}
+          res = rytas.analyse_all(ev, with_seats=True)
+          for e in names:
+              print("GAME", names[e][:40], "| season_total", res[e]["season_total"], "| this game", res[e]["totals"]["season"])
+          eid = next(e for e in names if "Nanterre" in names[e])
+          tls = {e: rytas.timelines(rytas.load_seats(e)) for e in names}
+          groups = rytas.season_groups(names); season = rytas.season_seats(groups[eid], tls)
+          tl = tls[eid]
+          titles = {}
+          for r in rytas.read_csv(rytas.SNAPSHOTS): titles[r["section_id"]] = r["section"]
+          for seat in season:
+              rows = tl.get(seat)
+              if rows and any(str(r["status"]) == "1" for r in rows):
+                  print("FREED", titles.get(rows[0]["section_id"], rows[0]["section_id"]), "row", rows[0]["row"], "place", rows[0]["place"],
+                        [(r["ts_utc"][5:16], r["status"], r["price_class"]) for r in rows])
+          PY
