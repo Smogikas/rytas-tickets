@@ -564,14 +564,6 @@ def timelines(seat_rows):
     return tl
 
 
-def released_seats(names, tls):
-    """Seats ever put on single sale (seen free) in a game that has season tickets: regular
-    seats, not season tickets, in every game - the club held them back (partners, guests,
-    technical holds) and released them, e.g. Nanterre: 114 row 7 seat 5, 104 Lounge row 8 seat 8."""
-    return {seat for eid, tl in tls.items() if season_covered(names[eid])
-            for seat, rows in tl.items() if any(str(r["status"]) == "1" for r in rows)}
-
-
 def season_groups(names):
     """event_id -> tuple of event_ids to compare with for the season-ticket estimate.
 
@@ -904,22 +896,19 @@ def analyse_all(ev, with_seats=False):
     sold_somewhere = set(seat_sec.values())
     extra_fans = {sid: (title.split() or [""])[0] for sid, title in sec_titles.items()
                   if (title.split() or [""])[0] in FAN_EXTRA}
-    # seats of the membership sections (107) ever put on single sale in any game: regular
-    # seats, not season tickets (Nanterre: 1 of 107's 137 seats)
-    regular = Counter(rows[0]["section_id"] for tl in tls.values() for rows in tl.values()
-                      if rows[0]["section_id"] in SEASON_SECTIONS and any(str(r["status"]) == "1" for r in rows))
-    released = released_seats(names, tls)
+    # Season holders can return their seat for a single game: it then goes on sale and counts as
+    # free (or as a single ticket once bought) in THAT game only, and stays a season ticket in the
+    # season total and in the other games (classify_seats: a season seat seen free in a game).
     for eid in names:
         g = groups[eid]
         if g not in cache:
-            cache[g] = season_seats(g, tls) - released
+            cache[g] = season_seats(g, tls)
         price_rows = load_snapshots(eid)
         out[eid] = analyse_event(tls[eid], price_rows, cache[g], zn)
         out[eid]["season_group_size"] = len(g)
         conf_cap = load_capacity(ev["events"][eid].get("conf_id", ""))
         # season tickets: the same for every game (also when 107 is on sale)
-        out[eid]["season_total"] = len(cache[g]) + sum(max(0, conf_cap[sid] - regular[sid])
-                                                       for sid in SEASON_SECTIONS if g and sid in conf_cap)
+        out[eid]["season_total"] = len(cache[g]) + sum(conf_cap[sid] for sid in SEASON_SECTIONS if g and sid in conf_cap)
         if with_seats:
             seats = classify_seats(tls[eid], price_lookup(price_rows, zn), cache[g])
             # 107 put on sale: its seats already taken are season tickets (as in the totals), so the
@@ -946,18 +935,14 @@ def analyse_all(ev, with_seats=False):
         for k in ("seats", "taken", "season"):
             t[k] += t["season_off"]
         out[eid]["season_off_sections"] = sorted((sid, sec_titles.get(sid, sid), n) for sid, n in off.items())
-        # sections sold out as memberships (107), not on single sale in this game: their
-        # season seats count (capacity less the seats ever put on single sale, which are
-        # closed in this game); the section is shown closed
-        whole = [(sid, name, max(0, cap[sid] - regular[sid])) for sid, name in SEASON_SECTIONS.items()
+        # sections sold out as memberships (107), not on single sale in this game: all their
+        # seats are season tickets; the section is shown closed
+        whole = [(sid, name, cap[sid]) for sid, name in SEASON_SECTIONS.items()
                  if g and sid in cap and sid not in on_sale] if g else []
         n_whole = sum(c for _s, _n, c in whole)
         for k in ("seats", "taken", "season"):
             t[k] += n_whole
         out[eid]["season_sections"] = whole
-        out[eid]["regular_seats"] = {seat for tl in tls.values() for seat, rows in tl.items()
-                                     if rows[0]["section_id"] in SEASON_SECTIONS
-                                     and any(str(r["status"]) == "1" for r in rows)}
         by_sec = Counter(seat_sec[x] for x in cache[g] if seat_sec[x] not in fan_set)
         by_sec.update({sid: c for sid, _n, c in whole})
         out[eid]["season_by_section"] = dict(by_sec)
@@ -1257,7 +1242,7 @@ def cmd_season(args):
     names = {eid: m["name"] for eid, m in ev["events"].items()}
     tls = {eid: timelines(load_seats(eid)) for eid in names}
     for group in sorted(set(season_groups(names).values())):
-        seats = season_seats(group, tls) - released_seats(names, tls)
+        seats = season_seats(group, tls)
         comps = sorted({competition(names[e]) for e in group})
         with_data = sum(1 for e in group if tls[e])
         print(f"\n{'/'.join(comps)}: {len(group)} games ({with_data} with seat data) -> "
@@ -1276,11 +1261,9 @@ def cmd_season(args):
         for sid, n in sorted(by_sec.items(), key=lambda kv: (titles.get(kv[0], kv[0]))):
             print(f"  {titles.get(sid, sid)[:30]:<32}{n:>7}{cap.get(sid, ''):>7}")
         if group:
-            reg = Counter(rows[0]["section_id"] for tl in tls.values() for rows in tl.values()
-                          if rows[0]["section_id"] in SEASON_SECTIONS and any(str(r["status"]) == "1" for r in rows))
             for sid, name in SEASON_SECTIONS.items():
                 if sid in cap:
-                    print(f"  {name + ' (memberships)':<32}{cap[sid] - reg[sid]:>7}{cap[sid]:>7}")
+                    print(f"  {name + ' (memberships)':<32}{cap[sid]:>7}{cap[sid]:>7}")
     print(f"\nA seat counts once it is seen in {SEASON_MIN_GAMES}+ games (2+ while fewer games have data) "
           "and is taken the first time it is seen in every one. More games tracked = better estimate.")
     return 0
@@ -1454,11 +1437,9 @@ def cmd_export(args):
                 per[sid].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), cat, p, f, ts])
         fan_ids = {sid for sid, _n, _c in r["fan_sections"]}
         whole_ids = {sid for sid, _n, _c in r.get("season_sections", [])}
-        regular = r.get("regular_seats", set())
         for seat_id, lo in layout.items():  # B Tribūna / membership sections: seats from the venue plan
             if lo["section_id"] in fan_ids or lo["section_id"] in whole_ids:
-                # "C": a regular seat of 107, not on sale in this game
-                cat = "F" if lo["section_id"] in fan_ids else "C" if seat_id in regular else "S"
+                cat = "F" if lo["section_id"] in fan_ids else "S"
                 per[lo["section_id"]].append([lo["row"], lo["place"], int(float(lo["x"])), int(float(lo["y"])), cat, None, None, None])
         (out / "seats" / f"{eid}.json").write_text(json.dumps(per, ensure_ascii=False, separators=(",", ":")),
                                                   encoding="utf-8")

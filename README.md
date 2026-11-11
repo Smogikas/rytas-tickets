@@ -59,9 +59,10 @@ Seat ids are the same in every game, so for each game:
 - **Taken** = seats − available = **expected crowd** if every season holder comes
 - **Season tickets** (estimate): seats seen in 3+ games (2 while fewer games have seat data) and
   **taken when first seen in every one** (games of the same competition; all games if it has
-  fewer than 3). A seat ever put on single sale in a game with season tickets is a regular seat
-  the club held back (partners, guests, technical holds) and is no season ticket in any game
-  (Nanterre, Nov 2026: 114 row 7 seat 5, 104 Lounge row 8 seat 8, and 1 seat of 107).
+  fewer than 3). The set does not shrink during the season: holders can return their seat for a
+  single game, and it then goes on sale - in that game it counts as free, or as a single ticket
+  once bought; it stays a season ticket in the total and in the other games (Nanterre, Nov 2026:
+  114 row 7 seat 5, 104 Lounge row 8 seat 8, and 1 seat of 107).
   Far-away games, with few single tickets sold yet, keep seats sold to single buyers out.
   They cluster in the central sideline sections (108, 116–120, lounges 102–104), mostly in
   the middle rows, in blocks of 2–10 seats.
@@ -89,11 +90,10 @@ Seat ids are the same in every game, so for each game:
   the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
   For some games (Žalgiris) B Tribūna covers 109–112: sections 109 and 112 count as B Tribūna (full)
   in a game where they are not on sale online but are on sale in other games.
-- **107** (137 seats) was sold out as memberships (club posts, Aug 2026). A seat of 107 ever put on
-  single sale (Nanterre, 9 Nov: 1 seat at 30 EUR) is a regular seat; the other 136 are season tickets
-  in every game. When 107 is not on sale the section is shown closed (its 136 season seats still
-  count; the regular seat is closed); when it is on sale it is read like any section, the seats taken
-  then staying season tickets and only seats seen sold counting as single.
+- **107** (137 seats) was sold out as memberships (club posts, Aug 2026): all 137 are season tickets.
+  When 107 is not on sale the section is shown closed and all its seats count; when a holder returns
+  a seat for a game (Nanterre, 9 Nov: 1 seat at 30 EUR) 107 is read like any section that game - the
+  seats taken stay season tickets, the returned seat is free, or a single ticket once bought.
 - A section is shown sold out (hatched) when every seat is taken or bilietai.lt lists it as sold out. (107 AMUSNET Lounge, the 20-seat corner, is read normally.)
 - **BCL Top 8** games are not covered by memberships: every seat is a normal ticket there, no
   season tickets are counted.

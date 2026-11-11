@@ -558,7 +558,7 @@ class Analysis(Base):
         self.assertEqual(t3["season_off"], 0)                  # its season seats are inside B Tribūna, not counted twice
         self.assertEqual(t3["expected"], t3["taken"] + 46)
 
-    def test_season_seat_given_back_later_stays_in_the_raw_set(self):
+    def test_season_seat_given_back_later_stays_season(self):
         def tl(*seats):
             return {seat: [{"ts_utc": f"T{i}", "section_id": "S", "seat_id": seat, "status": st}
                            for i, st in enumerate(sts)] for seat, sts in seats}
@@ -572,19 +572,18 @@ class Analysis(Base):
         tls["c"]["x"].append({"ts_utc": "T3", "section_id": "S", "seat_id": "x", "status": 1})
         self.assertEqual(rytas.classify_seats(tls["c"], {}, season)["x"][1], rytas.AVAILABLE)
 
-    def test_seat_ever_put_on_sale_is_not_a_season_ticket_anywhere(self):
-        """Nanterre: 114 r7 s5 taken in every game, then released for sale: a held-back regular seat."""
+    def test_returned_season_seat_is_free_only_in_that_game(self):
+        """Holders can return their seat for one game (Nanterre: 114 r7 s5): free / resold there, season elsewhere."""
         def tl(*seats):
             return {seat: [{"ts_utc": f"T{i}", "section_id": "S", "seat_id": seat, "status": st}
                            for i, st in enumerate(sts)] for seat, sts in seats}
-        tls = {"a": tl(("x", [0]), ("z", [0])), "b": tl(("x", [0]), ("z", [0])), "c": tl(("x", [0, 1]), ("z", [0])),
-               "t8": tl(("z", [1]))}                    # z free only in a game without season tickets
-        names = {"a": "LKL: Rytas - A", "b": "LKL: Rytas - B", "c": "BCL: Rytas - C", "t8": "BCL TOP 8: Rytas - D"}
-        released = rytas.released_seats(names, tls)
-        self.assertEqual(released, {"x"})
-        season = rytas.season_seats(("a", "b", "c"), tls) - released
-        self.assertEqual(season, {"z"})
-        self.assertEqual(rytas.classify_seats(tls["a"], {}, season)["x"][1], rytas.SOLD_BEFORE)   # not season in game a either
+        tls = {"a": tl(("x", [0])), "b": tl(("x", [0])), "c": tl(("x", [0, 1]))}
+        season = rytas.season_seats(("a", "b", "c"), tls)
+        self.assertEqual(season, {"x"})                                          # still counted in the season total
+        self.assertEqual(rytas.classify_seats(tls["a"], {}, season)["x"][1], rytas.SEASON)
+        self.assertEqual(rytas.classify_seats(tls["c"], {}, season)["x"][1], rytas.AVAILABLE)
+        tls["c"]["x"].append({"ts_utc": "T2", "section_id": "S", "seat_id": "x", "status": 0})
+        self.assertEqual(rytas.classify_seats(tls["c"], {}, season)["x"][1], rytas.SOLD_SEEN)   # bought by someone else
 
     def test_membership_section_counts_as_season_and_bcl_top8_has_none(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
@@ -630,15 +629,15 @@ class Analysis(Base):
         covered = [e for e in games if res[e]["season_group_size"]]
         self.assertEqual({res[e]["season_total"] for e in covered}, {len(rytas.season_seats(
             rytas.season_groups({x: m["name"] for x, m in rytas.load_events()["events"].items()})[one],
-            {x: rytas.timelines(rytas.load_seats(x)) for x in games})) + 39})          # same in every game
+            {x: rytas.timelines(rytas.load_seats(x)) for x in games})) + 40})          # all of 107, in every game
         sec = {x["section_id"]: x for x in res[one]["sections"]}["72935"]
         self.assertEqual((sec["seats"], sec["season"], sec["available"], sec["singles"]), (40, 39, 1, 0))
         cats = [c for (sid, c, *_rest) in res[one]["seats"].values() if sid == "72935"]
         self.assertEqual((cats.count("S"), cats.count("A"), cats.count("B")), (39, 1, 0))   # seat plan agrees with totals
         other = {x["section_id"]: x for x in res[games[0]]["sections"]}["72935"]
-        self.assertEqual((other["seats"], other["season"], other["status"]), (39, 39, "closed"))
+        self.assertEqual((other["seats"], other["season"], other["status"]), (40, 40, "closed"))   # the returned seat: season there
         seats = json.loads((data_dir / "seats" / f"{games[0]}.json").read_text(encoding="utf-8"))["72935"]
-        self.assertEqual(sorted(q[4] for q in seats).count("C"), 1)                 # the regular seat: not on sale
+        self.assertEqual(sorted(q[4] for q in seats).count("S"), 40)
 
     def test_seat_sold_in_one_game_before_tracking_is_not_season(self):
         rytas.main(["add-series", "PNJMMUNJYB"])
