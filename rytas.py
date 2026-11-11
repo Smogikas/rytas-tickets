@@ -490,7 +490,9 @@ def seats_due(meta, now, hot=False):
         return True
     hours_left = (parse_ts(meta["start_utc"]) - now).total_seconds() / 3600
     interval = seat_interval(hours_left, hot)
-    return now - parse_ts(last) >= timedelta(hours=interval * 0.9)
+    # hourly: every run at least 35 min after the last scan (GitHub starts runs 45-70 min apart,
+    # so a 54-min rule skipped every few hours); 6-hourly / daily: 90% of the interval
+    return now - parse_ts(last) >= (timedelta(minutes=35) if interval == 1 else timedelta(hours=interval * 0.9))
 
 
 def game_midnight(start_utc):

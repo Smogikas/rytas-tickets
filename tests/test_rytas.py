@@ -414,6 +414,15 @@ class Zones(unittest.TestCase):
         self.assertEqual(rytas.price_at(pl, "S", "T1", "1370"), (99.0, 7.0))  # this game's 21-ta kaina
         self.assertEqual(rytas.price_at(rytas.price_lookup(old), "S", "T1", "1370"), (89.0, 7.0))  # without: cheapest
 
+    def test_hourly_seat_scans_tolerate_early_runs(self):
+        now = rytas.parse_ts("2026-11-11T00:42:00+00:00")
+        near = {"start_utc": "2026-11-11T17:30:00+00:00", "last_seats_utc": "2026-11-10T23:49:00+00:00"}   # 53 min ago
+        self.assertTrue(rytas.seats_due(near, now))
+        near["last_seats_utc"] = "2026-11-11T00:20:00+00:00"                                             # 22 min ago
+        self.assertFalse(rytas.seats_due(near, now))
+        far = {"start_utc": "2026-11-20T17:30:00+00:00", "last_seats_utc": "2026-11-10T20:00:00+00:00"}   # 6-hourly, 4.7 h ago
+        self.assertFalse(rytas.seats_due(far, now))
+
     def test_game_day_scan_times(self):
         # game 2026-11-11 19:00 Vilnius (17:00 UTC): local midnight = 22:00 UTC the day before
         meta = {"start_utc": "2026-11-11T17:00:00+00:00"}
