@@ -696,6 +696,10 @@ class Commands(Base):
         self.assertEqual(rytas.main(["export", str(out)]), 0)
         data = json.loads((out / "data.json").read_text(encoding="utf-8"))
         self.assertEqual(len(data["games"]), 3)
+        checks = [m.get("last_prices_utc") for m in rytas.load_events()["events"].values()]
+        self.assertTrue(all(checks))
+        self.assertEqual(data["updated"], max(checks))          # time of the last data check, not of the build
+        self.assertGreaterEqual(data["built"], data["updated"])
         g = next(x for x in data["games"] if x["id"] == "PNJMMUNJYB")
         self.assertEqual((g["comp"], g["opp"]), ("BCL", "Nantero „Nanterre 92“"))
         self.assertEqual((g["taken"], g["season"], g["singles"], g["seen"], g["before"]), (21, 18, 3, 1, 2))

@@ -528,6 +528,7 @@ def snapshot_event(event_id, meta, now, force_seats=False):
     ensure_capacity(meta["conf_id"])
     prices = fetch_prices(event_id)
     rows, written = take_snapshot(event_id, prices)
+    meta["last_prices_utc"] = now_utc()          # the page's "data updated" time
     msg = f"prices: {len(written)} changed"
     sellout = opponent_in(meta.get("name", ""), SELLOUT_OPPONENTS)
     hot = is_hot(meta, load_seats(event_id), now)
@@ -1470,7 +1471,9 @@ def cmd_export(args):
     for conf, shp in shapes.items():
         cap = load_capacity(conf)
         arena_cap[conf] = sum(cap.get(sid, 0) for sid, _pts in shp)
-    data = {"updated": now_utc(), "seasonSeats": any_res.get("season_total", 0),
+    # "updated": the last time data was collected (a code push rebuilds the page without collecting)
+    checks = [m.get(k) for m in ev["events"].values() for k in ("last_prices_utc", "last_seats_utc", "final_check_utc") if m.get(k)]
+    data = {"updated": max(checks) if checks else now_utc(), "built": now_utc(), "seasonSeats": any_res.get("season_total", 0),
             "games": games, "sections": sections, "shapes": shapes, "arenaCap": arena_cap,
             "membership": membership_table(ev, res), "popularity": popularity(res, ev, now),
             "warnings": health_warnings(ev, res, now)}

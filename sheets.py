@@ -43,7 +43,7 @@ GAME_HEAD = ["Laikas (UTC)", "Įrašas", "Sektoriaus ID", "Sektorius", "Zona / k
              "Bilieto tipas", "Kaina €", "Mokesčiai €", "Laisva sektoriuje (iki 22)",
              "Vietos ID", "Eilė", "Vieta", "Būsena (1 laisva, 0 užimta)", "Zonos ID"]
 PRICE, SEAT = "kaina", "vieta"
-EVENT_FIELDS = ["id", "name", "start_utc", "series_id", "status", "conf_id", "last_seats_utc", "final_check_utc", "tab", "day_scans"]
+EVENT_FIELDS = ["id", "name", "start_utc", "series_id", "status", "conf_id", "last_seats_utc", "final_check_utc", "tab", "day_scans", "last_prices_utc"]
 SERIES_FIELDS = ["id", "title"]
 HIDDEN = {"_events": EVENT_FIELDS, "_series": SERIES_FIELDS,
           "_layout": rytas.LAYOUT_FIELDS, "_shapes": rytas.SHAPE_FIELDS, "_capacity": rytas.CAP_FIELDS}
