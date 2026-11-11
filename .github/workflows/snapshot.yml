@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "17 * * * *"   # hourly at :17: prices every hour, seat plans when due;
                            # the 23:17 (Vilnius) run also looks for new / rescheduled games
+    - cron: "47 * * * *"   # backup: GitHub sometimes skips or badly delays the :17 run; this one
+                           # only works if no collection run has started in the last 40 minutes
   workflow_dispatch:
     inputs:
       add_series:
@@ -66,16 +68,33 @@ jobs:
       built: ${{ steps.site.outputs.built }}
       soon: ${{ steps.soon.outputs.soon }}
     steps:
+      # the :47 backup run stops here when a collection run started in the last 40 minutes
+      - name: Backup run needed?
+        id: gate
+        if: github.event_name == 'schedule' && github.event.schedule == '47 * * * *'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          since=$(date -u -d '-40 min' +%Y-%m-%dT%H:%M:%SZ)
+          n=$(gh api "repos/${{ github.repository }}/actions/workflows/snapshot.yml/runs?status=success&per_page=50" \
+                -q "[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | select(.run_started_at > \"$since\")] | length")
+          echo "Collection runs started since $since: $n"
+          if [ "$n" -gt 0 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Main run already done: nothing to do"; fi
+
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.skip != 'true'
       - uses: actions/setup-python@v5
+        if: steps.gate.outputs.skip != 'true'
         with:
           python-version: "3.12"
       - run: pip install google-auth==2.38.0 requests==2.32.3
+        if: steps.gate.outputs.skip != 'true'
 
       # Google Sheet when the GOOGLE_SA_KEY secret exists; until then the data
       # stays in the repo (data/, events.json) as before, so tracking never pauses
       - name: Load data
         id: pull
+        if: steps.gate.outputs.skip != 'true'
         run: |
           if [ -n "$GOOGLE_SA_KEY" ]; then
             echo "STORE=sheet" >> "$GITHUB_ENV"
@@ -100,12 +119,13 @@ jobs:
       # daily, in the run that starts at 23:xx Vilnius time (or on request)
       - name: Discover new games
         id: disc
-        if: env.COLLECT == 'true'
+        if: env.COLLECT == 'true' && steps.gate.outputs.skip != 'true'
         env:
           ASKED: ${{ inputs.discover }}
           EVENT_NAME: ${{ github.event_name }}
+          SCHED: ${{ github.event.schedule }}
         run: |
-          if [ "$ASKED" = true ] || { [ "$EVENT_NAME" = schedule ] && [ "$(TZ=Europe/Vilnius date +%H)" = 23 ]; }; then
+          if [ "$ASKED" = true ] || { [ "$EVENT_NAME" = schedule ] && [ "$(TZ=Europe/Vilnius date +%H)" = 23 ] && [ "$SCHED" != "47 * * * *" ]; }; then
             python rytas.py discover
           else
             echo "Not the 23:xx run: skipped"
@@ -115,7 +135,7 @@ jobs:
       # activity, and this job writes to the Sheet, not the repo. Re-enabling the
       # workflow twice a month (1st and 15th, 23:xx; also on manual runs) keeps the hourly schedule alive.
       - name: Keep the schedule alive
-        if: ${{ !cancelled() && env.COLLECT == 'true' }}
+        if: ${{ !cancelled() && env.COLLECT == 'true' && steps.gate.outputs.skip != 'true' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
