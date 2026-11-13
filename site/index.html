@@ -1831,8 +1831,9 @@ render();
 if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.theme === "auto") render(); });
 fetch("data.json", { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => {
   DATA = d;
-  if (!DATA.games.some((g) => !g.played)) S.when = "played";
-  if (S.game){ const g = DATA.games.find((x) => x.id === S.game); if (g) S.when = g.played ? "played" : "upcoming"; }
+  // always open on the upcoming games; a remembered game only if it is still upcoming
+  S.when = DATA.games.some((g) => !g.played) ? "upcoming" : "played";
+  if (S.game){ const g = DATA.games.find((x) => x.id === S.game); if (!g || g.played !== (S.when === "played")) S.game = null; }
   render();
 }).catch(() => { $("view").innerHTML = `<div class="err">${esc(t("loadErr"))}</div>`; });
 </script>

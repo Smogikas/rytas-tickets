@@ -121,7 +121,7 @@ Seat ids are the same in every game, so for each game:
   change, or fewer tickets left in a section showing under 22, that section's seat plan is
   read right away (sections showing "22+" give no signal and wait for the full scan).
 - **backup (:47 UTC)**: GitHub starts the :17 runs 25-50 min late and sometimes skips one; the
-  :47 run checks whether a collection run started in the last 40 minutes and, if not, does the
+  :47 run checks whether a collection run started in the last 50 minutes and, if not, does the
   full hourly run itself (otherwise it stops within seconds). In the last 5 days a seat scan is
   due 35 min after the previous one, so every run that happens scans.
 - **10 minutes before tip-off**: a final full check (every seat and price) of that game, in

@@ -5,7 +5,7 @@ on:
     - cron: "17 * * * *"   # hourly at :17: prices every hour, seat plans when due;
                            # the 23:17 (Vilnius) run also looks for new / rescheduled games
     - cron: "47 * * * *"   # backup: GitHub sometimes skips or badly delays the :17 run; this one
-                           # only works if no collection run has started in the last 40 minutes
+                           # only works if no collection run has started in the last 50 minutes
   workflow_dispatch:
     inputs:
       add_series:
@@ -68,14 +68,14 @@ jobs:
       built: ${{ steps.site.outputs.built }}
       soon: ${{ steps.soon.outputs.soon }}
     steps:
-      # the :47 backup run stops here when a collection run started in the last 40 minutes
+      # the :47 backup run stops here when a collection run started in the last 50 minutes
       - name: Backup run needed?
         id: gate
         if: github.event_name == 'schedule' && github.event.schedule == '47 * * * *'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          since=$(date -u -d '-40 min' +%Y-%m-%dT%H:%M:%SZ)
+          since=$(date -u -d '-50 min' +%Y-%m-%dT%H:%M:%SZ)   # 50: the backup can wait in the queue a few minutes
           n=$(gh api "repos/${{ github.repository }}/actions/workflows/snapshot.yml/runs?status=success&per_page=50" \
                 -q "[.workflow_runs[] | select(.id != ${{ github.run_id }}) | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | select(.run_started_at > \"$since\")] | length")
           echo "Collection runs started since $since: $n"
