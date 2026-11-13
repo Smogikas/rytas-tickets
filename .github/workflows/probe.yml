@@ -4,15 +4,6 @@ permissions: { contents: write }
 jobs:
   p:
     runs-on: ubuntu-latest
-    env:
-      GOOGLE_SA_KEY: ${{ secrets.GOOGLE_SA_KEY }}
-      SHEET_ID: 12u2OBPsVzivfjZopgrjTtUKfc-TtXARYcEODmzRVGaM
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install google-auth==2.38.0 requests==2.32.3
-      - run: |
-          python sheets.py pull && python rytas.py export _out
-          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan tmp-preview-data && git rm -rq --cached . && git add -f _out && git commit -qm "temporary preview data" && git push -f origin tmp-preview-data
+      - run: git push origin --delete tmp-preview-data
