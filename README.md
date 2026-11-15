@@ -90,6 +90,9 @@ Seat ids are the same in every game, so for each game:
   the venue plan) is added to the expected crowd as an estimate, unless it appears on sale.
   For some games (Žalgiris) B Tribūna covers 109–112: sections 109 and 112 count as B Tribūna (full)
   in a game where they are not on sale online but are on sale in other games.
+- **B Tribūna on sale** (110-111, e.g. Jonava, 15 Nov: 3 + 1 seats at 10 EUR): the seats already taken
+  are the fans' - counted in B Tribūna (expected crowd), not as single tickets or revenue; a seat seen
+  sold later is a single ticket.
 - **107** (137 seats) was sold out as memberships (club posts, Aug 2026): all 137 are season tickets.
   When 107 is not on sale the section is shown closed and all its seats count; when a holder returns
   a seat for a game (Nanterre, 9 Nov: 1 seat at 30 EUR) 107 is read like any section that game - the

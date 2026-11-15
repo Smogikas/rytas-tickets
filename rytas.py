@@ -729,6 +729,7 @@ SIX_HOURLY_DAYS = 14  # every 6 hours within 14 days, daily further away
 
 # seat categories
 SEASON, SOLD_SEEN, SOLD_BEFORE, AVAILABLE, BLOCKED = "S", "O", "B", "A", "X"
+FAN_HELD = "F"      # B Tribūna seat (110-111) already taken when the section is on sale
 
 
 def blocked(row):
@@ -793,9 +794,10 @@ def analyse_event(tl, price_rows, season, names=None):
         if sid not in first_seen or rows[0]["ts_utc"] < first_seen[sid]:
             first_seen[sid] = rows[0]["ts_utc"]
 
-    keys = ["seats", "available", "taken", "season", "sold_seen", "pre_taken"]
+    keys = ["seats", "available", "taken", "season", "sold_seen", "pre_taken", "fans"]
     sec = defaultdict(lambda: dict({k: 0 for k in keys}, revenue=0.0, gross=0.0))
-    count_key = {SEASON: "season", SOLD_SEEN: "sold_seen", SOLD_BEFORE: "pre_taken", AVAILABLE: "available"}
+    count_key = {SEASON: "season", SOLD_SEEN: "sold_seen", SOLD_BEFORE: "pre_taken", AVAILABLE: "available",
+                 FAN_HELD: "fans"}
     sale_times = []                   # when each single ticket sold while tracked was seen
     for seat, (sid, cat, p, f, _ts) in classify_seats(tl, prices, season).items():
         if cat == BLOCKED:
@@ -804,6 +806,11 @@ def analyse_event(tl, price_rows, season, names=None):
             # a season-ticket section (107) put on sale: the seats already taken are the
             # season tickets, only seats seen sold later are single tickets
             cat = SEASON
+        elif cat == SOLD_BEFORE and sid in FAN_SECTIONS:
+            # B Tribūna (110-111) put on sale (Jonava, 15 Nov: 3 + 1 seats at 10 EUR): the seats
+            # already taken are the fans' (not sold online, no revenue); only seats seen sold
+            # later are single tickets
+            cat = FAN_HELD
         elif cat == SOLD_BEFORE and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1):
             # section opened after tracking began: seats already taken then were sold
             # (or given out) by then, so they count as sales of that day
@@ -834,7 +841,7 @@ def analyse_event(tl, price_rows, season, names=None):
 
     sections = []
     for sid, x in sec.items():
-        x["singles"] = x["taken"] - x["season"]
+        x["singles"] = x["taken"] - x["season"] - x["fans"]
         later = first_ts and parse_ts(first_seen[sid]) - parse_ts(first_ts) > timedelta(hours=1)
         zs = current_zones(prices, sid)
         open_zs = [z for z in zs if z[3]] or zs
@@ -916,6 +923,8 @@ def analyse_all(ev, with_seats=False):
             for seat, (sid, cat, p, f, ts) in seats.items():
                 if cat == SOLD_BEFORE and sid in SEASON_SECTIONS:
                     seats[seat] = (sid, SEASON, None, None, ts)
+                elif cat == SOLD_BEFORE and sid in FAN_SECTIONS:
+                    seats[seat] = (sid, FAN_HELD, None, None, ts)
             out[eid]["seats"] = seats
         # B Tribūna not on sale for this game: assume full (their whole capacity).
         # 110-111 always; 109 / 112 when on sale in other games but not in this one.
@@ -949,11 +958,12 @@ def analyse_all(ev, with_seats=False):
         for sid, name, c in whole:
             out[eid]["sections"].append(dict(
                 section_id=sid, section=name, seats=c, available=0, taken=c, season=c, sold_seen=0,
-                pre_taken=0, singles=0, revenue=0.0, gross=0.0, price=None, fee=None, price_max=None,
+                pre_taken=0, fans=0, singles=0, revenue=0.0, gross=0.0, price=None, fee=None, price_max=None,
                 zones=[], opened_later=None, status="closed", closed_at=None, history=[], whole=True))
         out[eid]["fan_sections"] = fans
-        out[eid]["totals"]["fans_est"] = sum(n for _s, _n, n in fans)
-        out[eid]["totals"]["expected"] = out[eid]["totals"]["taken"] + out[eid]["totals"]["fans_est"]
+        # B Tribūna = sections not on sale (whole capacity, estimate) + fans' seats in 110-111 when on sale
+        t["fans_est"] = sum(n for _s, _n, n in fans) + t.get("fans", 0)
+        t["expected"] = t["taken"] + sum(n for _s, _n, n in fans)
     return out
 
 
@@ -1425,6 +1435,7 @@ def cmd_export(args):
             "zones": [{"name": z["name"], "price": z["price"], "fee": z["fee"], "open": z["open"],
                        "history": [[h[0], h[1], h[2]] for h in z["history"]]} for z in x["zones"]],
             "seats": x["seats"], "available": x["available"], "season": x["season"], "singles": x["singles"],
+            "fans": x.get("fans", 0),
             "seen": x["sold_seen"], "before": x["pre_taken"], "revenue": r2(x["revenue"]), "gross": r2(x["gross"]),
             "openedLater": x["opened_later"], "status": x["status"], "closedAt": x["closed_at"],
             "history": [[h[0], h[1], h[2], h[3]] for h in x["history"]],

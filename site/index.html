@@ -966,7 +966,7 @@ function renderGames(){
 function sectionValue(s){
   const seats = s.seats || 1;
   if (S.mode === "price") return s._p;
-  return (s.season + s.singles) / seats;
+  return (s.season + s.singles + (s.fans || 0)) / seats;
 }
 
 // colours of the arena map for one game (also used by the share picture)
@@ -1197,6 +1197,7 @@ function sectionPanel(s, g){
     <div class="grid2">
       <div><span class="muted">${t("seats")}</span><b class="num">${nf(s.seats)}</b></div><div><span class="muted">${t("free")}</span><b class="num">${nf(s.available)}</b></div>
       <div><span class="muted">${t("season")}</span><b class="num">${nf(s.season)}</b></div><div><span class="muted">${t("singles")}</span><b class="num">${nf(s.singles)}</b></div>
+      ${s.fans ? `<div><span class="muted">${FAN}</span><b class="num">${nf(s.fans)}</b></div><div></div>` : ""}
       <div><span class="muted">${t("revenue")}</span><b class="num">${eur(s.revenue)}</b></div><div><span class="muted">${t("full")}</span><b class="num">${pct(s.seats - s.available, s.seats).toFixed(0)}%</b></div>
     </div>
   </div>

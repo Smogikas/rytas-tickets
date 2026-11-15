@@ -742,13 +742,25 @@ class Commands(Base):
         self.assertEqual([s[4] for s in seats["72934"]], ["F"] * 10)
         self.assertEqual(rytas.main(["capacity"]), 0)
 
-        # if a fan sector goes on sale, real seat data replaces the estimate
+        # a fan sector put on sale (Jonava, 15 Nov): real seat data replaces the estimate; the seats
+        # already taken are the fans' (B Tribūna, no single tickets, no revenue)
+        before = rytas.analyse_all(rytas.load_events())["PNJMMUNJYB"]["totals"]
         self.site.prices["PNJMMUNJYB"]["eventSections"].append(
             dict(copy.deepcopy(PRICES["eventSections"][0]), id="72934", title="111"))
         self.site.seats["PNJMMUNJYB"]["72934"] = {f"F2-{i}": (0 if i < 4 else 1) for i in range(10)}
         self.snapshot_all()
-        t = rytas.analyse_all(rytas.load_events())["PNJMMUNJYB"]["totals"]
-        self.assertEqual((t["fans_est"], t["taken"]), (8, 22))
+        res = rytas.analyse_all(rytas.load_events(), with_seats=True)["PNJMMUNJYB"]
+        t = res["totals"]
+        self.assertEqual((t["fans_est"], t["taken"], t["expected"]), (8 + 4, 22, 22 + 8))
+        self.assertEqual((t["singles"], t["revenue"]), (before["singles"], before["revenue"]))   # not sold online
+        sec = next(x for x in res["sections"] if x["section_id"] == "72934")
+        self.assertEqual((sec["fans"], sec["available"], sec["singles"]), (4, 6, 0))
+        self.assertEqual(sorted(c for (sid, c, *_r) in res["seats"].values() if sid == "72934"), ["A"] * 6 + ["F"] * 4)
+        # a fan seat bought later is a single ticket
+        self.site.seats["PNJMMUNJYB"]["72934"]["F2-9"] = 0
+        self.snapshot_all(seats=True)
+        sec = next(x for x in rytas.analyse_all(rytas.load_events())["PNJMMUNJYB"]["sections"] if x["section_id"] == "72934")
+        self.assertEqual((sec["fans"], sec["singles"], sec["available"]), (4, 1, 5))
 
     def test_split_name(self):
         self.assertEqual(rytas.split_name("LKL: Vilniaus ''Rytas'' - Kauno ''Žalgiris''"), ("LKL", "Kauno „Žalgiris“"))
