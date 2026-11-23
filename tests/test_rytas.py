@@ -485,6 +485,24 @@ class Zones(unittest.TestCase):
         tls["c"] = tl(("x", 1))
         self.assertEqual(rytas.season_seats(("a", "b", "c"), tls), set())     # free in one game: not season
 
+    def test_season_set_leaves_out_membership_section_and_b_tribuna(self):
+        """107 (counted whole by capacity) and B Tribūna 110-111 (fans) put on sale already
+        taken in 3+ games are not added to the season set (Nanterre, Jonava, Utena: +308)."""
+        fan, mem = next(iter(rytas.FAN_SECTIONS)), next(iter(rytas.SEASON_SECTIONS))
+        def tl():
+            return {s: [{"ts_utc": "T1", "section_id": sid, "seat_id": s, "status": 0}]
+                    for s, sid in (("x", "S"), ("f", fan), ("m", mem))}
+        tls = {"a": tl(), "b": tl(), "c": tl()}
+        self.assertEqual(rytas.season_seats(("a", "b", "c"), tls), {"x"})
+
+    def test_season_headline_is_the_shared_value(self):
+        res = {"bcl": {"season_total": 1980, "season_group_size": 14},
+               "l1": {"season_total": 1672, "season_group_size": 13},
+               "l2": {"season_total": 1672, "season_group_size": 13},
+               "top8": {"season_total": 0, "season_group_size": 0}}
+        self.assertEqual(rytas.season_headline(res), 1672)
+        self.assertEqual(rytas.season_headline({}), 0)
+
 
 class Analysis(Base):
     def test_season_groups(self):

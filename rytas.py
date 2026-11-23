@@ -598,6 +598,14 @@ def season_groups(names):
     return groups
 
 
+def season_headline(res):
+    """The season-ticket total for the page header: the value most games share (all
+    games covered by memberships normally give the same number), not whichever game
+    happens to come first, since a competition compared with all games can differ."""
+    vals = Counter(r["season_total"] for r in res.values() if r.get("season_group_size"))
+    return vals.most_common(1)[0][0] if vals else 0
+
+
 def season_covered(name):
     """Do season memberships cover this game? Not BCL Top 8 (or a league-run final four)."""
     return not ("BCL" in competition(name).upper() and NO_SEASON.search(name))
@@ -612,13 +620,17 @@ def season_seats(group, tls):
 
     A season seat that becomes free later (the holder gives it back) stays a season
     seat, so the set does not shrink during the season; in that game it counts as
-    available, or as a single ticket once resold (classify_seats)."""
+    available, or as a single ticket once resold (classify_seats).
+
+    Seats of the membership section (107: counted whole, by its capacity) and of
+    B Tribūna (110-111: fans) are left out even when they appear on sale already
+    taken in several games, so they are not counted twice or as season tickets."""
     with_data = sum(1 for eid in group if tls.get(eid))
     need = max(2, min(SEASON_MIN_GAMES, with_data))
     seen, ever_free = Counter(), set()
     for eid in group:
         for seat, rows in tls.get(eid, {}).items():
-            if blocked(rows[-1]):
+            if blocked(rows[-1]) or rows[-1]["section_id"] in SEASON_SECTIONS or rows[-1]["section_id"] in FAN_SECTIONS:
                 continue
             seen[seat] += 1
             if rows[0]["status"] == 1:         # free when first seen: not a season seat
@@ -1474,7 +1486,6 @@ def cmd_export(args):
     shapes = defaultdict(list)
     for s in read_csv(SHAPES):
         shapes[s["conf_id"]].append([s["section_id"], s["points"]])
-    any_res = next(iter(res.values()), {})
     # total arena capacity: seats of every section drawn on the arena map (full venue plan)
     arena_cap = {}
     for conf, shp in shapes.items():
@@ -1482,7 +1493,7 @@ def cmd_export(args):
         arena_cap[conf] = sum(cap.get(sid, 0) for sid, _pts in shp)
     # "updated": the last time data was collected (a code push rebuilds the page without collecting)
     checks = [m.get(k) for m in ev["events"].values() for k in ("last_prices_utc", "last_seats_utc", "final_check_utc") if m.get(k)]
-    data = {"updated": max(checks) if checks else now_utc(), "built": now_utc(), "seasonSeats": any_res.get("season_total", 0),
+    data = {"updated": max(checks) if checks else now_utc(), "built": now_utc(), "seasonSeats": season_headline(res),
             "games": games, "sections": sections, "shapes": shapes, "arenaCap": arena_cap,
             "membership": membership_table(ev, res), "popularity": popularity(res, ev, now),
             "warnings": health_warnings(ev, res, now)}
