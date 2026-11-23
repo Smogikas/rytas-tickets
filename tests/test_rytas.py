@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock
+import urllib.error
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -981,6 +982,54 @@ class RealHttp(unittest.TestCase):
             self.assertIsNone(rytas.fetch_section_seats("X", "CLOSED"))
         self.assertEqual(calls[0], ("POST", "/api/v1/login/express"))
         self.assertEqual([c[0] for c in calls].count("POST"), 1)
+
+    def test_server_error_is_tried_again(self):
+        """bilietai.lt answering 500 for a moment: tried up to 3 times; 4xx at once."""
+        import http.server
+        import threading
+
+        fails = {"n": 0, "left": 0}
+
+        class Fake(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _send(self, code, body):
+                data = json.dumps(body).encode()
+                self.send_response(code)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                self._send(200, {})
+
+            def do_GET(self):
+                fails["n"] += 1
+                if "/sections/CLOSED/" in self.path:
+                    return self._send(400, {})
+                if fails["left"] > 0:
+                    fails["left"] -= 1
+                    return self._send(500, {})
+                self._send(200, EVENT)
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Fake)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.shutdown)
+        with unittest.mock.patch.object(rytas, "API", f"http://127.0.0.1:{srv.server_port}/api/v1"), \
+             unittest.mock.patch.object(rytas, "_opener", None), \
+             unittest.mock.patch.object(rytas, "RETRY_WAITS", (0, 0)), \
+             unittest.mock.patch.dict("os.environ", {"no_proxy": "127.0.0.1", "NO_PROXY": "127.0.0.1"}):
+            fails.update(n=0, left=2)
+            self.assertEqual(rytas.fetch_info("X")["eventStartAt"], "2026-11-11T17:30:00Z")
+            self.assertEqual(fails["n"], 3)
+            fails.update(n=0, left=5)
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                rytas.fetch_info("X")
+            self.assertEqual((cm.exception.code, fails["n"]), (500, 3))
+            fails.update(n=0, left=0)
+            self.assertIsNone(rytas.fetch_section_seats("X", "CLOSED"))
+            self.assertEqual(fails["n"], 1)
 
 
 if __name__ == "__main__":

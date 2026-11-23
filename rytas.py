@@ -133,16 +133,33 @@ def opener():
     return _opener
 
 
+RETRY_WAITS = (5, 20)   # seconds before the 2nd and 3rd try
+
+
+def _read(req):
+    """Body of a request. A server error (HTTP 5xx) or a dropped/timed-out
+    connection is tried again twice, since bilietai.lt sometimes answers 500
+    for a moment. Other HTTP errors (403, 404, ...) are raised at once."""
+    for wait in RETRY_WAITS + (None,):
+        try:
+            with opener().open(req, timeout=30) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or wait is None:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if wait is None:
+                raise
+        time.sleep(wait)
+
+
 def get_json(url):
-    req = urllib.request.Request(url, headers=HEADERS)
-    with opener().open(req, timeout=30) as r:
-        return json.load(r)
+    return json.loads(_read(urllib.request.Request(url, headers=HEADERS)))
 
 
 def get_text(url):
     req = urllib.request.Request(url, headers=dict(HEADERS, Accept="*/*"))
-    with opener().open(req, timeout=30) as r:
-        return r.read().decode("utf-8", "replace")
+    return _read(req).decode("utf-8", "replace")
 
 
 def fetch_shapes(conf_id):
